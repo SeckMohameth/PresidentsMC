@@ -13,10 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, LogOut, ShieldCheck, UserPlus } from 'lucide-react-native';
 import { doc, getDoc } from 'firebase/firestore';
 import Colors from '@/constants/colors';
-import { Art } from '@/constants/art';
 import { CLUB_ID, CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
+
+const WAITING_ROOM_IMAGE = require('../assets/images/waiting-room.jpg');
 
 export default function CrewSelectionScreen() {
   const { user, signOut, requestJoin, cancelJoinRequest } = useAuth();
@@ -76,7 +77,7 @@ export default function CrewSelectionScreen() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground source={{ uri: Art.rider }} style={styles.background} resizeMode="cover">
+      <ImageBackground source={WAITING_ROOM_IMAGE} style={styles.background} resizeMode="cover">
         <LinearGradient
           colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)', Colors.dark.background]}
           style={styles.backgroundOverlay}
