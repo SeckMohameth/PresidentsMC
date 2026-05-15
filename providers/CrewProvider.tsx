@@ -30,6 +30,11 @@ import {
 } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 
+export type InviteCodeSettings = {
+  inviteCode: string;
+  expiresAt: string | null;
+};
+
 function normalizeDate(value: any) {
   if (!value) return new Date().toISOString();
   if (typeof value === 'string') return value;
@@ -551,6 +556,36 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     }
   }, [crewId, currentUser]);
 
+  const getInviteSettings = useCallback(async (): Promise<InviteCodeSettings> => {
+    if (!crewId || !currentUser) throw new Error('No crew');
+    assertAdmin();
+    const callable = httpsCallable(functions, 'getCrewInviteCode');
+    const result = await callable();
+    const data = result.data as { inviteCode?: string; expiresAt?: string | null };
+    return {
+      inviteCode: data.inviteCode || '',
+      expiresAt: data.expiresAt ?? null,
+    };
+  }, [crewId, currentUser, assertAdmin]);
+
+  const updateInviteSettings = useCallback(async ({
+    inviteCode,
+    expiresAt,
+  }: {
+    inviteCode?: string;
+    expiresAt?: string | null;
+  }): Promise<InviteCodeSettings> => {
+    if (!crewId) throw new Error('No crew');
+    assertAdmin();
+    const callable = httpsCallable(functions, 'setCrewInviteCode');
+    const result = await callable({ inviteCode, expiresAt: expiresAt ?? null });
+    const data = result.data as { inviteCode?: string; expiresAt?: string | null };
+    return {
+      inviteCode: data.inviteCode || '',
+      expiresAt: data.expiresAt ?? null,
+    };
+  }, [crewId, assertAdmin]);
+
   const removeMember = useCallback(async (memberId: string) => {
     if (!crewId) throw new Error('No crew');
     assertAdmin();
@@ -798,6 +833,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     checkIn,
     leaveCrew,
     getInviteCode,
+    getInviteSettings,
+    updateInviteSettings,
     addPhoto,
     removeMember,
     setMemberRole,

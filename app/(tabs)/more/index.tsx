@@ -179,7 +179,7 @@ export default function MoreScreen() {
 
   useEffect(() => {
     let isActive = true;
-    if (!crew?.id) {
+    if (!crew?.id || !isAdmin) {
       setCrewInviteCode('');
       setIsInviteCodeLoading(false);
       return;
@@ -206,7 +206,7 @@ export default function MoreScreen() {
     return () => {
       isActive = false;
     };
-  }, [crew?.id, getInviteCode]);
+  }, [crew?.id, getInviteCode, isAdmin]);
 
   const openEditProfile = () => {
     setEditName(currentUser?.name || '');
@@ -494,24 +494,26 @@ export default function MoreScreen() {
           </View>
         )}
 
-        <View style={styles.inviteCard}>
-          <View style={styles.inviteHeader}>
-            <Text style={styles.inviteTitle}>Invite Code</Text>
-            <Pressable style={styles.shareButton} onPress={handleShareInvite}>
-              <Share2 size={16} color={Colors.dark.primary} />
-              <Text style={styles.shareButtonText}>Share</Text>
-            </Pressable>
+        {isAdmin && (
+          <View style={styles.inviteCard}>
+            <View style={styles.inviteHeader}>
+              <Text style={styles.inviteTitle}>Invite Code</Text>
+              <Pressable style={styles.shareButton} onPress={handleShareInvite}>
+                <Share2 size={16} color={Colors.dark.primary} />
+                <Text style={styles.shareButtonText}>Share</Text>
+              </Pressable>
+            </View>
+            <View style={styles.inviteCodeRow}>
+              <Text style={styles.inviteCode}>
+                {crewInviteCode || (isInviteCodeLoading ? 'Loading...' : 'Unavailable')}
+              </Text>
+              <Pressable style={styles.copyButton} onPress={handleCopyInviteCode}>
+                <Copy size={18} color={Colors.dark.text} />
+              </Pressable>
+            </View>
+            <Text style={styles.inviteHint}>Share this code to invite new members</Text>
           </View>
-          <View style={styles.inviteCodeRow}>
-            <Text style={styles.inviteCode}>
-              {crewInviteCode || (isInviteCodeLoading ? 'Loading...' : 'Unavailable')}
-            </Text>
-            <Pressable style={styles.copyButton} onPress={handleCopyInviteCode}>
-              <Copy size={18} color={Colors.dark.text} />
-            </Pressable>
-          </View>
-          <Text style={styles.inviteHint}>Share this code to invite new members</Text>
-        </View>
+        )}
 
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Club</Text>

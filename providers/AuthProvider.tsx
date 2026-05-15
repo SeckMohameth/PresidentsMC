@@ -120,12 +120,14 @@ async function ensureSingleClubOwner(profile: {
 
     await setDoc(doc(db, 'crews', CLUB_ID, 'private', 'settings'), {
       inviteCode,
+      expiresAt: null,
       updatedAt: now,
     });
 
     await setDoc(doc(db, 'crewInviteCodes', inviteCode), {
       code: inviteCode,
       crewId: CLUB_ID,
+      expiresAt: null,
       createdBy: profile.id,
       createdAt: now,
     });
@@ -538,12 +540,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
       await setDoc(doc(db, 'crews', crewId, 'private', 'settings'), {
         inviteCode,
+        expiresAt: null,
         updatedAt: new Date().toISOString(),
       });
 
       await setDoc(doc(db, 'crewInviteCodes', inviteCode), {
         code: inviteCode,
         crewId,
+        expiresAt: null,
         createdBy: profile.id,
         createdAt: new Date().toISOString(),
       });

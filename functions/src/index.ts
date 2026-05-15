@@ -396,26 +396,39 @@ async function generateUniqueInviteCode() {
 
 async function persistCrewInviteCode(
   crewRef: FirebaseFirestore.DocumentReference,
-  inviteCode: string
+  inviteCode: string,
+  expiresAt: string | null = null
 ) {
   const normalizedCode = inviteCode.toUpperCase();
   const now = new Date().toISOString();
-  await Promise.all([
-    crewRef.collection('private').doc('settings').set(
-      {
-        inviteCode: normalizedCode,
-        updatedAt: now,
-      },
-      { merge: true }
-    ),
+  const previousSettingsSnap = await crewRef.collection('private').doc('settings').get();
+  const previousInviteCode = String(previousSettingsSnap.data()?.inviteCode ?? '').trim().toUpperCase();
+  const lookupWrites: Promise<unknown>[] = [
     adminDb.collection('crewInviteCodes').doc(normalizedCode).set(
       {
         code: normalizedCode,
         crewId: crewRef.id,
+        expiresAt,
         updatedAt: now,
       },
       { merge: true }
     ),
+  ];
+
+  if (previousInviteCode && previousInviteCode !== normalizedCode) {
+    lookupWrites.push(adminDb.collection('crewInviteCodes').doc(previousInviteCode).delete());
+  }
+
+  await Promise.all([
+    crewRef.collection('private').doc('settings').set(
+      {
+        inviteCode: normalizedCode,
+        expiresAt,
+        updatedAt: now,
+      },
+      { merge: true }
+    ),
+    ...lookupWrites,
     crewRef.set(
       {
         inviteCode: FieldValue.delete(),
@@ -433,13 +446,46 @@ async function getOrCreateCrewInviteCode(
   const privateSettingsSnap = await crewRef.collection('private').doc('settings').get();
   const privateInviteCode = String(privateSettingsSnap.data()?.inviteCode ?? '').trim().toUpperCase();
   if (privateInviteCode) {
-    return privateInviteCode;
+    return {
+      inviteCode: privateInviteCode,
+      expiresAt: (privateSettingsSnap.data()?.expiresAt as string | null | undefined) ?? null,
+    };
   }
 
   const crewData = crew ?? ((await crewRef.get()).data() as CrewDoc | undefined);
   const legacyInviteCode = String(crewData?.inviteCode ?? '').trim().toUpperCase();
   const inviteCode = legacyInviteCode || (await generateUniqueInviteCode());
-  return persistCrewInviteCode(crewRef, inviteCode);
+  const persistedInviteCode = await persistCrewInviteCode(crewRef, inviteCode);
+  return { inviteCode: persistedInviteCode, expiresAt: null };
+}
+
+function normalizeRequestedInviteCode(value: unknown) {
+  const code = String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4 || code.length > 16) {
+    throw new HttpsError('invalid-argument', 'INVITE_CODE_LENGTH');
+  }
+  return code;
+}
+
+function normalizeInviteExpiration(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpsError('invalid-argument', 'INVALID_INVITE_EXPIRATION');
+  }
+  if (date.getTime() <= Date.now()) {
+    throw new HttpsError('invalid-argument', 'INVITE_EXPIRATION_IN_PAST');
+  }
+  return date.toISOString();
+}
+
+function isInviteExpired(expiresAt?: string | null) {
+  if (!expiresAt) return false;
+  const expiresAtMs = new Date(expiresAt).getTime();
+  return Number.isNaN(expiresAtMs) || expiresAtMs <= Date.now();
 }
 
 async function refreshCrewAggregates(crewId: string) {
@@ -884,7 +930,10 @@ export const joinCrewByInvite = onCall(async (request) => {
 
   let crewDoc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot | null = null;
   if (inviteLookupSnap.exists) {
-    const lookupData = inviteLookupSnap.data() as { crewId?: string };
+    const lookupData = inviteLookupSnap.data() as { crewId?: string; expiresAt?: string | null };
+    if (isInviteExpired(lookupData.expiresAt)) {
+      throw new HttpsError('failed-precondition', 'INVITE_CODE_EXPIRED');
+    }
     if (lookupData.crewId) {
       const candidate = await adminDb.collection('crews').doc(lookupData.crewId).get();
       if (candidate.exists) {
@@ -909,6 +958,15 @@ export const joinCrewByInvite = onCall(async (request) => {
   }
 
   const crew = crewDoc.data() as CrewDoc;
+  const settingsSnap = await crewDoc.ref.collection('private').doc('settings').get();
+  const settingsData = settingsSnap.data() as { inviteCode?: string; expiresAt?: string | null } | undefined;
+  if (
+    String(settingsData?.inviteCode ?? '').trim().toUpperCase() === inviteCode &&
+    isInviteExpired(settingsData?.expiresAt)
+  ) {
+    throw new HttpsError('failed-precondition', 'INVITE_CODE_EXPIRED');
+  }
+
   if (crew.status === 'archived') {
     throw new HttpsError('failed-precondition', 'CREW_ARCHIVED');
   }
@@ -990,8 +1048,35 @@ export const getCrewInviteCode = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  const inviteCode = await getOrCreateCrewInviteCode(context.crewRef, context.crew);
-  return { inviteCode };
+  requireAdmin(context.member, context.crew);
+  return getOrCreateCrewInviteCode(context.crewRef, context.crew);
+});
+
+export const setCrewInviteCode = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const context = await getActingMemberContext(userId);
+  requireAdmin(context.member, context.crew);
+
+  const requestedCode = request.data?.inviteCode;
+  const inviteCode = requestedCode
+    ? normalizeRequestedInviteCode(requestedCode)
+    : await generateUniqueInviteCode();
+  const expiresAt = normalizeInviteExpiration(request.data?.expiresAt);
+
+  const existingSnap = await adminDb.collection('crewInviteCodes').doc(inviteCode).get();
+  if (existingSnap.exists) {
+    const existing = existingSnap.data() as { crewId?: string };
+    if (existing.crewId && existing.crewId !== context.crewRef.id) {
+      throw new HttpsError('already-exists', 'INVITE_CODE_TAKEN');
+    }
+  }
+
+  const persistedInviteCode = await persistCrewInviteCode(context.crewRef, inviteCode, expiresAt);
+  return { inviteCode: persistedInviteCode, expiresAt };
 });
 
 export const leaveCrew = onCall(async (request) => {

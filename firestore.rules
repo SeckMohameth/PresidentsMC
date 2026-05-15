@@ -177,16 +177,19 @@ service cloud.firestore {
         allow create: if isPresidentsClub(crewId)
           && docId == 'settings'
           && crewDoc(crewId).data.ownerId == request.auth.uid
-          && request.resource.data.keys().hasOnly(['inviteCode', 'updatedAt'])
-          && request.resource.data.inviteCode is string;
+          && request.resource.data.keys().hasOnly(['inviteCode', 'expiresAt', 'updatedAt'])
+          && request.resource.data.inviteCode is string
+          && (request.resource.data.expiresAt == null || request.resource.data.expiresAt is string);
         allow update: if isPresidentsClub(crewId)
           && docId == 'settings'
           && (isCrewOwner(crewId) || isDeveloperSupport(crewId))
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'inviteCode',
+            'expiresAt',
             'updatedAt'
           ])
-          && request.resource.data.inviteCode is string;
+          && request.resource.data.inviteCode is string
+          && (request.resource.data.expiresAt == null || request.resource.data.expiresAt is string);
         allow delete: if false;
       }
 
@@ -246,6 +249,7 @@ service cloud.firestore {
         && request.resource.data.code == inviteCode
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.crewId == 'presidents-mc'
+        && (request.resource.data.expiresAt == null || request.resource.data.expiresAt is string)
         && exists(crewPath('presidents-mc'))
         && get(crewPath('presidents-mc')).data.ownerId == request.auth.uid;
     }

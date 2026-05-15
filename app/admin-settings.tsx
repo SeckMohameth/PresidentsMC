@@ -13,10 +13,36 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { Camera, Shield, Star, UserMinus, UserPlus } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
+import { Camera, Copy, RefreshCcw, Shield, Star, UserMinus, UserPlus } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { CrewMember, JoinRequest } from '@/types';
+
+const INVITE_EXPIRATION_OPTIONS = [
+  { label: 'Never', value: 'never' },
+  { label: '24h', value: '24h' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+] as const;
+
+type InviteExpirationOption = (typeof INVITE_EXPIRATION_OPTIONS)[number]['value'];
+
+function expiresAtForOption(option: InviteExpirationOption) {
+  if (option === 'never') return null;
+  const hours = option === '24h' ? 24 : option === '7d' ? 24 * 7 : 24 * 30;
+  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+}
+
+function getInviteExpirationLabel(expiresAt: string | null) {
+  if (!expiresAt) return 'Never expires';
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return 'Expiration unavailable';
+  return `Expires ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })} at ${date.toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`;
+}
 
 export default function AdminSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -30,6 +56,8 @@ export default function AdminSettingsScreen() {
     removeMember,
     setMemberRole,
     updateCrewSettings,
+    getInviteSettings,
+    updateInviteSettings,
     isAdmin,
     isOwner,
     isSubscriptionActive,
@@ -41,6 +69,12 @@ export default function AdminSettingsScreen() {
   const [isDiscoverable, setIsDiscoverable] = useState(crew?.isDiscoverable ?? true);
   const [requiresApproval, setRequiresApproval] = useState(crew?.requiresApproval ?? true);
   const [isSaving, setIsSaving] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null);
+  const [inviteExpirationOption, setInviteExpirationOption] =
+    useState<InviteExpirationOption>('never');
+  const [isInviteLoading, setIsInviteLoading] = useState(false);
+  const [isInviteSaving, setIsInviteSaving] = useState(false);
 
   useEffect(() => {
     if (!crew) return;
@@ -55,6 +89,33 @@ export default function AdminSettingsScreen() {
     () => joinRequests.filter((request) => request.status === 'pending'),
     [joinRequests]
   );
+
+  useEffect(() => {
+    let isActive = true;
+    if (!isAdmin) return;
+
+    setIsInviteLoading(true);
+    getInviteSettings()
+      .then((settings) => {
+        if (!isActive) return;
+        setInviteCode(settings.inviteCode);
+        setInviteExpiresAt(settings.expiresAt);
+        setInviteExpirationOption('never');
+      })
+      .catch((error) => {
+        if (__DEV__) {
+          console.log('[AdminSettings] Invite settings load error:', error);
+        }
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setIsInviteLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [getInviteSettings, isAdmin]);
 
   const pickLogo = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -139,6 +200,36 @@ export default function AdminSettingsScreen() {
           : 'Unable to update this member role.';
       Alert.alert('Error', message);
     }
+  };
+
+  const saveInviteSettings = async ({ rotate }: { rotate: boolean }) => {
+    setIsInviteSaving(true);
+    try {
+      const expiresAt = expiresAtForOption(inviteExpirationOption);
+      const settings = await updateInviteSettings({
+        inviteCode: rotate ? undefined : inviteCode,
+        expiresAt,
+      });
+      setInviteCode(settings.inviteCode);
+      setInviteExpiresAt(settings.expiresAt);
+      Alert.alert('Invite Updated', rotate ? 'A new invite code is ready.' : 'Invite settings saved.');
+    } catch (error: any) {
+      const message =
+        error?.message === 'INVITE_CODE_TAKEN'
+          ? 'That invite code is already taken.'
+          : error?.message === 'INVITE_CODE_LENGTH'
+            ? 'Invite codes must be 4 to 16 letters or numbers.'
+            : 'Unable to update invite settings right now.';
+      Alert.alert('Error', message);
+    } finally {
+      setIsInviteSaving(false);
+    }
+  };
+
+  const copyInviteCode = async () => {
+    if (!inviteCode) return;
+    await Clipboard.setStringAsync(inviteCode);
+    Alert.alert('Copied', 'Invite code copied.');
   };
 
   return (
@@ -249,6 +340,75 @@ export default function AdminSettingsScreen() {
           </View>
         )}
 
+        {isAdmin && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Invite Code</Text>
+            <Text style={styles.helperText}>
+              Members can join with this code. Rotate it anytime or set it to expire.
+            </Text>
+
+            <View style={styles.inviteCodeBox}>
+              <TextInput
+                style={styles.inviteInput}
+                value={isInviteLoading ? 'Loading...' : inviteCode}
+                onChangeText={(value) => setInviteCode(value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                editable={!isInviteLoading && !isInviteSaving}
+                autoCapitalize="characters"
+                placeholder="INVITE"
+                placeholderTextColor={Colors.dark.textTertiary}
+                maxLength={16}
+              />
+              <Pressable style={styles.iconButton} onPress={copyInviteCode} disabled={!inviteCode}>
+                <Copy size={16} color={Colors.dark.text} />
+              </Pressable>
+            </View>
+            <Text style={styles.inviteExpiryText}>{getInviteExpirationLabel(inviteExpiresAt)}</Text>
+
+            <View style={styles.expirationOptions}>
+              {INVITE_EXPIRATION_OPTIONS.map((option) => {
+                const selected = inviteExpirationOption === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    style={[styles.expirationChip, selected && styles.expirationChipSelected]}
+                    onPress={() => setInviteExpirationOption(option.value)}
+                    disabled={isInviteSaving}
+                  >
+                    <Text
+                      style={[
+                        styles.expirationChipText,
+                        selected && styles.expirationChipTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.inviteActions}>
+              <Pressable
+                style={[styles.secondaryActionButton, isInviteSaving && styles.disabledAction]}
+                onPress={() => saveInviteSettings({ rotate: true })}
+                disabled={isInviteSaving}
+              >
+                <RefreshCcw size={16} color={Colors.dark.text} />
+                <Text style={styles.secondaryActionText}>Rotate</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.saveButton, styles.inviteSaveButton, isInviteSaving && styles.disabledAction]}
+                onPress={() => saveInviteSettings({ rotate: false })}
+                disabled={isInviteSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isInviteSaving ? 'Saving...' : 'Save Invite'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Members</Text>
           {members.map((member) => (
@@ -339,6 +499,11 @@ const styles = StyleSheet.create({
   emptyText: {
     color: Colors.dark.textTertiary,
     fontSize: 14,
+  },
+  helperText: {
+    color: Colors.dark.textTertiary,
+    fontSize: 13,
+    lineHeight: 18,
   },
   requestRow: {
     flexDirection: 'row',
@@ -445,6 +610,81 @@ const styles = StyleSheet.create({
   inputMultiline: {
     minHeight: 96,
     textAlignVertical: 'top',
+  },
+  inviteCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  inviteInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    borderRadius: 12,
+    backgroundColor: Colors.dark.surfaceElevated,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: Colors.dark.text,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  inviteExpiryText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+  },
+  expirationOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  expirationChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    backgroundColor: Colors.dark.surfaceElevated,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  expirationChipSelected: {
+    borderColor: Colors.dark.primary,
+    backgroundColor: 'rgba(229,229,229,0.12)',
+  },
+  expirationChipText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  expirationChipTextSelected: {
+    color: Colors.dark.text,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  secondaryActionButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.dark.borderLight,
+    backgroundColor: Colors.dark.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryActionText: {
+    color: Colors.dark.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  inviteSaveButton: {
+    flex: 1,
+    minHeight: 48,
+  },
+  disabledAction: {
+    opacity: 0.6,
   },
   switchRow: {
     flexDirection: 'row',
