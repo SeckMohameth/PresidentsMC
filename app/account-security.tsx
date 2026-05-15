@@ -266,6 +266,9 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',

@@ -1,10 +1,15 @@
 import { Tabs } from "expo-router";
 import { Home, Route, Images, BarChart3, Menu } from "lucide-react-native";
 import React from "react";
-import { Platform, View, StyleSheet } from "react-native";
+import { Platform, View, StyleSheet, useWindowDimensions } from "react-native";
 import Colors from "@/constants/colors";
 
 export default function TabLayout() {
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const tabBarWidth = isTablet ? Math.min(width - 48, 640) : undefined;
+  const tabBarSide = isTablet && tabBarWidth ? (width - tabBarWidth) / 2 : 14;
+
   return (
     <Tabs
       screenOptions={{
@@ -12,8 +17,8 @@ export default function TabLayout() {
         tabBarInactiveTintColor: Colors.dark.tabIconDefault,
         tabBarStyle: {
           position: 'absolute',
-          left: 14,
-          right: 14,
+          left: tabBarSide,
+          right: tabBarSide,
           bottom: Platform.OS === 'ios' ? 18 : 12,
           backgroundColor: 'rgba(12,12,13,0.92)',
           borderTopColor: Colors.dark.borderLight,

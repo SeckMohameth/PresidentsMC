@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "app.mostudios.presidentsmc",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow PresidentsMC to access your photos to upload ride photos and update your profile picture.",

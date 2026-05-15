@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, Dimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, Modal, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,16 +10,20 @@ import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
 import { RidePhoto } from '@/types';
 
-const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - 32 - 8) / 3;
-
 export default function AlbumScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const router = useRouter();
   const { addPhoto } = useCrew();
   const { ride } = useRide(id || '');
   const [selectedPhoto, setSelectedPhoto] = useState<RidePhoto | null>(null);
+  const isTablet = width >= 768;
+  const columnCount = isTablet ? 5 : 3;
+  const gridWidth = Math.min(width, 980);
+  const gridPadding = isTablet ? 24 : 16;
+  const gridGap = isTablet ? 8 : 4;
+  const photoSize = (gridWidth - gridPadding * 2 - gridGap * (columnCount - 1)) / columnCount;
 
   if (!ride) {
     return (
@@ -46,8 +50,10 @@ export default function AlbumScreen() {
       style={[
         styles.photoItem, 
         { 
-          marginRight: (index + 1) % 3 === 0 ? 0 : 4,
-          marginBottom: 4,
+          width: photoSize,
+          height: photoSize,
+          marginRight: (index + 1) % columnCount === 0 ? 0 : gridGap,
+          marginBottom: gridGap,
         }
       ]}
       onPress={() => setSelectedPhoto(item)}
@@ -94,8 +100,16 @@ export default function AlbumScreen() {
           data={ride.photos}
           renderItem={renderPhoto}
           keyExtractor={item => item.id}
-          numColumns={3}
-          contentContainerStyle={styles.gridContent}
+          key={columnCount}
+          numColumns={columnCount}
+          contentContainerStyle={[
+            styles.gridContent,
+            {
+              width: gridWidth,
+              padding: gridPadding,
+            },
+          ]}
+          style={styles.gridList}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -182,14 +196,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   gridContent: {
-    padding: 16,
+    alignSelf: 'center',
   },
   photoItem: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: Colors.dark.surface,
+  },
+  gridList: {
+    width: '100%',
   },
   photoImage: {
     width: '100%',

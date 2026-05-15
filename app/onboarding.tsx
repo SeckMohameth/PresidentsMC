@@ -133,6 +133,9 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 26,
     paddingBottom: 18,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   copyBlock: {
     marginBottom: 34,

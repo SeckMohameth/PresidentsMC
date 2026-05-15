@@ -172,6 +172,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     justifyContent: 'flex-end',
     paddingBottom: 34,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   header: {
     alignItems: 'center',

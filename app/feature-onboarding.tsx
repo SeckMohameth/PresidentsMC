@@ -197,6 +197,9 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 22,
     paddingTop: 6,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   clubMark: {
     width: 40,
@@ -224,8 +227,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: 22,
     paddingBottom: 18,
+    alignItems: 'center',
   },
   featurePanel: {
+    width: '100%',
+    maxWidth: 560,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.dark.borderLight,
@@ -297,6 +303,9 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: 22,
     paddingBottom: 16,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   dots: {
     flexDirection: 'row',

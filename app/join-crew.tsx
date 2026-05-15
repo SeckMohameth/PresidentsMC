@@ -371,6 +371,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     padding: 24,
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
   },
   section: {
     marginBottom: 24,
