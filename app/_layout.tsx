@@ -198,7 +198,7 @@ export default function RootLayout() {
           <AnalyticsProvider>
             <CrewProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
-                <StatusBar style="light" />
+                <StatusBar style="auto" />
                 <PushNotificationManager />
                 <AuthGate>
                   <RootLayoutNav />
