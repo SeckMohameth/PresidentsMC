@@ -101,6 +101,13 @@ cp .env.example .env
 ```
 
 4. Create a Firebase project and add your web app config to `.env`.
+   If your Firestore database ID is `default`, set:
+
+```bash
+EXPO_PUBLIC_FIRESTORE_DATABASE_ID=default
+```
+
+   If your project uses Firebase's implicit `(default)` database, you can omit that variable.
 5. Enable Firebase Auth email/password sign-in.
 6. Create Firestore, Storage, and Functions.
 7. Set your first owner email:
