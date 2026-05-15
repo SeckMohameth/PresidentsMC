@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const memoryStorage = new Map<string, string>();
+const failedStorageKeys = new Set<string>();
 
 function logStorageWarning(operation: string, key: string, error: unknown) {
-  if (__DEV__) {
-    console.log(`[AsyncStorage] ${operation} failed for ${key}:`, error);
+  const warningKey = `${operation}:${key}`;
+  if (__DEV__ && !failedStorageKeys.has(warningKey)) {
+    failedStorageKeys.add(warningKey);
+    console.log(`[AsyncStorage] ${operation} failed for ${key}. Using in-memory fallback for this session.`, error);
   }
 }
 

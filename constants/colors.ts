@@ -1,12 +1,6 @@
-import { DynamicColorIOS, Platform, PlatformColor } from 'react-native';
-
-function adaptive(light: string, dark: string, androidAttr?: string): string {
-  if (Platform.OS === 'ios') {
-    return DynamicColorIOS({ light, dark }) as unknown as string;
-  }
-  if (Platform.OS === 'android' && androidAttr) {
-    return PlatformColor(androidAttr) as unknown as string;
-  }
+function adaptive(_light: string, dark: string, _androidAttr?: string): string {
+  // Keep exported colors as plain strings. Reanimated and Expo LinearGradient
+  // cannot safely consume iOS DynamicColorIOS/Android PlatformColor objects.
   return dark;
 }
 
