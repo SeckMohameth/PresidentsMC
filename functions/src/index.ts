@@ -31,13 +31,6 @@ const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 type UserRole = 'admin' | 'officer' | 'member';
 type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'trialing';
 
-type UnsplashPhoto = {
-  id: string;
-  urls: { small: string; regular: string };
-  user: { name: string; username: string; links?: { html?: string } };
-  links: { html?: string };
-};
-
 type CrewDoc = {
   id: string;
   name?: string;
@@ -798,45 +791,6 @@ function normalizeAnalyticsEvent(input: AnalyticsEventInput, fallbackUserId: str
     properties: input.properties ?? {},
   };
 }
-
-export const unsplashSearch = onCall(async (request) => {
-  const unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
-  if (!unsplashAccessKey) {
-    throw new HttpsError('failed-precondition', 'UNSPLASH_NOT_CONFIGURED');
-  }
-
-  const query = String(request.data?.query ?? '').trim();
-  if (query.length < 2) {
-    throw new HttpsError('invalid-argument', 'Query must be at least 2 characters.');
-  }
-
-  const perPageRaw = Number(request.data?.perPage ?? 30);
-  const perPage = Number.isFinite(perPageRaw) ? Math.min(perPageRaw, 30) : 30;
-
-  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-    query
-  )}&per_page=${perPage}&client_id=${unsplashAccessKey}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new HttpsError('internal', 'Unsplash request failed.');
-  }
-
-  const data = (await res.json()) as { results?: UnsplashPhoto[] };
-
-  return {
-    results: (data.results ?? []).map((photo) => ({
-      id: photo.id,
-      urls: photo.urls,
-      user: {
-        name: photo.user.name,
-        username: photo.user.username,
-        links: { html: photo.user.links?.html },
-      },
-      links: { html: photo.links?.html },
-    })),
-  };
-});
 
 export const recordAnalyticsEvents = onCall(async (request) => {
   const rawEvents = Array.isArray(request.data?.events)

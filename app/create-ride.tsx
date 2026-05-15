@@ -9,7 +9,6 @@ import { X, MapPin, Calendar, Clock, Gauge, FileText, ImagePlus, Image as ImageI
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
-import UnsplashPicker, { UnsplashSelection } from '@/components/UnsplashPicker';
 import AddressAutocomplete, { AddressSelection } from '@/components/AddressAutocomplete';
 import { ImageAttribution } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
@@ -44,7 +43,6 @@ export default function CreateRideScreen() {
   const [notes, setNotes] = useState('');
   const [coverImage, setCoverImage] = useState<string>('');
   const [coverAttribution, setCoverAttribution] = useState<ImageAttribution | undefined>();
-  const [showUnsplash, setShowUnsplash] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const { width } = useWindowDimensions();
@@ -113,12 +111,6 @@ export default function CreateRideScreen() {
       setCoverImage(result.assets[0].uri);
       setCoverAttribution(undefined);
     }
-  };
-
-  const handleUnsplashSelect = (selection: UnsplashSelection) => {
-    setCoverImage(selection.url);
-    setCoverAttribution(selection.attribution);
-    setShowUnsplash(false);
   };
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -372,10 +364,6 @@ export default function CreateRideScreen() {
                 <ImagePlus size={18} color={Colors.dark.text} />
                 <Text style={styles.coverButtonText}>Photos</Text>
               </Pressable>
-              <Pressable style={styles.coverButton} onPress={() => setShowUnsplash(true)}>
-                <ImageIcon size={18} color={Colors.dark.text} />
-                <Text style={styles.coverButtonText}>Unsplash</Text>
-              </Pressable>
             </View>
           </View>
 
@@ -577,13 +565,6 @@ export default function CreateRideScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <UnsplashPicker
-        visible={showUnsplash}
-        onClose={() => setShowUnsplash(false)}
-        onSelect={handleUnsplashSelect}
-        title="Choose a Cover"
-      />
     </View>
   );
 }

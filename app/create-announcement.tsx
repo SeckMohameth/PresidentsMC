@@ -8,7 +8,6 @@ import { X, Pin, ImagePlus, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
-import UnsplashPicker, { UnsplashSelection } from '@/components/UnsplashPicker';
 import { ImageAttribution } from '@/types';
 
 export default function CreateAnnouncementScreen() {
@@ -27,7 +26,6 @@ export default function CreateAnnouncementScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageAttribution, setImageAttribution] = useState<ImageAttribution | undefined>();
-  const [showUnsplash, setShowUnsplash] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
@@ -74,12 +72,6 @@ export default function CreateAnnouncementScreen() {
     }
   };
 
-  const handleUnsplashSelect = (selection: UnsplashSelection) => {
-    setImageUri(selection.url);
-    setImageAttribution(selection.attribution);
-    setShowUnsplash(false);
-  };
-
   const removeImage = () => {
     setImageUri(null);
     setImageAttribution(undefined);
@@ -117,6 +109,12 @@ export default function CreateAnnouncementScreen() {
           imageAttribution: imageUri ? imageAttribution : null,
         });
         router.back();
+      } catch (error: any) {
+        const message =
+          error?.message === 'SUBSCRIPTION_INACTIVE'
+            ? 'Subscription inactive. Renew to update announcements.'
+            : 'Unable to save this announcement right now.';
+        Alert.alert('Error', message);
       } finally {
         setIsSaving(false);
       }
@@ -129,21 +127,31 @@ export default function CreateAnnouncementScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    createAnnouncement({
-      crewId: crew?.id || '',
-      authorId: currentUser?.id || '',
-      authorName: currentUser?.name || '',
-      authorAvatar: currentUser?.avatar || '',
-      authorRole: currentUser?.role || 'member',
-      title: title.trim(),
-      content: content.trim(),
-      link: normalizeLink(link),
-      isPinned,
-      imageUrl: imageUri || undefined,
-      imageAttribution: imageAttribution,
-    });
+    try {
+      await createAnnouncement({
+        crewId: crew?.id || '',
+        authorId: currentUser?.id || '',
+        authorName: currentUser?.name || '',
+        authorAvatar: currentUser?.avatar || '',
+        authorRole: currentUser?.role || 'member',
+        title: title.trim(),
+        content: content.trim(),
+        link: normalizeLink(link),
+        isPinned,
+        imageUrl: imageUri || undefined,
+        imageAttribution,
+      });
 
-    router.back();
+      router.back();
+    } catch (error: any) {
+      const message =
+        error?.message === 'SUBSCRIPTION_INACTIVE'
+          ? 'Subscription inactive. Renew to post announcements.'
+          : 'Unable to post this announcement right now.';
+      Alert.alert('Error', message);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleDelete = () => {
@@ -258,16 +266,10 @@ export default function CreateAnnouncementScreen() {
                 </Pressable>
               </View>
             ) : (
-              <View style={styles.imagePickerGroup}>
-                <Pressable style={styles.imagePickerButton} onPress={pickImage}>
-                  <ImagePlus size={24} color={Colors.dark.textTertiary} />
-                  <Text style={styles.imagePickerText}>Add from Photos</Text>
-                </Pressable>
-                <Pressable style={styles.imagePickerButton} onPress={() => setShowUnsplash(true)}>
-                  <ImagePlus size={24} color={Colors.dark.textTertiary} />
-                  <Text style={styles.imagePickerText}>Choose from Unsplash</Text>
-                </Pressable>
-              </View>
+              <Pressable style={styles.imagePickerButton} onPress={pickImage}>
+                <ImagePlus size={24} color={Colors.dark.textTertiary} />
+                <Text style={styles.imagePickerText}>Add from Photos</Text>
+              </Pressable>
             )}
           </View>
 
@@ -296,13 +298,6 @@ export default function CreateAnnouncementScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <UnsplashPicker
-        visible={showUnsplash}
-        onClose={() => setShowUnsplash(false)}
-        onSelect={handleUnsplashSelect}
-        title="Choose an Image"
-      />
     </View>
   );
 }

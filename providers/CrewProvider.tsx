@@ -52,7 +52,9 @@ async function uploadImageIfNeeded(uri: string, path: string) {
   const response = await fetch(uri);
   const blob = await response.blob();
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob);
+  const contentType =
+    blob.type || (path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+  await uploadBytes(storageRef, blob, { contentType });
   return getDownloadURL(storageRef);
 }
 
