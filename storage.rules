@@ -15,17 +15,17 @@ service firebase.storage {
     }
 
     function crewDoc(crewId) {
-      return firestore.get(/databases/(default)/documents/crews/$(crewId));
+      return firestore.get(/databases/default/documents/crews/$(crewId));
     }
 
     function crewMemberDoc(crewId, userId) {
-      return firestore.get(/databases/(default)/documents/crews/$(crewId)/members/$(userId));
+      return firestore.get(/databases/default/documents/crews/$(crewId)/members/$(userId));
     }
 
     function isCrewMember(crewId) {
       return signedIn()
         && isPresidentsClub(crewId)
-        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(request.auth.uid));
+        && firestore.exists(/databases/default/documents/crews/$(crewId)/members/$(request.auth.uid));
     }
 
     function isCrewOwner(crewId) {
@@ -39,6 +39,11 @@ service firebase.storage {
 
     function hasActiveSubscription(crewId) {
       return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+    }
+
+    function isDeveloperSupport(crewId) {
+      return isCrewMember(crewId)
+        && crewMemberDoc(crewId, request.auth.uid).data.isDeveloperSupport == true;
     }
 
     function isImage() {
@@ -61,22 +66,22 @@ service firebase.storage {
 
     match /crews/{crewId}/announcements/{fileName} {
       allow read: if isCrewMember(crewId);
-      allow write: if (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)))
+      allow write: if (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)))
         && isImage();
-      allow delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+      allow delete: if isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
     }
 
     match /crews/{crewId}/rides/{rideId}/cover.jpg {
       allow read: if isCrewMember(crewId);
-      allow write: if (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)))
+      allow write: if (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)))
         && isImage();
-      allow delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+      allow delete: if isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
     }
 
     match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
       allow read: if isCrewMember(crewId);
       allow write: if isCrewMember(crewId) && isImage();
-      allow delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+      allow delete: if isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
     }
 
     match /{allPaths=**} {

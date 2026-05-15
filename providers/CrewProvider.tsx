@@ -85,17 +85,19 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const isAdmin = currentUser?.role === 'admin';
   const isOfficer = currentUser?.role === 'officer';
+  const isDeveloperSupport = !!currentUser?.isDeveloperSupport;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
   const isSubscriptionActive =
     crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing';
-  const canPost = isOwner || isAdmin || (isOfficer && isSubscriptionActive);
+  const canPost = isDeveloperSupport || isOwner || isAdmin || (isOfficer && isSubscriptionActive);
 
   const assertAdminActive = useCallback(() => {
+    if (isDeveloperSupport) return;
     if (isOwner) return;
     if (!isSubscriptionActive) {
       throw new Error('SUBSCRIPTION_INACTIVE');
     }
-  }, [isOwner, isSubscriptionActive]);
+  }, [isDeveloperSupport, isOwner, isSubscriptionActive]);
 
   const assertAdminOrOfficer = useCallback(() => {
     if (!isAdmin && !isOfficer) {
@@ -150,7 +152,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
           joinedAt: normalizeDate(data.joinedAt),
         };
       });
-      setMembers(list);
+      setMembers(list.filter((member) => !member.isDeveloperSupport));
       const self = list.find((member) => member.id === user?.id) || null;
       setCurrentUser(self);
     });

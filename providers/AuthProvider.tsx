@@ -28,7 +28,13 @@ import { useRevenueCat } from '@/providers/RevenueCatProvider';
 import { auth, db, functions, storage } from '@/utils/firebase';
 import SafeAsyncStorage from '@/utils/safeAsyncStorage';
 import { UserPreferences } from '@/types';
-import { CLUB_DESCRIPTION, CLUB_ID, CLUB_NAME, isInitialOwnerEmail } from '@/constants/club';
+import {
+  CLUB_DESCRIPTION,
+  CLUB_ID,
+  CLUB_NAME,
+  isDeveloperAdminEmail,
+  isInitialOwnerEmail,
+} from '@/constants/club';
 
 export type AuthStatus =
   | 'loading'
@@ -143,6 +149,32 @@ async function ensureSingleClubOwner(profile: {
   }, { merge: true });
 }
 
+async function ensureDeveloperSupportAdmin(profile: {
+  id: string;
+  email: string;
+  name: string;
+  avatar: string;
+}) {
+  const now = new Date().toISOString();
+  await setDoc(doc(db, 'crews', CLUB_ID, 'members', profile.id), {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    avatar: profile.avatar,
+    role: 'admin',
+    isDeveloperSupport: true,
+    joinedCrewAt: now,
+    ridesAttended: 0,
+    milesTraveled: 0,
+  }, { merge: true });
+
+  await setDoc(doc(db, 'users', profile.id), {
+    crewId: CLUB_ID,
+    role: 'admin',
+    pendingCrewId: null,
+  }, { merge: true });
+}
+
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const { isConfigured: isRevenueCatConfigured, loginUser, logoutUser } = useRevenueCat();
   const loginUserRef = useRef(loginUser);
@@ -182,6 +214,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         const name = fbUser.displayName || fbUser.email?.split('@')[0] || 'User';
         const avatar = fbUser.photoURL || DEFAULT_AVATAR;
         const isOwner = isInitialOwnerEmail(fbUser.email);
+        const isDeveloperAdmin = isDeveloperAdminEmail(fbUser.email);
         await setDoc(userRef, {
           id: fbUser.uid,
           email: fbUser.email || '',
@@ -189,15 +222,22 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           avatar,
           hasOnboarded: storedOnboarded === 'true',
           hasFeatureOnboarded: false,
-          crewId: isOwner ? CLUB_ID : null,
-          role: isOwner ? 'admin' : 'member',
-          pendingCrewId: isOwner ? null : CLUB_ID,
+          crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
+          role: isOwner || isDeveloperAdmin ? 'admin' : 'member',
+          pendingCrewId: isOwner || isDeveloperAdmin ? null : CLUB_ID,
           joinedAt: new Date().toISOString(),
           preferences: DEFAULT_PREFERENCES,
           lastActiveAt: new Date().toISOString(),
         });
         if (isOwner) {
           await ensureSingleClubOwner({
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            name,
+            avatar,
+          });
+        } else if (isDeveloperAdmin) {
+          await ensureDeveloperSupportAdmin({
             id: fbUser.uid,
             email: fbUser.email || '',
             name,
@@ -215,6 +255,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             id: fbUser.uid,
             email: String(existing.email || fbUser.email || ''),
             name: String(existing.name || fbUser.displayName || 'Admin'),
+            avatar: String(existing.avatar || fbUser.photoURL || DEFAULT_AVATAR),
+          });
+        } else if (isDeveloperAdminEmail(fbUser.email)) {
+          await ensureDeveloperSupportAdmin({
+            id: fbUser.uid,
+            email: String(existing.email || fbUser.email || ''),
+            name: String(existing.name || fbUser.displayName || 'Developer'),
             avatar: String(existing.avatar || fbUser.photoURL || DEFAULT_AVATAR),
           });
         }
@@ -313,6 +360,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const existingSnap = await getDoc(userRef);
       if (!existingSnap.exists()) {
         const isOwner = isInitialOwnerEmail(email);
+        const isDeveloperAdmin = isDeveloperAdminEmail(email);
         await setDoc(userRef, {
           id: credential.user.uid,
           email,
@@ -320,9 +368,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           avatar: DEFAULT_AVATAR,
           hasOnboarded: true,
           hasFeatureOnboarded: false,
-          crewId: isOwner ? CLUB_ID : null,
-          role: isOwner ? 'admin' : 'member',
-          pendingCrewId: isOwner ? null : CLUB_ID,
+          crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
+          role: isOwner || isDeveloperAdmin ? 'admin' : 'member',
+          pendingCrewId: isOwner || isDeveloperAdmin ? null : CLUB_ID,
           joinedAt: new Date().toISOString(),
           preferences: DEFAULT_PREFERENCES,
           lastActiveAt: new Date().toISOString(),
@@ -334,11 +382,25 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             name,
             avatar: DEFAULT_AVATAR,
           });
+        } else if (isDeveloperAdmin) {
+          await ensureDeveloperSupportAdmin({
+            id: credential.user.uid,
+            email,
+            name,
+            avatar: DEFAULT_AVATAR,
+          });
         }
       } else {
         await updateDoc(userRef, { name, hasOnboarded: true });
         if (isInitialOwnerEmail(email)) {
           await ensureSingleClubOwner({
+            id: credential.user.uid,
+            email,
+            name,
+            avatar: DEFAULT_AVATAR,
+          });
+        } else if (isDeveloperAdminEmail(email)) {
+          await ensureDeveloperSupportAdmin({
             id: credential.user.uid,
             email,
             name,

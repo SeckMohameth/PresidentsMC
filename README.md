@@ -116,6 +116,12 @@ EXPO_PUBLIC_FIRESTORE_DATABASE_ID=default
 EXPO_PUBLIC_OWNER_EMAILS=owner@example.com
 ```
 
+   Optional developer support accounts can be hidden from the member UI while still having admin tools:
+
+```bash
+EXPO_PUBLIC_DEVELOPER_ADMIN_EMAILS=developer@example.com
+```
+
 8. For Android builds, add a restricted Google Maps API key:
 
 ```bash

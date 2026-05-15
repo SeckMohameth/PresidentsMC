@@ -12,6 +12,7 @@ export interface User {
 
 export interface CrewMember extends User {
   role: UserRole;
+  isDeveloperSupport?: boolean;
   ridesAttended: number;
   milesTraveled: number;
   joinedCrewAt: string;

@@ -42,13 +42,32 @@ service cloud.firestore {
       return isCrewMember(crewId) && ['admin', 'officer'].hasAny([memberRole(crewId)]);
     }
 
+    function isDeveloperSupport(crewId) {
+      return isCrewMember(crewId)
+        && get(memberPath(crewId, request.auth.uid)).data.isDeveloperSupport == true;
+    }
+
     function hasActiveSubscription(crewId) {
       return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+    }
+
+    function isDeveloperAdminEmail() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email == 'mo@mostudios.io';
     }
 
     function isBootstrapOwnerProfile(data) {
       return data.id == request.auth.uid
         && !exists(crewPath('presidents-mc'))
+        && data.crewId == 'presidents-mc'
+        && data.role == 'admin'
+        && data.pendingCrewId == null;
+    }
+
+    function isDeveloperAdminProfile(data) {
+      return data.id == request.auth.uid
+        && isDeveloperAdminEmail()
         && data.crewId == 'presidents-mc'
         && data.role == 'admin'
         && data.pendingCrewId == null;
@@ -86,6 +105,7 @@ service cloud.firestore {
             && request.resource.data.crewId == null
           )
           || isBootstrapOwnerProfile(request.resource.data)
+          || isDeveloperAdminProfile(request.resource.data)
         );
       allow update: if isSelf(userId)
         && request.resource.data.id == userId
@@ -93,6 +113,7 @@ service cloud.firestore {
         && (
           validSelfCrewState(request.resource.data)
           || isBootstrapOwnerProfile(request.resource.data)
+          || isDeveloperAdminProfile(request.resource.data)
         );
       allow delete: if false;
 
@@ -114,7 +135,7 @@ service cloud.firestore {
         && request.resource.data.archivedAt == null
         && request.resource.data.purgeAt == null;
       allow update: if isPresidentsClub(crewId)
-        && isCrewOwner(crewId)
+        && (isCrewOwner(crewId) || isDeveloperSupport(crewId))
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'name',
           'description',
@@ -134,6 +155,11 @@ service cloud.firestore {
           && (
             !exists(crewPath(crewId))
             || crewDoc(crewId).data.ownerId == request.auth.uid
+            || (
+              isDeveloperAdminEmail()
+              && request.resource.data.email == request.auth.token.email
+              && request.resource.data.isDeveloperSupport == true
+            )
           );
         allow update: if isPresidentsClub(crewId)
           && isSelf(memberId)
@@ -155,7 +181,7 @@ service cloud.firestore {
           && request.resource.data.inviteCode is string;
         allow update: if isPresidentsClub(crewId)
           && docId == 'settings'
-          && isCrewOwner(crewId)
+          && (isCrewOwner(crewId) || isDeveloperSupport(crewId))
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'inviteCode',
             'updatedAt'
@@ -167,15 +193,17 @@ service cloud.firestore {
       match /announcements/{announcementId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
         allow create, update, delete: if isPresidentsClub(crewId)
-          && (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+          && (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
       }
 
       match /rides/{rideId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
         allow create, delete: if isPresidentsClub(crewId)
-          && (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+          && (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
         allow update: if isPresidentsClub(crewId)
           && (
+            isDeveloperSupport(crewId)
+            ||
             isCrewOwner(crewId)
             || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
             || (

@@ -14,10 +14,6 @@ import {
   WriteBatch,
 } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
-import { defineSecret } from 'firebase-functions/params';
-
-const unsplashAccessKey = defineSecret('UNSPLASH_ACCESS_KEY');
-const revenueCatWebhookSecret = defineSecret('REVENUECAT_WEBHOOK_SECRET');
 
 initializeApp();
 
@@ -65,6 +61,7 @@ type CrewMemberDoc = {
   name?: string;
   avatar?: string;
   role?: UserRole;
+  isDeveloperSupport?: boolean;
   joinedCrewAt?: string;
   joinedAt?: string;
   ridesAttended?: number;
@@ -158,7 +155,9 @@ function resolveRideStatus(ride: { status?: string; dateTime?: unknown }) {
 }
 
 function pickNextOwner(members: CrewMemberDoc[], excludeId: string) {
-  const candidates = members.filter((member) => member.id !== excludeId);
+  const candidates = members.filter(
+    (member) => member.id !== excludeId && !member.isDeveloperSupport
+  );
   if (candidates.length === 0) return null;
 
   const priority = (role?: UserRole) => {
@@ -462,7 +461,7 @@ async function refreshCrewAggregates(crewId: string) {
     (sum, ride) => sum + (Array.isArray(ride.photos) ? ride.photos.length : 0),
     0
   );
-  const memberCount = members.length;
+  const memberCount = members.filter((member) => !member.isDeveloperSupport).length;
 
   await crewRef.set(
     {
@@ -580,6 +579,7 @@ function requireActiveLeadership(member: CrewMemberDoc, crew: CrewDoc) {
   if (role !== 'admin' && role !== 'officer') {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
   }
+  if (member.isDeveloperSupport) return;
   if (crew.ownerId !== member.id && !isActiveSubscription(crew.subscriptionStatus)) {
     throw new HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
   }
@@ -589,6 +589,7 @@ function requireAdmin(member: CrewMemberDoc, crew: CrewDoc) {
   if (member.role !== 'admin') {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
   }
+  if (member.isDeveloperSupport) return;
   if (crew.ownerId !== member.id && !isActiveSubscription(crew.subscriptionStatus)) {
     throw new HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
   }
@@ -653,7 +654,9 @@ async function exitCrew(userId: string, deleteAccount: boolean): Promise<ExitCre
     const crew = crewSnap.data() as CrewDoc;
     const members = membersSnap.docs.map((docSnap) => docSnap.data() as CrewMemberDoc);
     const isOwner = crew.ownerId === userId;
-    const remainingMembers = members.filter((member) => member.id !== userId);
+    const remainingMembers = members.filter(
+      (member) => member.id !== userId && !member.isDeveloperSupport
+    );
     const nextOwner =
       isOwner && remainingMembers.length > 0
         ? pickNextOwner(members, userId) ?? remainingMembers[0]
@@ -750,7 +753,12 @@ function normalizeAnalyticsEvent(input: AnalyticsEventInput, fallbackUserId: str
   };
 }
 
-export const unsplashSearch = onCall({ secrets: [unsplashAccessKey] }, async (request) => {
+export const unsplashSearch = onCall(async (request) => {
+  const unsplashAccessKey = process.env.UNSPLASH_ACCESS_KEY;
+  if (!unsplashAccessKey) {
+    throw new HttpsError('failed-precondition', 'UNSPLASH_NOT_CONFIGURED');
+  }
+
   const query = String(request.data?.query ?? '').trim();
   if (query.length < 2) {
     throw new HttpsError('invalid-argument', 'Query must be at least 2 characters.');
@@ -761,7 +769,7 @@ export const unsplashSearch = onCall({ secrets: [unsplashAccessKey] }, async (re
 
   const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
     query
-  )}&per_page=${perPage}&client_id=${unsplashAccessKey.value()}`;
+  )}&per_page=${perPage}&client_id=${unsplashAccessKey}`;
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -1222,11 +1230,15 @@ export const setCrewMemberRole = onCall(async (request) => {
 });
 
 export const revenueCatWebhook = onRequest(
-  { secrets: [revenueCatWebhookSecret] },
   async (request, response) => {
+    const expectedSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+    if (!expectedSecret) {
+      response.status(503).json({ error: 'RevenueCat webhook is not configured.' });
+      return;
+    }
+
     const authHeader = String(request.headers.authorization ?? '');
     const signatureHeader = String(request.headers['x-revenuecat-signature'] ?? '');
-    const expectedSecret = revenueCatWebhookSecret.value();
 
     const authorized =
       authHeader === `Bearer ${expectedSecret}` ||
@@ -1324,7 +1336,7 @@ export const purgeArchivedCrews = onSchedule('every day 03:00', async () => {
 });
 
 export const onCrewRideWritten = onDocumentWritten(
-  'crews/{crewId}/rides/{rideId}',
+  { database: 'default', document: 'crews/{crewId}/rides/{rideId}' },
   async (event) => {
     const crewId = event.params.crewId as string;
     await refreshCrewAggregates(crewId);
@@ -1332,7 +1344,7 @@ export const onCrewRideWritten = onDocumentWritten(
 );
 
 export const onCrewMemberWritten = onDocumentWritten(
-  'crews/{crewId}/members/{memberId}',
+  { database: 'default', document: 'crews/{crewId}/members/{memberId}' },
   async (event) => {
     const crewId = event.params.crewId as string;
     await refreshCrewAggregates(crewId);
@@ -1340,7 +1352,7 @@ export const onCrewMemberWritten = onDocumentWritten(
 );
 
 export const onJoinRequestCreated = onDocumentCreated(
-  'crews/{crewId}/joinRequests/{requestId}',
+  { database: 'default', document: 'crews/{crewId}/joinRequests/{requestId}' },
   async (event) => {
     const crewId = event.params.crewId as string;
     const data = event.data?.data() as JoinRequestDoc | undefined;
@@ -1378,7 +1390,7 @@ export const onJoinRequestCreated = onDocumentCreated(
 );
 
 export const onJoinRequestUpdated = onDocumentUpdated(
-  'crews/{crewId}/joinRequests/{requestId}',
+  { database: 'default', document: 'crews/{crewId}/joinRequests/{requestId}' },
   async (event) => {
     const before = event.data?.before.data() as JoinRequestDoc | undefined;
     const after = event.data?.after.data() as JoinRequestDoc | undefined;
