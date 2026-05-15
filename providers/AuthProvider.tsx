@@ -49,6 +49,7 @@ interface AuthUser {
   email: string;
   name: string;
   avatar: string;
+  bike?: string;
   emailVerified?: boolean;
 }
 
@@ -222,6 +223,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           email: fbUser.email || '',
           name,
           avatar,
+          bike: '',
           hasOnboarded: storedOnboarded === 'true',
           hasFeatureOnboarded: false,
           crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
@@ -283,6 +285,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           email: data.email,
           name: data.name,
           avatar: data.avatar,
+          bike: data.bike || '',
           emailVerified: fbUser.emailVerified,
           crewId: data.crewId || null,
           role: data.role || 'member',
@@ -368,6 +371,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           email,
           name,
           avatar: DEFAULT_AVATAR,
+          bike: '',
           hasOnboarded: true,
           hasFeatureOnboarded: false,
           crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
@@ -532,6 +536,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         email: profile.email,
         name: profile.name,
         avatar: profile.avatar,
+        bike: profile.bike || '',
         role: 'admin',
         joinedCrewAt: new Date().toISOString(),
         ridesAttended: 0,
@@ -560,7 +565,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     }
   }, [profile]);
 
-  const updateUserProfile = useCallback(async (updates: { name?: string; avatar?: string }) => {
+  const updateUserProfile = useCallback(async (updates: { name?: string; avatar?: string; bike?: string }) => {
     if (!profile?.id) throw new Error('Not authenticated');
     const uid = profile.id;
     await updateDoc(doc(db, 'users', uid), updates);

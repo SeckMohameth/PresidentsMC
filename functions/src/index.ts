@@ -53,6 +53,7 @@ type CrewMemberDoc = {
   email?: string;
   name?: string;
   avatar?: string;
+  bike?: string;
   role?: UserRole;
   isDeveloperSupport?: boolean;
   joinedCrewAt?: string;
@@ -66,6 +67,7 @@ type UserDoc = {
   email?: string;
   name?: string;
   avatar?: string;
+  bike?: string;
   crewId?: string | null;
   role?: UserRole;
   preferences?: Record<string, unknown>;
@@ -957,6 +959,7 @@ export const joinCrewByInvite = onCall(async (request) => {
             email: freshUser.email ?? '',
             name: freshUser.name ?? 'Member',
             avatar: freshUser.avatar ?? '',
+            bike: freshUser.bike ?? '',
             role: 'member',
             joinedCrewAt: new Date().toISOString(),
             ridesAttended: 0,
@@ -1130,6 +1133,7 @@ export const approveJoinRequest = onCall(async (request) => {
           email: targetUser.email ?? joinRequest.userEmail ?? '',
           name: targetUser.name ?? joinRequest.userName ?? 'Member',
           avatar: targetUser.avatar ?? joinRequest.userAvatar ?? '',
+          bike: targetUser.bike ?? '',
           role: 'member',
           joinedCrewAt: new Date().toISOString(),
           ridesAttended: 0,

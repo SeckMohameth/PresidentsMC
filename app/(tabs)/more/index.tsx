@@ -23,7 +23,8 @@ import {
   Mail,
   Globe,
   AtSign,
-  KeyRound
+  KeyRound,
+  Bike
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -110,6 +111,7 @@ export default function MoreScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
+  const [editBike, setEditBike] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [isSendingVerification, setIsSendingVerification] = useState(false);
@@ -211,6 +213,7 @@ export default function MoreScreen() {
   const openEditProfile = () => {
     setEditName(currentUser?.name || '');
     setEditAvatar(currentUser?.avatar || '');
+    setEditBike(currentUser?.bike || '');
     setEditModalVisible(true);
   };
 
@@ -248,7 +251,11 @@ export default function MoreScreen() {
         await uploadBytes(storageRef, blob);
         avatarUrl = await getDownloadURL(storageRef);
       }
-      await updateProfile({ name: editName.trim(), avatar: avatarUrl });
+      await updateProfile({
+        name: editName.trim(),
+        avatar: avatarUrl,
+        bike: editBike.trim(),
+      });
       setEditModalVisible(false);
       Alert.alert('Saved', 'Your profile has been updated.');
     } catch {
@@ -455,6 +462,12 @@ export default function MoreScreen() {
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{currentUser?.name}</Text>
             <Text style={styles.profileEmail}>{currentUser?.email}</Text>
+            {currentUser?.bike ? (
+              <View style={styles.bikeLine}>
+                <Bike size={13} color={Colors.dark.textTertiary} />
+                <Text style={styles.profileBike}>{currentUser.bike}</Text>
+              </View>
+            ) : null}
             <View style={styles.roleTag}>
               <Text style={styles.roleTagText}>
                 {currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'officer' ? 'Officer' : 'Member'}
@@ -646,6 +659,16 @@ export default function MoreScreen() {
               onChangeText={setEditName}
               placeholder="Your name"
               placeholderTextColor={Colors.dark.textTertiary}
+            />
+
+            <Text style={[styles.editLabel, styles.editLabelSpaced]}>Bike</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editBike}
+              onChangeText={setEditBike}
+              placeholder="Harley-Davidson Street Glide"
+              placeholderTextColor={Colors.dark.textTertiary}
+              maxLength={80}
             />
           </View>
         </View>
@@ -844,6 +867,17 @@ const styles = StyleSheet.create({
     color: Colors.dark.textTertiary,
     fontSize: 14,
     marginBottom: 8,
+  },
+  bikeLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  profileBike: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
   },
   roleTag: {
     backgroundColor: 'rgba(212, 166, 52, 0.15)',
@@ -1072,6 +1106,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
+  },
+  editLabelSpaced: {
+    marginTop: 16,
   },
   editInput: {
     backgroundColor: Colors.dark.surface,

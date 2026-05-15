@@ -85,6 +85,7 @@ service cloud.firestore {
         'name',
         'email',
         'avatar',
+        'bike',
         'preferences',
         'hasOnboarded',
         'hasFeatureOnboarded',
@@ -167,7 +168,8 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'name',
             'email',
-            'avatar'
+            'avatar',
+            'bike'
           ]);
         allow delete: if false;
       }

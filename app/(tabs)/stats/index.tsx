@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History } from 'lucide-react-native';
+import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike } from 'lucide-react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import Colors from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
@@ -57,7 +57,7 @@ export default function StatsScreen() {
           >
             <Users size={16} color={activeTab === 'crew' ? Colors.dark.primary : Colors.dark.textTertiary} />
             <Text style={[styles.tabText, activeTab === 'crew' && styles.activeTabText]}>
-              Club
+              Crew Stats
             </Text>
           </Pressable>
           <Pressable 
@@ -66,7 +66,7 @@ export default function StatsScreen() {
           >
             <TrendingUp size={16} color={activeTab === 'personal' ? Colors.dark.primary : Colors.dark.textTertiary} />
             <Text style={[styles.tabText, activeTab === 'personal' && styles.activeTabText]}>
-              Personal
+              My Stats
             </Text>
           </Pressable>
         </View>
@@ -223,6 +223,12 @@ export default function StatsScreen() {
               <Text style={styles.profileRole}>
                 {currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'officer' ? 'Officer' : 'Member'}
               </Text>
+              <View style={styles.bikePill}>
+                <Bike size={14} color={Colors.dark.textSecondary} />
+                <Text style={styles.bikePillText}>
+                  {currentUser?.bike || 'Add your bike in Profile'}
+                </Text>
+              </View>
               <Text style={styles.memberSince}>
                 Member since {new Date(memberStats.memberSince).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </Text>
@@ -230,7 +236,7 @@ export default function StatsScreen() {
 
             <MilestoneBurst milestones={personalMilestones} />
 
-            <Text style={styles.sectionTitle}>Your Journey</Text>
+            <Text style={styles.sectionTitle}>My Biker Stats</Text>
             <View style={styles.statsGrid}>
               <StatCard 
                 icon={Route} 
@@ -388,7 +394,24 @@ const styles = StyleSheet.create({
     color: Colors.dark.primary,
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  bikePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: Colors.dark.surfaceElevated,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    marginBottom: 10,
+  },
+  bikePillText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
   },
   memberSince: {
     color: Colors.dark.textTertiary,
