@@ -120,6 +120,30 @@ export default function RideDetailScreen() {
   const isCheckedIn = currentUser ? ride.checkedIn.includes(currentUser.id) : false;
   const isUpcoming = ride.status === 'upcoming';
   const isCompleted = ride.status === 'completed';
+  const statusLabel =
+    ride.status === 'completed'
+      ? 'Completed'
+      : ride.status === 'cancelled'
+        ? 'Cancelled'
+        : ride.status === 'active'
+          ? 'Active'
+          : 'Upcoming';
+  const statusStyle =
+    ride.status === 'completed'
+      ? styles.completedBadge
+      : ride.status === 'cancelled'
+        ? styles.cancelledBadge
+        : ride.status === 'active'
+          ? styles.activeBadge
+          : styles.upcomingBadge;
+  const statusTone =
+    ride.status === 'completed'
+      ? Colors.dark.completed
+      : ride.status === 'cancelled'
+        ? Colors.dark.cancelled
+        : ride.status === 'active'
+          ? Colors.dark.info
+          : Colors.dark.upcoming;
   
   const hasStartCoordinates = hasUsableCoordinates(ride.startLocation);
   const hasEndCoordinates = hasUsableCoordinates(ride.endLocation);
@@ -264,9 +288,9 @@ export default function RideDetailScreen() {
             </Pressable>
           )}
           <View style={[styles.heroContent, { paddingBottom: 20 }]}>
-            <View style={[styles.statusBadge, ride.status === 'completed' && styles.completedBadge]}>
-              <Text style={styles.statusText}>
-                {ride.status === 'upcoming' ? 'Upcoming' : 'Completed'}
+            <View style={[styles.statusBadge, statusStyle]}>
+              <Text style={[styles.statusText, { color: statusTone }]}>
+                {statusLabel}
               </Text>
             </View>
             <Text style={styles.heroTitle}>{ride.title}</Text>
@@ -571,18 +595,27 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   statusBadge: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: 'rgba(10,10,10,0.72)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     alignSelf: 'flex-start',
     marginBottom: 12,
+    borderWidth: 1,
+  },
+  upcomingBadge: {
+    borderColor: Colors.dark.upcoming,
+  },
+  activeBadge: {
+    borderColor: Colors.dark.info,
   },
   completedBadge: {
-    backgroundColor: Colors.dark.success,
+    borderColor: Colors.dark.completed,
+  },
+  cancelledBadge: {
+    borderColor: Colors.dark.cancelled,
   },
   statusText: {
-    color: Colors.dark.text,
     fontSize: 12,
     fontWeight: '600',
   },

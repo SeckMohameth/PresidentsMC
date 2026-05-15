@@ -169,15 +169,20 @@ export default function AdminSettingsScreen() {
             pendingRequests.map((request) => (
               <View key={request.id} style={styles.requestRow}>
                 <View style={styles.requestInfo}>
-                  <Text style={styles.memberName}>{request.userName}</Text>
+                  <View style={styles.requestNameRow}>
+                    <Text style={styles.memberName}>{request.userName}</Text>
+                    <View style={styles.pendingPill}>
+                      <Text style={styles.pendingPillText}>Pending</Text>
+                    </View>
+                  </View>
                   <Text style={styles.memberMeta}>{request.userEmail}</Text>
                 </View>
                 <View style={styles.rowActions}>
-                  <Pressable style={styles.iconButton} onPress={() => handleApprove(request)}>
-                    <UserPlus size={16} color={Colors.dark.text} />
+                  <Pressable style={[styles.iconButton, styles.approveButton]} onPress={() => handleApprove(request)}>
+                    <UserPlus size={16} color={Colors.dark.created} />
                   </Pressable>
-                  <Pressable style={styles.iconButton} onPress={() => handleDeny(request)}>
-                    <UserMinus size={16} color={Colors.dark.text} />
+                  <Pressable style={[styles.iconButton, styles.denyButton]} onPress={() => handleDeny(request)}>
+                    <UserMinus size={16} color={Colors.dark.deleted} />
                   </Pressable>
                 </View>
               </View>
@@ -342,6 +347,24 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  requestNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pendingPill: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: 'rgba(245,158,11,0.14)',
+    borderWidth: 1,
+    borderColor: Colors.dark.pending,
+  },
+  pendingPillText: {
+    color: Colors.dark.pending,
+    fontSize: 11,
+    fontWeight: '800',
+  },
   rowActions: {
     flexDirection: 'row',
     gap: 10,
@@ -353,6 +376,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.dark.surfaceElevated,
+  },
+  approveButton: {
+    borderWidth: 1,
+    borderColor: Colors.dark.created,
+  },
+  denyButton: {
+    borderWidth: 1,
+    borderColor: Colors.dark.deleted,
   },
   memberRow: {
     flexDirection: 'row',

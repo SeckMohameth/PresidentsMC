@@ -101,7 +101,7 @@ export default function CrewSelectionScreen() {
           <View style={styles.glassPanel}>
           {hasPendingRequest ? (
             <View style={styles.pendingCard}>
-              <Clock size={22} color={Colors.dark.primary} />
+              <Clock size={22} color={Colors.dark.pending} />
               <View style={styles.pendingText}>
                 <Text style={styles.pendingTitle}>Request Pending</Text>
                 <Text style={styles.pendingSubtitle}>
@@ -216,11 +216,11 @@ const styles = StyleSheet.create({
   pendingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(26,26,26,0.78)',
+    backgroundColor: 'rgba(245,158,11,0.10)',
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(229,229,229,0.16)',
+    borderColor: Colors.dark.pending,
     marginBottom: 16,
     gap: 12,
   },
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   pendingTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark.text,
+    color: Colors.dark.pending,
   },
   pendingSubtitle: {
     fontSize: 13,

@@ -19,6 +19,29 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   const isRideToday = isToday(ride.dateTime);
   const startLabel = ride.startLocation?.name || ride.startLocation?.address || 'Start';
   const endLabel = ride.endLocation?.name || ride.endLocation?.address || 'End';
+  const isPastDue = ride.status === 'upcoming' && daysUntil < 0;
+  const statusTone =
+    ride.status === 'completed'
+      ? Colors.dark.completed
+      : ride.status === 'cancelled'
+        ? Colors.dark.cancelled
+        : isRideToday
+          ? Colors.dark.heat
+          : isPastDue
+            ? Colors.dark.pending
+            : Colors.dark.upcoming;
+  const statusLabel =
+    ride.status === 'completed'
+      ? 'Completed'
+      : ride.status === 'cancelled'
+        ? 'Cancelled'
+        : isPastDue
+          ? 'Past due'
+          : isRideToday
+            ? 'Today'
+            : daysUntil === 1
+              ? 'Tomorrow'
+              : `In ${daysUntil} days`;
 
   const handlePress = () => {
     router.push(`/ride/${ride.id}`);
@@ -75,10 +98,10 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
           end={{ x: 1, y: 1 }}
           style={styles.heatLine}
         />
-        {ride.status === 'upcoming' && (
-          <View style={[styles.statusBadge, isRideToday && styles.todayBadge]}>
-            <Text style={[styles.statusText, isRideToday && styles.todayText]}>
-              {isRideToday ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil} days`}
+        {(ride.status === 'upcoming' || ride.status === 'completed' || ride.status === 'cancelled') && (
+          <View style={[styles.statusBadge, { borderColor: statusTone }]}>
+            <Text style={[styles.statusText, { color: statusTone }]}>
+              {statusLabel}
             </Text>
           </View>
         )}
@@ -174,24 +197,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: 'rgba(0,0,0,0.48)',
+    backgroundColor: 'rgba(10,10,10,0.72)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(229,229,229,0.2)',
   },
-  todayBadge: {
-    backgroundColor: Colors.dark.heat,
-    borderColor: Colors.dark.heat,
-  },
   statusText: {
-    color: Colors.dark.text,
     fontSize: 12,
     fontWeight: '600',
-  },
-  todayText: {
-    color: Colors.dark.text,
   },
   imageOverlay: {
     position: 'absolute',

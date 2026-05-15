@@ -304,7 +304,12 @@ export default function JoinCrewScreen() {
                             {result.memberCount || 0} members
                           </Text>
                         </View>
-                        <Text style={styles.resultJoin}>
+                        <Text
+                          style={[
+                            styles.resultJoin,
+                            requestStatus[result.id] === 'pending' && styles.resultJoinPending,
+                          ]}
+                        >
                           {requestStatus[result.id] === 'pending' ? 'Pending' : 'Request'}
                         </Text>
                       </TouchableOpacity>
@@ -519,5 +524,8 @@ const styles = StyleSheet.create({
     color: Colors.dark.primary,
     fontSize: 14,
     fontWeight: '700' as const,
+  },
+  resultJoinPending: {
+    color: Colors.dark.pending,
   },
 });
