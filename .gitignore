@@ -25,12 +25,15 @@ expo-env.d.ts
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+firebase-debug.log
+firebase-debug.*.log
 
 # macOS
 .DS_Store
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -41,3 +44,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# generated Firebase Functions build output
+functions/lib/

@@ -1,50 +1,165 @@
-# Welcome to your Expo app 👋
+# PresidentsMC
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+PresidentsMC is a private mobile app for a biker club based in Connecticut. I built it as a focused, single-club version of a broader app idea I had called Crew, which was originally designed to support many riding clubs. For this project I intentionally narrowed the scope: one club, one branded experience, free members, and paid admin access to help cover hosting and maintenance.
 
-## Get started
+The app was vibe coded with Codex and then shaped around a real client use case: a private club that needs simple tools for announcements, rides, members, photos, and stats without using a noisy social network.
 
-1. Install dependencies
+## Why This Exists
 
-   ```bash
-   npm install
-   ```
+The original idea was a multi-club SaaS product where any bike or motorcycle club could create a space, invite members, and manage rides. For this build, the goal changed:
 
-2. Start the app
+- Build one polished app for one biker club.
+- Keep members free.
+- Let the club owner/admin pay a small subscription for admin tools.
+- Use the project as a real portfolio piece with production-style auth, database rules, file storage, functions, subscriptions, and mobile UI.
 
-   ```bash
-   npx expo start
-   ```
+## Features
 
-In the output, you'll find options to open the app in a
+- Email/password sign up and sign in
+- Private access request flow
+- Owner/admin approval for members
+- Member profiles with profile image upload
+- Announcements with optional images and links
+- Ride planning with start/end locations
+- Native map display through `react-native-maps`
+- Address geocoding through Expo Location
+- Ride RSVPs and check-ins
+- Shared ride photo albums
+- Club/member stats
+- Admin settings, roles, and member management
+- RevenueCat-ready admin subscription flow
+- Firebase Functions scaffold for invites, cleanup, analytics, notifications, subscriptions, and stats
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Access Model
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Members do not pay. They create an account, request access, and wait for approval.
 
-## Get a fresh project
-
-When you're ready, run:
+The initial owner is bootstrapped from:
 
 ```bash
-npm run reset-project
+EXPO_PUBLIC_OWNER_EMAILS=owner@example.com
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+That owner/admin can approve members and manage club content. Admin tools are designed to be gated by subscription status, while basic member access remains free.
 
-## Learn more
+## Monetization
 
-To learn more about developing your project with Expo, look at the following resources:
+This was built as a favor-style project, not a big SaaS launch. The monetization idea is intentionally lightweight:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- Members: free
+- Club owner/admin: low subscription
+- Example pricing: `$1.99/month` or `$19.99/year`
 
-## Join the community
+The subscription is meant to help cover hosting, app upkeep, Firebase usage, App Store/Play Store maintenance, and ongoing support.
 
-Join our community of developers creating universal apps.
+## Tech Stack
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Expo
+- React Native
+- Expo Router
+- TypeScript
+- Firebase Auth
+- Firestore
+- Firebase Storage
+- Firebase Functions
+- RevenueCat
+- Expo Notifications
+- Expo Location
+- `react-native-maps`
+
+## Security Model
+
+The repo is public, but the live app should be protected by Firebase rules and private environment variables.
+
+Important security choices:
+
+- `.env` is ignored and must not be committed.
+- Firestore rules deny public reads/writes.
+- Storage rules deny public reads/writes.
+- Only approved members can read club data.
+- Pending users can only create/cancel their own join request.
+- Users can only update their own profile/account fields.
+- Image uploads are limited to image content under 10 MB.
+- Admin/officer writes are role-gated and subscription-aware.
+- Firebase Functions use server-side permissions for sensitive actions.
+
+See [SECURITY.md](SECURITY.md) before deploying your own clone.
+
+## Local Setup
+
+1. Clone the repo.
+2. Install dependencies:
+
+```bash
+npm install --legacy-peer-deps
+```
+
+3. Copy the environment template:
+
+```bash
+cp .env.example .env
+```
+
+4. Create a Firebase project and add your web app config to `.env`.
+5. Enable Firebase Auth email/password sign-in.
+6. Create Firestore, Storage, and Functions.
+7. Set your first owner email:
+
+```bash
+EXPO_PUBLIC_OWNER_EMAILS=owner@example.com
+```
+
+8. For Android builds, add a restricted Google Maps API key:
+
+```bash
+GOOGLE_MAPS_ANDROID_API_KEY=your-restricted-android-maps-key
+```
+
+The key should be restricted in Google Cloud to the Android package `app.mostudios.presidentsmc` and the SHA-1 certificate for the build you are shipping. iOS uses Apple Maps by default in the app.
+
+9. Set Firebase CLI project:
+
+```bash
+firebase use --add
+```
+
+10. Deploy rules:
+
+```bash
+firebase deploy --only firestore:rules,storage --project your-firebase-project-id
+```
+
+11. Run the app:
+
+```bash
+npm run start
+```
+
+## Development Commands
+
+```bash
+npm run start
+npm run web
+npm run lint
+npx tsc --noEmit
+npm run test:rules
+```
+
+`npm run test:rules` uses Firebase emulators and needs Java installed locally.
+
+## Cloning and Reuse
+
+You are free to clone this repo and adapt it for your own club, group, or private community app.
+
+Before using it for your own project:
+
+- Replace all app branding.
+- Use your own Firebase project.
+- Use your own RevenueCat project/products.
+- Deploy your own Firestore and Storage rules.
+- Review the security rules for your data model.
+- Do not reuse another club's private assets, photos, names, or copy.
+
+## Notes
+
+This app is still evolving. The current codebase started from an Expo starter, pulled in the useful parts of the earlier Crew app, then was reshaped into a single-club PresidentsMC experience with black/silver biker-club styling.

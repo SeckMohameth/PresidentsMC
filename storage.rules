@@ -1,0 +1,86 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isPresidentsClub(crewId) {
+      return crewId == 'presidents-mc';
+    }
+
+    function crewDoc(crewId) {
+      return firestore.get(/databases/(default)/documents/crews/$(crewId));
+    }
+
+    function crewMemberDoc(crewId, userId) {
+      return firestore.get(/databases/(default)/documents/crews/$(crewId)/members/$(userId));
+    }
+
+    function isCrewMember(crewId) {
+      return signedIn()
+        && isPresidentsClub(crewId)
+        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(request.auth.uid));
+    }
+
+    function isCrewOwner(crewId) {
+      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
+    }
+
+    function isCrewLeader(crewId) {
+      return isCrewMember(crewId)
+        && ['admin', 'officer'].hasAny([crewMemberDoc(crewId, request.auth.uid).data.role]);
+    }
+
+    function hasActiveSubscription(crewId) {
+      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+    }
+
+    function isImage() {
+      return request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /users/{userId}/avatar.jpg {
+      allow read: if isSelf(userId);
+      allow write: if isSelf(userId) && isImage();
+    }
+
+    match /crews/{crewId}/logo.jpg {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewOwner(crewId)
+        && crewDoc(crewId).data.status == 'active'
+        && isImage();
+    }
+
+    match /crews/{crewId}/announcements/{fileName} {
+      allow read: if isCrewMember(crewId);
+      allow write: if (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)))
+        && isImage();
+      allow delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+    }
+
+    match /crews/{crewId}/rides/{rideId}/cover.jpg {
+      allow read: if isCrewMember(crewId);
+      allow write: if (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)))
+        && isImage();
+      allow delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+    }
+
+    match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewMember(crewId) && isImage();
+      allow delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

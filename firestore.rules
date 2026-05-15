@@ -1,0 +1,229 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isPresidentsClub(crewId) {
+      return crewId == 'presidents-mc';
+    }
+
+    function crewPath(crewId) {
+      return /databases/$(database)/documents/crews/$(crewId);
+    }
+
+    function memberPath(crewId, userId) {
+      return /databases/$(database)/documents/crews/$(crewId)/members/$(userId);
+    }
+
+    function crewDoc(crewId) {
+      return get(crewPath(crewId));
+    }
+
+    function isCrewMember(crewId) {
+      return signedIn() && exists(memberPath(crewId, request.auth.uid));
+    }
+
+    function memberRole(crewId) {
+      return get(memberPath(crewId, request.auth.uid)).data.role;
+    }
+
+    function isCrewOwner(crewId) {
+      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
+    }
+
+    function isCrewLeader(crewId) {
+      return isCrewMember(crewId) && ['admin', 'officer'].hasAny([memberRole(crewId)]);
+    }
+
+    function hasActiveSubscription(crewId) {
+      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+    }
+
+    function isBootstrapOwnerProfile(data) {
+      return data.id == request.auth.uid
+        && !exists(crewPath('presidents-mc'))
+        && data.crewId == 'presidents-mc'
+        && data.role == 'admin'
+        && data.pendingCrewId == null;
+    }
+
+    function validSelfCrewState(data) {
+      return data.crewId == null
+        ? data.role == 'member'
+        : exists(memberPath(data.crewId, request.auth.uid))
+          && get(memberPath(data.crewId, request.auth.uid)).data.role == data.role;
+    }
+
+    function validUserMutableKeys() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'name',
+        'email',
+        'avatar',
+        'preferences',
+        'hasOnboarded',
+        'hasFeatureOnboarded',
+        'lastActiveAt',
+        'crewId',
+        'role',
+        'pendingCrewId'
+      ]);
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create: if isSelf(userId)
+        && request.resource.data.id == userId
+        && (
+          (
+            request.resource.data.role == 'member'
+            && request.resource.data.crewId == null
+          )
+          || isBootstrapOwnerProfile(request.resource.data)
+        );
+      allow update: if isSelf(userId)
+        && request.resource.data.id == userId
+        && validUserMutableKeys()
+        && (
+          validSelfCrewState(request.resource.data)
+          || isBootstrapOwnerProfile(request.resource.data)
+        );
+      allow delete: if false;
+
+      match /pushTokens/{token} {
+        allow read, create, update, delete: if isSelf(userId);
+      }
+    }
+
+    match /crews/{crewId} {
+      allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+      allow create: if isPresidentsClub(crewId)
+        && signedIn()
+        && !exists(crewPath(crewId))
+        && request.resource.data.id == crewId
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.subscriptionOwnerId == request.auth.uid
+        && request.resource.data.memberCount == 1
+        && request.resource.data.status == 'active'
+        && request.resource.data.archivedAt == null
+        && request.resource.data.purgeAt == null;
+      allow update: if isPresidentsClub(crewId)
+        && isCrewOwner(crewId)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'name',
+          'description',
+          'logoUrl',
+          'isDiscoverable',
+          'requiresApproval',
+          'nameLower'
+        ]);
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow create: if isPresidentsClub(crewId)
+          && isSelf(memberId)
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.role == 'admin'
+          && (
+            !exists(crewPath(crewId))
+            || crewDoc(crewId).data.ownerId == request.auth.uid
+          );
+        allow update: if isPresidentsClub(crewId)
+          && isSelf(memberId)
+          && isCrewMember(crewId)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name',
+            'email',
+            'avatar'
+          ]);
+        allow delete: if false;
+      }
+
+      match /private/{docId} {
+        allow read: if false;
+        allow create: if isPresidentsClub(crewId)
+          && docId == 'settings'
+          && crewDoc(crewId).data.ownerId == request.auth.uid
+          && request.resource.data.keys().hasOnly(['inviteCode', 'updatedAt'])
+          && request.resource.data.inviteCode is string;
+        allow update: if isPresidentsClub(crewId)
+          && docId == 'settings'
+          && isCrewOwner(crewId)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'inviteCode',
+            'updatedAt'
+          ])
+          && request.resource.data.inviteCode is string;
+        allow delete: if false;
+      }
+
+      match /announcements/{announcementId} {
+        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow create, update, delete: if isPresidentsClub(crewId)
+          && (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+      }
+
+      match /rides/{rideId} {
+        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow create, delete: if isPresidentsClub(crewId)
+          && (isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+        allow update: if isPresidentsClub(crewId)
+          && (
+            isCrewOwner(crewId)
+            || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+            || (
+              isCrewMember(crewId)
+              && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+                'attendees',
+                'checkedIn',
+                'photos'
+              ])
+            )
+          );
+      }
+
+      match /joinRequests/{requestId} {
+        allow read: if isPresidentsClub(crewId)
+          && ((signedIn() && requestId == request.auth.uid) || isCrewLeader(crewId));
+        allow create: if isPresidentsClub(crewId)
+          && signedIn()
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.crewId == crewId
+          && request.resource.data.status == 'pending'
+          && !isCrewMember(crewId);
+        allow update: if false;
+        allow delete: if isPresidentsClub(crewId)
+          && signedIn()
+          && requestId == request.auth.uid
+          && resource.data.status == 'pending';
+      }
+
+      match /statsHistory/{snapshotId} {
+        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /crewInviteCodes/{inviteCode} {
+      allow read, update, delete: if false;
+      allow create: if signedIn()
+        && request.resource.data.code == inviteCode
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.crewId == 'presidents-mc'
+        && exists(crewPath('presidents-mc'))
+        && get(crewPath('presidents-mc')).data.ownerId == request.auth.uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
