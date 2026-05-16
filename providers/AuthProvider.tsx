@@ -28,6 +28,7 @@ import { useRevenueCat } from '@/providers/RevenueCatProvider';
 import { auth, db, functions, storage } from '@/utils/firebase';
 import SafeAsyncStorage from '@/utils/safeAsyncStorage';
 import { UserPreferences } from '@/types';
+import { DEFAULT_AVATAR } from '@/utils/avatar';
 import {
   CLUB_DESCRIPTION,
   CLUB_ID,
@@ -67,8 +68,6 @@ const STORAGE_KEYS = {
   HAS_FEATURE_ONBOARDED: 'has_feature_onboarded',
 };
 
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop';
 const DEFAULT_PREFERENCES: UserPreferences = {
   pushEnabled: true,
   announcements: true,
@@ -347,7 +346,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     setIsSigningUp(true);
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateFirebaseProfile(credential.user, { displayName: name, photoURL: DEFAULT_AVATAR });
+      await updateFirebaseProfile(credential.user, { displayName: name });
 
       let verificationEmailSent = false;
       try {

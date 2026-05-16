@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Shield, Star, ChevronRight, UserMinus } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { CrewMember } from '@/types';
+import { getAvatarSource } from '@/utils/avatar';
 import { getInitials, formatMiles } from '@/utils/helpers';
 
 interface MemberRowProps {
@@ -40,7 +41,7 @@ export default function MemberRow({ member, onPress, showStats = true, showRemov
       <View style={styles.avatarContainer}>
         {member.avatar ? (
           <Image 
-            source={{ uri: member.avatar }} 
+            source={getAvatarSource(member.avatar)}
             style={styles.avatar}
             contentFit="cover"
           />

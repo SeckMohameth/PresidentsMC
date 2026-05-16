@@ -8,6 +8,7 @@ import Colors from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import MilestoneBurst from '@/components/MilestoneBurst';
 import StatCard from '@/components/StatCard';
+import { getAvatarSource } from '@/utils/avatar';
 import { formatMiles, formatNumber } from '@/utils/helpers';
 
 type TabType = 'crew' | 'personal';
@@ -219,7 +220,7 @@ export default function StatsScreen() {
           <>
             <Animated.View entering={FadeInDown.duration(420)} layout={Layout.springify().damping(18)} style={styles.profileCard}>
               <Image 
-                source={{ uri: currentUser?.avatar }}
+                source={getAvatarSource(currentUser?.avatar)}
                 style={styles.profileImage}
                 contentFit="cover"
               />

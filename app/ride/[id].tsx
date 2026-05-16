@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
+import { getAvatarSource } from '@/utils/avatar';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, MapsApp } from '@/utils/helpers';
 
 const getRouteCoordinates = (start: { latitude: number; longitude: number }, end: { latitude: number; longitude: number }) => {
@@ -438,7 +439,7 @@ export default function RideDetailScreen() {
                 <View key={member.id} style={[styles.attendeeAvatar, { marginLeft: index > 0 ? -12 : 0 }]}>
                   {member.avatar ? (
                     <Image 
-                      source={{ uri: member.avatar }}
+                      source={getAvatarSource(member.avatar)}
                       style={styles.attendeeImage}
                       contentFit="cover"
                     />

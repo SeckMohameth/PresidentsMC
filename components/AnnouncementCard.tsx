@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
 import { Announcement } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
+import { getAvatarSource } from '@/utils/avatar';
 import { formatRelativeTime, getInitials } from '@/utils/helpers';
 
 interface AnnouncementCardProps {
@@ -59,7 +60,7 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
         <View style={styles.avatarContainer}>
           {announcement.authorAvatar ? (
             <Image 
-              source={{ uri: announcement.authorAvatar }} 
+              source={getAvatarSource(announcement.authorAvatar)}
               style={styles.avatar}
               contentFit="cover"
             />

@@ -31,6 +31,7 @@ import Colors from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useCrew } from '@/providers/CrewProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { getAvatarSource, isDefaultAvatar } from '@/utils/avatar';
 import { getInitials } from '@/utils/helpers';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 import * as Clipboard from 'expo-clipboard';
@@ -244,7 +245,7 @@ export default function MoreScreen() {
     setIsSaving(true);
     try {
       let avatarUrl = editAvatar;
-      if (avatarUrl && !avatarUrl.startsWith('http') && user?.id) {
+      if (avatarUrl && !avatarUrl.startsWith('http') && !isDefaultAvatar(avatarUrl) && user?.id) {
         const response = await fetch(avatarUrl);
         const blob = await response.blob();
         const storageRef = ref(storage, `users/${user.id}/avatar.jpg`);
@@ -442,7 +443,7 @@ export default function MoreScreen() {
           <View style={styles.profileAvatarContainer}>
             {currentUser?.avatar ? (
               <Image
-                source={{ uri: currentUser.avatar }}
+                source={getAvatarSource(currentUser.avatar)}
                 style={styles.profileAvatar}
                 contentFit="cover"
               />
@@ -641,7 +642,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.editAvatarContainer} onPress={pickAvatar}>
               {editAvatar ? (
-                <Image source={{ uri: editAvatar }} style={styles.editAvatar} contentFit="cover" />
+                <Image source={getAvatarSource(editAvatar)} style={styles.editAvatar} contentFit="cover" />
               ) : (
                 <View style={styles.editAvatarPlaceholder}>
                   <Text style={styles.editAvatarInitials}>{getInitials(editName || 'U')}</Text>

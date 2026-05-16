@@ -10,6 +10,7 @@ import { Art } from '@/constants/art';
 import { useCrew } from '@/providers/CrewProvider';
 import AnnouncementCard from '@/components/AnnouncementCard';
 import RideCard from '@/components/RideCard';
+import { getAvatarSource } from '@/utils/avatar';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -70,7 +71,7 @@ export default function HomeScreen() {
             </View>
             <Pressable style={styles.profileButton} onPress={() => router.push('/(tabs)/more')}>
               {currentUser?.avatar ? (
-                <Image source={{ uri: currentUser.avatar }} style={styles.profileImage} contentFit="cover" />
+                <Image source={getAvatarSource(currentUser.avatar)} style={styles.profileImage} contentFit="cover" />
               ) : (
                 <View style={styles.profilePlaceholder}>
                   <Text style={styles.profileInitials}>{currentUser?.name.charAt(0) || 'U'}</Text>
