@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { X, MapPin, Calendar, Clock, Gauge, FileText, ImagePlus, Image as ImageIcon, Trash2 } from 'lucide-react-native';
+import MapView, { MapPressEvent, Marker, Polyline } from 'react-native-maps';
+import { X, MapPin, Calendar, Clock, Gauge, FileText, ImagePlus, Image as ImageIcon, Trash2, MapPinned, LocateFixed } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
@@ -14,11 +16,26 @@ import { ImageAttribution } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 
 type PaceType = 'casual' | 'moderate' | 'spirited';
+type MapTarget = 'start' | 'end';
 const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=400&fit=crop';
+const DEFAULT_REGION = {
+  latitude: 41.7658,
+  longitude: -72.6734,
+  latitudeDelta: 0.2,
+  longitudeDelta: 0.2,
+};
+
+function formatReverseAddress(item?: Location.LocationGeocodedAddress) {
+  if (!item) return 'Dropped pin';
+  const lineOne = [item.name, item.street].filter(Boolean).join(' ');
+  const lineTwo = [item.city, item.region, item.postalCode].filter(Boolean).join(', ');
+  return [lineOne, lineTwo].filter(Boolean).join(', ') || 'Dropped pin';
+}
 
 export default function CreateRideScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const mapRef = useRef<MapView>(null);
   const { rideId } = useLocalSearchParams<{ rideId?: string }>();
   const { crew, currentUser, createRide, updateRide, deleteRide, isCreatingRide } = useCrew();
   const { ride } = useRide(rideId || '');
@@ -45,6 +62,8 @@ export default function CreateRideScreen() {
   const [coverAttribution, setCoverAttribution] = useState<ImageAttribution | undefined>();
   const [isSaving, setIsSaving] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [mapTarget, setMapTarget] = useState<MapTarget>('start');
+  const [isResolvingPin, setIsResolvingPin] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
@@ -84,6 +103,52 @@ export default function CreateRideScreen() {
       setDistance(String(Math.round(computed * 10) / 10));
     }
   }, [startCoords, endCoords]);
+
+  const mapRegion = useMemo(() => {
+    if (startCoords && endCoords) {
+      const latitudeDelta = Math.max(Math.abs(startCoords.latitude - endCoords.latitude) * 1.8, 0.04);
+      const longitudeDelta = Math.max(Math.abs(startCoords.longitude - endCoords.longitude) * 1.8, 0.04);
+      return {
+        latitude: (startCoords.latitude + endCoords.latitude) / 2,
+        longitude: (startCoords.longitude + endCoords.longitude) / 2,
+        latitudeDelta,
+        longitudeDelta,
+      };
+    }
+
+    const point = startCoords || endCoords;
+    if (point) {
+      return {
+        latitude: point.latitude,
+        longitude: point.longitude,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      };
+    }
+
+    return DEFAULT_REGION;
+  }, [endCoords, startCoords]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (startCoords && endCoords) {
+      mapRef.current.fitToCoordinates([startCoords, endCoords], {
+        edgePadding: { top: 70, right: 70, bottom: 70, left: 70 },
+        animated: true,
+      });
+      return;
+    }
+
+    const point = startCoords || endCoords;
+    if (point) {
+      mapRef.current.animateToRegion({
+        latitude: point.latitude,
+        longitude: point.longitude,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08,
+      }, 350);
+    }
+  }, [endCoords, startCoords]);
 
   if (isEditMode && !ride) {
     return (
@@ -144,6 +209,44 @@ export default function CreateRideScreen() {
   const handleEndAddressSelect = (selection: AddressSelection) => {
     setEndAddress(selection.address);
     setEndCoords({ latitude: selection.latitude, longitude: selection.longitude });
+  };
+
+  const setDroppedPin = async (target: MapTarget, coordinate: { latitude: number; longitude: number }) => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync();
+    }
+
+    if (target === 'start') {
+      setStartCoords(coordinate);
+      if (!startName.trim()) setStartName('Start pin');
+    } else {
+      setEndCoords(coordinate);
+      if (!endName.trim()) setEndName('End pin');
+    }
+
+    setIsResolvingPin(true);
+    try {
+      const addresses = await Location.reverseGeocodeAsync(coordinate);
+      const formatted = formatReverseAddress(addresses[0]);
+      if (target === 'start') {
+        setStartAddress(formatted);
+      } else {
+        setEndAddress(formatted);
+      }
+    } catch {
+      const fallback = `${coordinate.latitude.toFixed(5)}, ${coordinate.longitude.toFixed(5)}`;
+      if (target === 'start') {
+        setStartAddress(fallback);
+      } else {
+        setEndAddress(fallback);
+      }
+    } finally {
+      setIsResolvingPin(false);
+    }
+  };
+
+  const handleMapPress = (event: MapPressEvent) => {
+    void setDroppedPin(mapTarget, event.nativeEvent.coordinate);
   };
 
   const formattedDate = dateSelected
@@ -419,6 +522,90 @@ export default function CreateRideScreen() {
                 Coordinates set ({endCoords.latitude.toFixed(4)}, {endCoords.longitude.toFixed(4)})
               </Text>
             )}
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.labelRow}>
+              <MapPinned size={16} color={Colors.dark.primary} />
+              <Text style={styles.label}>Map Pins</Text>
+            </View>
+            <View style={styles.mapPanel}>
+              <View style={styles.mapToolbar}>
+                <View style={styles.segmentedControl}>
+                  <Pressable
+                    style={[styles.segmentButton, mapTarget === 'start' && styles.segmentButtonActive]}
+                    onPress={() => setMapTarget('start')}
+                  >
+                    <Text style={[styles.segmentText, mapTarget === 'start' && styles.segmentTextActive]}>
+                      Start
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.segmentButton, mapTarget === 'end' && styles.segmentButtonActive]}
+                    onPress={() => setMapTarget('end')}
+                  >
+                    <Text style={[styles.segmentText, mapTarget === 'end' && styles.segmentTextActive]}>
+                      End
+                    </Text>
+                  </Pressable>
+                </View>
+                <View style={styles.pinStatus}>
+                  <LocateFixed size={14} color={isResolvingPin ? Colors.dark.warning : Colors.dark.textTertiary} />
+                  <Text style={styles.pinStatusText}>
+                    {isResolvingPin ? 'Resolving pin...' : `Tap map to set ${mapTarget}`}
+                  </Text>
+                </View>
+              </View>
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                initialRegion={mapRegion}
+                mapType="standard"
+                showsUserLocation
+                showsMyLocationButton
+                onPress={handleMapPress}
+              >
+                {startCoords && (
+                  <Marker
+                    coordinate={startCoords}
+                    title="Start"
+                    description={startAddress || startName || 'Ride start'}
+                    pinColor={Colors.dark.success}
+                    draggable
+                    onDragEnd={(event) => void setDroppedPin('start', event.nativeEvent.coordinate)}
+                  />
+                )}
+                {endCoords && (
+                  <Marker
+                    coordinate={endCoords}
+                    title="End"
+                    description={endAddress || endName || 'Ride end'}
+                    pinColor={Colors.dark.error}
+                    draggable
+                    onDragEnd={(event) => void setDroppedPin('end', event.nativeEvent.coordinate)}
+                  />
+                )}
+                {startCoords && endCoords && (
+                  <Polyline
+                    coordinates={[startCoords, endCoords]}
+                    strokeColor={Colors.dark.primary}
+                    strokeWidth={4}
+                    lineDashPattern={[10, 6]}
+                  />
+                )}
+              </MapView>
+              <View style={styles.mapLegend}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: Colors.dark.success }]} />
+                  <Text style={styles.legendText}>Start</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: Colors.dark.error }]} />
+                  <Text style={styles.legendText}>End</Text>
+                </View>
+                <Text style={styles.mapHint}>Drag either pin to adjust the route estimate.</Text>
+              </View>
+            </View>
           </View>
 
           <View style={styles.row}>
@@ -719,6 +906,89 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+  },
+  mapPanel: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    overflow: 'hidden',
+  },
+  mapToolbar: {
+    padding: 12,
+    gap: 10,
+    backgroundColor: Colors.dark.surfaceElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.dark.border,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: Colors.dark.background,
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentButtonActive: {
+    backgroundColor: Colors.dark.primary,
+  },
+  segmentText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  segmentTextActive: {
+    color: Colors.dark.text,
+  },
+  pinStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pinStatusText: {
+    color: Colors.dark.textTertiary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  map: {
+    width: '100%',
+    height: 280,
+  },
+  mapLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.dark.border,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mapHint: {
+    color: Colors.dark.textTertiary,
+    fontSize: 12,
+    flexShrink: 1,
   },
   textArea: {
     minHeight: 80,
