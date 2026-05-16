@@ -27,6 +27,7 @@ export default function MemberRow({ member, onPress, showStats = true, showRemov
   };
 
   const getRoleLabel = () => {
+    if (member.leadershipTitle) return member.leadershipTitle;
     if (member.role === 'admin') return 'Admin';
     if (member.role === 'officer') return 'Officer';
     return 'Member';
@@ -60,6 +61,14 @@ export default function MemberRow({ member, onPress, showStats = true, showRemov
         <Text style={styles.name}>{member.name}</Text>
         <View style={styles.metaRow}>
           <Text style={styles.role}>{getRoleLabel()}</Text>
+          {member.leadershipTitle && (
+            <>
+              <View style={styles.dot} />
+              <Text style={styles.roleKind}>
+                {member.role === 'admin' ? 'Admin' : member.role === 'officer' ? 'Officer' : 'Member'}
+              </Text>
+            </>
+          )}
           {showStats && (
             <>
               <View style={styles.dot} />
@@ -138,6 +147,10 @@ const styles = StyleSheet.create({
   role: {
     color: Colors.dark.textTertiary,
     fontSize: 13,
+  },
+  roleKind: {
+    color: Colors.dark.textTertiary,
+    fontSize: 12,
   },
   dot: {
     width: 3,

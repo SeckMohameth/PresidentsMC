@@ -646,6 +646,29 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     });
   }, [crewId, assertAdmin]);
 
+  const setMemberLeadership = useCallback(async (
+    memberId: string,
+    updates: { role?: CrewMember['role']; leadershipTitle?: string }
+  ) => {
+    if (!crewId) throw new Error('No crew');
+    assertAdmin();
+    const callable = httpsCallable(functions, 'setCrewMemberLeadership');
+    await callable({ memberId, ...updates });
+
+    void trackAnalyticsEvent({
+      eventName: 'crew_member_role_changed',
+      actorUserId: currentUser?.id ?? null,
+      crewId,
+      route: '/members',
+      properties: {
+        memberId,
+        role: updates.role ?? null,
+        leadershipTitle: updates.leadershipTitle ?? null,
+        action: 'set_member_leadership',
+      },
+    });
+  }, [crewId, assertAdmin, currentUser?.id]);
+
   const approveJoinRequest = useCallback(async (request: JoinRequest) => {
     if (!crewId) throw new Error('No crew');
     assertAdminOrOfficer();
@@ -862,6 +885,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     addPhoto,
     removeMember,
     setMemberRole,
+    setMemberLeadership,
     approveJoinRequest,
     denyJoinRequest,
     updateCrewSettings,

@@ -55,6 +55,7 @@ type CrewMemberDoc = {
   avatar?: string;
   bike?: string;
   role?: UserRole;
+  leadershipTitle?: string;
   isDeveloperSupport?: boolean;
   joinedCrewAt?: string;
   joinedAt?: string;
@@ -1402,6 +1403,57 @@ export const setCrewMemberRole = onCall(async (request) => {
   await Promise.all([
     targetMemberRef.set({ role }, { merge: true }),
     targetUserRef.set({ role }, { merge: true }),
+  ]);
+
+  return { ok: true };
+});
+
+export const setCrewMemberLeadership = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const memberId = String(request.data?.memberId ?? '').trim();
+  const nextRole = request.data?.role == null ? undefined : String(request.data.role).trim() as UserRole;
+  const leadershipTitle = String(request.data?.leadershipTitle ?? '').trim().slice(0, 48);
+
+  if (!memberId) {
+    throw new HttpsError('invalid-argument', 'MEMBER_ID_REQUIRED');
+  }
+  if (nextRole && !['admin', 'officer', 'member'].includes(nextRole)) {
+    throw new HttpsError('invalid-argument', 'INVALID_MEMBER_ROLE');
+  }
+
+  const context = await getActingMemberContext(userId);
+  requireAdmin(context.member, context.crew);
+
+  if (context.crew.ownerId === memberId && nextRole && nextRole !== 'admin') {
+    throw new HttpsError('failed-precondition', 'OWNER_ROLE_LOCKED');
+  }
+
+  const targetMemberRef = context.crewRef.collection('members').doc(memberId);
+  const targetUserRef = adminDb.collection('users').doc(memberId);
+  const targetMemberSnap = await targetMemberRef.get();
+  if (!targetMemberSnap.exists) {
+    throw new HttpsError('not-found', 'MEMBER_NOT_FOUND');
+  }
+
+  const memberUpdates: Record<string, unknown> = {
+    leadershipTitle: leadershipTitle || FieldValue.delete(),
+  };
+  const userUpdates: Record<string, unknown> = {
+    leadershipTitle: leadershipTitle || FieldValue.delete(),
+  };
+
+  if (nextRole) {
+    memberUpdates.role = nextRole;
+    userUpdates.role = nextRole;
+  }
+
+  await Promise.all([
+    targetMemberRef.set(memberUpdates, { merge: true }),
+    targetUserRef.set(userUpdates, { merge: true }),
   ]);
 
   return { ok: true };
