@@ -1,5 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Platform } from 'react-native';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -26,6 +27,7 @@ import { httpsCallable } from 'firebase/functions';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useRevenueCat } from '@/providers/RevenueCatProvider';
 import { auth, db, functions, storage } from '@/utils/firebase';
+import { getDevicePushToken } from '@/utils/pushNotifications';
 import SafeAsyncStorage from '@/utils/safeAsyncStorage';
 import { UserPreferences } from '@/types';
 import { DEFAULT_AVATAR } from '@/utils/avatar';
@@ -192,6 +194,37 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   useEffect(() => {
     loginUserRef.current = loginUser;
   }, [loginUser]);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    let isActive = true;
+
+    const syncPushToken = async () => {
+      try {
+        if (profile.preferences?.pushEnabled === false) {
+          return;
+        }
+
+        const token = await getDevicePushToken();
+        if (!token || !isActive) return;
+
+        await setDoc(doc(db, 'users', profile.id, 'pushTokens', token), {
+          token,
+          platform: Platform.OS,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[AuthProvider] Push token sync error:', error);
+        }
+      }
+    };
+
+    void syncPushToken();
+    return () => {
+      isActive = false;
+    };
+  }, [profile?.id, profile?.preferences?.pushEnabled]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;

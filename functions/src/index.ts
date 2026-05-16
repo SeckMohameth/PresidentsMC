@@ -84,6 +84,32 @@ type JoinRequestDoc = {
   message?: string;
 };
 
+type AnnouncementDoc = {
+  id?: string;
+  title?: string;
+  content?: string;
+  authorId?: string;
+  authorName?: string;
+};
+
+type RidePhotoDoc = {
+  id?: string;
+  uploadedBy?: string;
+  uploadedByName?: string;
+};
+
+type RideDoc = {
+  id?: string;
+  title?: string;
+  createdBy?: string | null;
+  createdByName?: string;
+  dateTime?: string;
+  attendees?: string[];
+  checkedIn?: string[];
+  photos?: RidePhotoDoc[];
+  status?: string;
+};
+
 type ExpoPushMessage = {
   to: string;
   title: string;
@@ -263,6 +289,115 @@ async function getUserPreferences(userId: string) {
 async function getUserPushTokens(userId: string) {
   const snap = await adminDb.collection('users').doc(userId).collection('pushTokens').get();
   return snap.docs.map((docSnap) => docSnap.id);
+}
+
+async function getCrewName(crewId: string) {
+  const crewSnap = await adminDb.collection('crews').doc(crewId).get();
+  return crewSnap.exists ? ((crewSnap.data() as CrewDoc).name ?? 'PresidentsMC') : 'PresidentsMC';
+}
+
+async function getCrewMembers(crewId: string) {
+  const snap = await adminDb.collection('crews').doc(crewId).collection('members').get();
+  return snap.docs.map((docSnap) => ({ ...(docSnap.data() as CrewMemberDoc), id: docSnap.id }));
+}
+
+async function getCrewLeaders(crewId: string) {
+  const members = await getCrewMembers(crewId);
+  return members.filter(
+    (member) =>
+      !member.isDeveloperSupport &&
+      (member.role === 'admin' || member.role === 'officer')
+  );
+}
+
+async function getMemberName(crewId: string, userId: string) {
+  const memberSnap = await adminDb
+    .collection('crews')
+    .doc(crewId)
+    .collection('members')
+    .doc(userId)
+    .get();
+  if (memberSnap.exists) {
+    const member = memberSnap.data() as CrewMemberDoc;
+    return member.name || 'A member';
+  }
+
+  const userSnap = await adminDb.collection('users').doc(userId).get();
+  if (userSnap.exists) {
+    const user = userSnap.data() as UserDoc;
+    return user.name || 'A member';
+  }
+
+  return 'A member';
+}
+
+async function queueUserPush(
+  messages: ExpoPushMessage[],
+  userId: string,
+  notificationType: 'announcements' | 'rides' | 'joinRequests',
+  payload: Omit<ExpoPushMessage, 'to'>
+) {
+  const prefs = await getUserPreferences(userId);
+  if (prefs.pushEnabled === false || prefs[notificationType] === false) return;
+
+  const tokens = await getUserPushTokens(userId);
+  tokens.forEach((token) => {
+    messages.push({ to: token, ...payload });
+  });
+}
+
+async function notifyCrewMembers({
+  crewId,
+  notificationType,
+  excludeUserIds = [],
+  title,
+  body,
+  data,
+}: {
+  crewId: string;
+  notificationType: 'announcements' | 'rides' | 'joinRequests';
+  excludeUserIds?: string[];
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}) {
+  const exclude = new Set(excludeUserIds.filter(Boolean));
+  const members = await getCrewMembers(crewId);
+  const messages: ExpoPushMessage[] = [];
+
+  for (const member of members) {
+    if (member.isDeveloperSupport || exclude.has(member.id)) continue;
+    await queueUserPush(messages, member.id, notificationType, { title, body, data });
+  }
+
+  await sendExpoPush(messages);
+}
+
+async function notifyCrewLeaders({
+  crewId,
+  notificationType = 'joinRequests',
+  excludeUserIds = [],
+  title,
+  body,
+  data,
+}: {
+  crewId: string;
+  notificationType?: 'announcements' | 'rides' | 'joinRequests';
+  excludeUserIds?: string[];
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}) {
+  const exclude = new Set(excludeUserIds.filter(Boolean));
+  const leaders = await getCrewLeaders(crewId);
+  const messages: ExpoPushMessage[] = [];
+
+  for (const leader of leaders) {
+    if (exclude.has(leader.id)) continue;
+    await queueUserPush(messages, leader.id, notificationType, { title, body, data });
+  }
+
+  await sendExpoPush(messages);
 }
 
 async function flushBatch(batch: WriteBatch, operations: number) {
@@ -1382,7 +1517,79 @@ export const onCrewRideWritten = onDocumentWritten(
   { database: 'default', document: 'crews/{crewId}/rides/{rideId}' },
   async (event) => {
     const crewId = event.params.crewId as string;
+    const rideId = event.params.rideId as string;
     await refreshCrewAggregates(crewId);
+
+    const beforeExists = event.data?.before.exists ?? false;
+    const afterExists = event.data?.after.exists ?? false;
+    const before = event.data?.before.data() as RideDoc | undefined;
+    const after = event.data?.after.data() as RideDoc | undefined;
+    if (!afterExists || !after) return;
+
+    const rideTitle = after.title || 'New ride';
+
+    if (!beforeExists) {
+      await notifyCrewMembers({
+        crewId,
+        notificationType: 'rides',
+        excludeUserIds: [after.createdBy || ''],
+        title: 'New Ride Posted',
+        body: `${rideTitle} is on the calendar.`,
+        data: { crewId, rideId, type: 'ride_created' },
+      });
+      return;
+    }
+
+    if (!before) return;
+
+    const beforeAttendees = new Set(before.attendees || []);
+    const afterAttendees = new Set(after.attendees || []);
+    const joined = [...afterAttendees].filter((userId) => !beforeAttendees.has(userId));
+    const left = [...beforeAttendees].filter((userId) => !afterAttendees.has(userId));
+
+    for (const userId of joined) {
+      const memberName = await getMemberName(crewId, userId);
+      await notifyCrewLeaders({
+        crewId,
+        notificationType: 'rides',
+        excludeUserIds: [userId],
+        title: 'Ride RSVP',
+        body: `${memberName} joined ${rideTitle}.`,
+        data: { crewId, rideId, userId, type: 'ride_joined' },
+      });
+    }
+
+    for (const userId of left) {
+      const memberName = await getMemberName(crewId, userId);
+      await notifyCrewLeaders({
+        crewId,
+        notificationType: 'rides',
+        excludeUserIds: [userId],
+        title: 'Ride RSVP',
+        body: `${memberName} left ${rideTitle}.`,
+        data: { crewId, rideId, userId, type: 'ride_left' },
+      });
+    }
+
+    const beforePhotos = before.photos || [];
+    const afterPhotos = after.photos || [];
+    if (afterPhotos.length > beforePhotos.length) {
+      const addedPhotos = afterPhotos.slice(beforePhotos.length);
+      const uploaderIds = [...new Set(addedPhotos.map((photo) => photo.uploadedBy).filter(Boolean) as string[])];
+      const firstPhoto = addedPhotos[0];
+      const uploaderName = firstPhoto?.uploadedByName || 'A member';
+      await notifyCrewMembers({
+        crewId,
+        notificationType: 'rides',
+        excludeUserIds: uploaderIds,
+        title: beforePhotos.length === 0 ? 'Ride Album Started' : 'New Ride Photos',
+        body:
+          beforePhotos.length === 0
+            ? `${uploaderName} started the album for ${rideTitle}.`
+            : `${uploaderName} added photos to ${rideTitle}.`,
+        data: { crewId, rideId, type: 'ride_photos_added' },
+      });
+    }
   }
 );
 
@@ -1390,7 +1597,53 @@ export const onCrewMemberWritten = onDocumentWritten(
   { database: 'default', document: 'crews/{crewId}/members/{memberId}' },
   async (event) => {
     const crewId = event.params.crewId as string;
+    const memberId = event.params.memberId as string;
     await refreshCrewAggregates(crewId);
+
+    const beforeExists = event.data?.before.exists ?? false;
+    const afterExists = event.data?.after.exists ?? false;
+    const before = event.data?.before.data() as CrewMemberDoc | undefined;
+    const after = event.data?.after.data() as CrewMemberDoc | undefined;
+    const crewName = await getCrewName(crewId);
+
+    if (!beforeExists && afterExists && after && !after.isDeveloperSupport) {
+      await notifyCrewLeaders({
+        crewId,
+        excludeUserIds: [memberId],
+        title: 'New Member Joined',
+        body: `${after.name || 'A member'} joined ${crewName}.`,
+        data: { crewId, memberId, type: 'member_joined' },
+      });
+    }
+
+    if (beforeExists && !afterExists && before && !before.isDeveloperSupport) {
+      await notifyCrewLeaders({
+        crewId,
+        excludeUserIds: [memberId],
+        title: 'Member Left',
+        body: `${before.name || 'A member'} left ${crewName}.`,
+        data: { crewId, memberId, type: 'member_left' },
+      });
+    }
+  }
+);
+
+export const onAnnouncementCreated = onDocumentCreated(
+  { database: 'default', document: 'crews/{crewId}/announcements/{announcementId}' },
+  async (event) => {
+    const crewId = event.params.crewId as string;
+    const announcementId = event.params.announcementId as string;
+    const data = event.data?.data() as AnnouncementDoc | undefined;
+    if (!data) return;
+
+    await notifyCrewMembers({
+      crewId,
+      notificationType: 'announcements',
+      excludeUserIds: [data.authorId || ''],
+      title: data.title || 'New Announcement',
+      body: data.content ? data.content.slice(0, 120) : `${data.authorName || 'An admin'} posted an announcement.`,
+      data: { crewId, announcementId, type: 'announcement_created' },
+    });
   }
 );
 
