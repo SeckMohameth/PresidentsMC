@@ -54,6 +54,7 @@ export interface Announcement {
   link?: string;
   createdAt: string;
   isPinned: boolean;
+  likedBy?: string[];
   imageUrl?: string;
   imageAttribution?: ImageAttribution;
 }

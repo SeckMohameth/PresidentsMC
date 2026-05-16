@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, Linking } from 'react-native';
 import { Image } from 'expo-image';
-import { Pin, Shield, Star, Pencil, X, Link as LinkIcon } from 'lucide-react-native';
+import { Heart, Pin, Shield, Star, Pencil, X, Link as LinkIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Colors from '@/constants/colors';
 import { Announcement } from '@/types';
+import { useAuth } from '@/providers/AuthProvider';
 import { formatRelativeTime, getInitials } from '@/utils/helpers';
 
 interface AnnouncementCardProps {
   announcement: Announcement;
   onEdit?: () => void;
+  onToggleLike?: () => void;
 }
 
-export default function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps) {
+export default function AnnouncementCard({ announcement, onEdit, onToggleLike }: AnnouncementCardProps) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [isOpeningLink, setIsOpeningLink] = useState(false);
+  const likedBy = announcement.likedBy || [];
+  const hasLiked = !!user?.id && likedBy.includes(user.id);
 
   const getRoleBadge = () => {
     if (announcement.authorRole === 'admin') {
@@ -104,6 +109,23 @@ export default function AnnouncementCard({ announcement, onEdit }: AnnouncementC
           </Pressable>
         </View>
       )}
+      <View style={styles.footer}>
+        <Pressable
+          style={[styles.likeButton, hasLiked && styles.likeButtonActive]}
+          onPress={onToggleLike}
+          disabled={!onToggleLike}
+          hitSlop={8}
+        >
+          <Heart
+            size={16}
+            color={hasLiked ? Colors.dark.primary : Colors.dark.textSecondary}
+            fill={hasLiked ? Colors.dark.primary : 'transparent'}
+          />
+          <Text style={[styles.likeText, hasLiked && styles.likeTextActive]}>
+            {likedBy.length}
+          </Text>
+        </Pressable>
+      </View>
 
       <Modal visible={isImageOpen} transparent animationType="fade" onRequestClose={() => setIsImageOpen(false)}>
         <View style={styles.modalOverlay}>
@@ -258,6 +280,36 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderRadius: 12,
+  },
+  footer: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  likeButton: {
+    minWidth: 54,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+  },
+  likeButtonActive: {
+    borderColor: 'rgba(249, 115, 22, 0.35)',
+    backgroundColor: 'rgba(249, 115, 22, 0.12)',
+  },
+  likeText: {
+    color: Colors.dark.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  likeTextActive: {
+    color: Colors.dark.primary,
   },
   modalOverlay: {
     flex: 1,

@@ -73,6 +73,14 @@ service cloud.firestore {
         && data.pendingCrewId == null;
     }
 
+    function isDeveloperSupportMemberData(data) {
+      return data.id == request.auth.uid
+        && isDeveloperAdminEmail()
+        && data.email == request.auth.token.email
+        && data.role == 'admin'
+        && data.isDeveloperSupport == true;
+    }
+
     function validSelfCrewState(data) {
       return data.crewId == null
         ? data.role == 'member'
@@ -165,12 +173,28 @@ service cloud.firestore {
         allow update: if isPresidentsClub(crewId)
           && isSelf(memberId)
           && isCrewMember(crewId)
-          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
-            'name',
-            'email',
-            'avatar',
-            'bike'
-          ]);
+          && (
+            request.resource.data.diff(resource.data).changedKeys().hasOnly([
+              'name',
+              'email',
+              'avatar',
+              'bike'
+            ])
+            || (
+              isDeveloperSupportMemberData(request.resource.data)
+              && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+                'id',
+                'name',
+                'email',
+                'avatar',
+                'role',
+                'isDeveloperSupport',
+                'joinedCrewAt',
+                'ridesAttended',
+                'milesTraveled'
+              ])
+            )
+          );
         allow delete: if false;
       }
 
@@ -197,8 +221,18 @@ service cloud.firestore {
 
       match /announcements/{announcementId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
-        allow create, update, delete: if isPresidentsClub(crewId)
+        allow create, delete: if isPresidentsClub(crewId)
           && (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+        allow update: if isPresidentsClub(crewId)
+          && (
+            isDeveloperSupport(crewId)
+            || isCrewOwner(crewId)
+            || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+            || (
+              isCrewMember(crewId)
+              && request.resource.data.diff(resource.data).changedKeys().hasOnly(['likedBy'])
+            )
+          );
       }
 
       match /rides/{rideId} {

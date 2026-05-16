@@ -36,6 +36,8 @@ export type AnalyticsEventName =
   | 'announcement_create_success'
   | 'announcement_update_success'
   | 'announcement_delete_success'
+  | 'announcement_like'
+  | 'announcement_unlike'
   | 'paywall_view'
   | 'purchase_intent'
   | 'purchase_success'

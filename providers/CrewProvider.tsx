@@ -257,6 +257,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       ...announcement,
       id: docRef.id,
       imageUrl: imageUrl || null,
+      likedBy: announcement.likedBy || [],
       createdAt: new Date().toISOString(),
     }));
 
@@ -326,6 +327,26 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       properties: { announcementId },
     });
   }, [crewId, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+
+  const toggleAnnouncementLike = useCallback(async (announcementId: string) => {
+    if (!crewId || !currentUser) throw new Error('No crew member');
+    const announcement = announcements.find((item) => item.id === announcementId);
+    if (!announcement) throw new Error('Announcement not found');
+    const announcementRef = doc(db, 'crews', crewId, 'announcements', announcementId);
+    const hasLiked = announcement.likedBy?.includes(currentUser.id);
+
+    await updateDoc(announcementRef, {
+      likedBy: hasLiked ? arrayRemove(currentUser.id) : arrayUnion(currentUser.id),
+    });
+
+    void trackAnalyticsEvent({
+      eventName: hasLiked ? 'announcement_unlike' : 'announcement_like',
+      actorUserId: currentUser.id,
+      crewId,
+      route: '/home',
+      properties: { announcementId },
+    });
+  }, [announcements, crewId, currentUser]);
 
   const createRide = useCallback(async (ride: Omit<Ride, 'id' | 'attendees' | 'checkedIn' | 'photos' | 'status'>) => {
     if (!crewId) throw new Error('No crew');
@@ -827,6 +848,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     createAnnouncement,
     updateAnnouncement,
     deleteAnnouncement,
+    toggleAnnouncementLike,
     createRide,
     updateRide,
     deleteRide,

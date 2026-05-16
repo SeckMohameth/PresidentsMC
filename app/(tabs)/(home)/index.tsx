@@ -14,7 +14,7 @@ import RideCard from '@/components/RideCard';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { crew, currentUser, announcements, upcomingRides, canPost, isAdmin, isLoading } = useCrew();
+  const { crew, currentUser, announcements, upcomingRides, canPost, isAdmin, isLoading, toggleAnnouncementLike } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -155,6 +155,7 @@ export default function HomeScreen() {
               <AnnouncementCard 
                 key={announcement.id} 
                 announcement={announcement}
+                onToggleLike={() => toggleAnnouncementLike(announcement.id)}
                 onEdit={isAdmin ? () => router.push({ pathname: '/create-announcement', params: { announcementId: announcement.id } }) : undefined}
               />
             ))
