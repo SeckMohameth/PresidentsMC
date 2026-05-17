@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { Bell, Camera, Map, Shield, Users } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -62,6 +62,8 @@ export default function FeatureOnboardingScreen() {
   const { width } = useWindowDimensions();
   const listRef = useRef<FlatList<FeatureSlide>>(null);
   const [index, setIndex] = useState(0);
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const complete = async () => {
     if (Platform.OS !== 'web') {
@@ -93,7 +95,7 @@ export default function FeatureOnboardingScreen() {
         <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.featurePanel}>
           <View style={styles.panelTopRow}>
             <View style={styles.iconBox}>
-              <Icon size={25} color={Colors.dark.text} strokeWidth={1.8} />
+              <Icon size={25} color={colors.text} strokeWidth={1.8} />
             </View>
             <Text style={styles.slideCount}>{slideIndex + 1}/{slides.length}</Text>
           </View>
@@ -123,7 +125,7 @@ export default function FeatureOnboardingScreen() {
       <View style={styles.imageHeader}>
         <Image source={heroImage} style={styles.heroImage} contentFit="cover" />
         <LinearGradient
-          colors={['rgba(0,0,0,0.08)', 'rgba(5,5,5,0.34)', Colors.dark.background]}
+          colors={['rgba(0,0,0,0.08)', 'rgba(5,5,5,0.34)', colors.background]}
           style={StyleSheet.absoluteFill}
         />
       </View>
@@ -131,7 +133,7 @@ export default function FeatureOnboardingScreen() {
       <SafeAreaView style={styles.safeArea}>
         <Animated.View entering={FadeInUp.duration(420)} style={styles.header}>
           <View style={styles.clubMark}>
-            <Users size={18} color={Colors.dark.background} strokeWidth={2.2} />
+            <Users size={18} color={colors.background} strokeWidth={2.2} />
           </View>
           <View>
             <Text style={styles.kicker}>Welcome to</Text>
@@ -172,10 +174,10 @@ export default function FeatureOnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   imageHeader: {
     position: 'absolute',
@@ -207,17 +209,17 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
   },
   kicker: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
   clubName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0,
@@ -234,7 +236,7 @@ const styles = StyleSheet.create({
     maxWidth: 560,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     backgroundColor: 'rgba(17,17,17,0.94)',
     padding: 18,
   },
@@ -250,15 +252,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.heat,
+    backgroundColor: colors.heat,
   },
   slideCount: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     fontWeight: '700',
   },
   slideLabel: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   slideTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 29,
     lineHeight: 35,
     fontWeight: '900',
@@ -274,7 +276,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   slideBody: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     marginBottom: 18,
@@ -292,11 +294,11 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: Colors.dark.heat,
+    backgroundColor: colors.heat,
   },
   bulletText: {
     flex: 1,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -317,21 +319,21 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.dark.borderLight,
+    backgroundColor: colors.borderLight,
   },
   dotActive: {
     width: 24,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
   },
   button: {
     minHeight: 56,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.text,
+    backgroundColor: colors.text,
   },
   buttonText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 16,
     fontWeight: '900',
   },

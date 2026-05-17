@@ -9,7 +9,7 @@ import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { AnalyticsProvider } from "@/providers/AnalyticsProvider";
 import { CrewProvider } from "@/providers/CrewProvider";
 import { RevenueCatProvider } from "@/providers/RevenueCatProvider";
-import Colors from "@/constants/colors";
+import Colors, { useThemeColors } from "@/constants/colors";
 import "@/utils/firebase";
 import PushNotificationManager from "@/components/PushNotificationManager";
 
@@ -19,6 +19,7 @@ const queryClient = new QueryClient();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { authStatus } = useAuth();
+  const colors = useThemeColors();
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
@@ -58,8 +59,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (authStatus === 'loading') {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.dark.primary} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -68,13 +69,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function RootLayoutNav() {
+  const colors = useThemeColors();
+
   return (
     <Stack
       screenOptions={{
         headerBackTitle: "Back",
-        headerStyle: { backgroundColor: Colors.dark.background },
-        headerTintColor: Colors.dark.text,
-        contentStyle: { backgroundColor: Colors.dark.background },
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -187,6 +190,9 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const colors = useThemeColors();
+  const statusBarStyle = colors.background === Colors.light.background ? 'dark' : 'light';
+
   useEffect(() => {
     SplashScreen.hideAsync();
   }, []);
@@ -198,7 +204,7 @@ export default function RootLayout() {
           <AnalyticsProvider>
             <CrewProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
-                <StatusBar style="auto" />
+                <StatusBar style={statusBarStyle} />
                 <PushNotificationManager />
                 <AuthGate>
                   <RootLayoutNav />
@@ -215,7 +221,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
     alignItems: 'center',
     justifyContent: 'center',
   },

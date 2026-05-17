@@ -9,7 +9,7 @@ import {
   Keyboard,
 } from 'react-native';
 import * as Location from 'expo-location';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 
 type NativeGeocodeResult = {
   id: string;
@@ -45,6 +45,8 @@ export default function AddressAutocomplete({
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestQueryRef = useRef('');
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const searchAddress = useCallback(async (query: string) => {
     const trimmed = query.trim();
@@ -109,7 +111,7 @@ export default function AddressAutocomplete({
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={Colors.dark.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={value}
           onChangeText={handleChangeText}
           onFocus={() => {
@@ -123,7 +125,7 @@ export default function AddressAutocomplete({
         {isLoading && (
           <ActivityIndicator
             size="small"
-            color={Colors.dark.primary}
+            color={colors.primary}
             style={styles.loader}
           />
         )}
@@ -150,7 +152,7 @@ export default function AddressAutocomplete({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     position: 'relative',
     zIndex: 1,
@@ -161,14 +163,14 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   loader: {
     position: 'absolute',
@@ -179,10 +181,10 @@ const styles = StyleSheet.create({
     top: '100%',
     left: 0,
     right: 0,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginTop: 4,
     maxHeight: 200,
     overflow: 'hidden',
@@ -197,15 +199,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   dropdownText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     lineHeight: 20,
   },
   dropdownSubtext: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 2,
   },

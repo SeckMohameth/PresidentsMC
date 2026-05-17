@@ -115,6 +115,7 @@ async function ensureSingleClubOwner(profile: {
       ownerId: profile.id,
       subscriptionOwnerId: profile.id,
       subscriptionStatus: 'inactive',
+      billingRequired: false,
       status: 'active',
       archivedAt: null,
       purgeAt: null,
@@ -510,6 +511,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     isDiscoverable = true,
     requiresApproval = true,
     subscriptionStatus = 'inactive',
+    billingRequired = false,
   }: {
     name: string;
     description: string;
@@ -517,6 +519,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     isDiscoverable?: boolean;
     requiresApproval?: boolean;
     subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'trialing';
+    billingRequired?: boolean;
   }) => {
     if (!profile?.id) throw new Error('Not authenticated');
     setIsCreatingCrew(true);
@@ -557,6 +560,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
             ? profile.id
             : null,
         subscriptionStatus,
+        billingRequired,
         status: 'active',
         archivedAt: null,
         purgeAt: null,

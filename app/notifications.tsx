@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 import { UserPreferences } from '@/types';
 
@@ -16,6 +16,8 @@ const DEFAULT_PREFS: UserPreferences = {
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { user, updatePreferences } = useAuth();
   const prefs = { ...DEFAULT_PREFS, ...(user?.preferences || {}) };
 
@@ -41,8 +43,8 @@ export default function NotificationsScreen() {
             <Switch
               value={prefs.pushEnabled}
               onValueChange={(value) => handleToggle('pushEnabled', value)}
-              trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-              thumbColor={Colors.dark.text}
+              trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+              thumbColor={colors.text}
             />
           </View>
           <Text style={styles.hint}>
@@ -56,8 +58,8 @@ export default function NotificationsScreen() {
             <Switch
               value={prefs.announcements}
               onValueChange={(value) => handleToggle('announcements', value)}
-              trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-              thumbColor={Colors.dark.text}
+              trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+              thumbColor={colors.text}
             />
           </View>
           <View style={styles.row}>
@@ -65,8 +67,8 @@ export default function NotificationsScreen() {
             <Switch
               value={prefs.rides}
               onValueChange={(value) => handleToggle('rides', value)}
-              trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-              thumbColor={Colors.dark.text}
+              trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+              thumbColor={colors.text}
             />
           </View>
           <View style={styles.row}>
@@ -74,8 +76,8 @@ export default function NotificationsScreen() {
             <Switch
               value={prefs.joinRequests}
               onValueChange={(value) => handleToggle('joinRequests', value)}
-              trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-              thumbColor={Colors.dark.text}
+              trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+              thumbColor={colors.text}
             />
           </View>
         </View>
@@ -84,10 +86,10 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   content: {
     paddingHorizontal: 20,
@@ -106,22 +108,22 @@ const styles = StyleSheet.create({
     width: 60,
   },
   backText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
   },
   card: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   row: {
     flexDirection: 'row',
@@ -130,12 +132,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   label: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
   hint: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 6,
   },

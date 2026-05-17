@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { MapPin, Clock, Users, ChevronRight, Gauge, Navigation } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { Ride } from '@/types';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, getDaysUntil, isToday } from '@/utils/helpers';
 
@@ -14,6 +14,8 @@ interface RideCardProps {
 }
 
 export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const daysUntil = getDaysUntil(ride.dateTime);
   const isRideToday = isToday(ride.dateTime);
@@ -22,14 +24,14 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   const isPastDue = ride.status === 'upcoming' && daysUntil < 0;
   const statusTone =
     ride.status === 'completed'
-      ? Colors.dark.completed
+      ? colors.completed
       : ride.status === 'cancelled'
-        ? Colors.dark.cancelled
+        ? colors.cancelled
         : isRideToday
-          ? Colors.dark.heat
+          ? colors.heat
           : isPastDue
-            ? Colors.dark.pending
-            : Colors.dark.upcoming;
+            ? colors.pending
+            : colors.upcoming;
   const statusLabel =
     ride.status === 'completed'
       ? 'Completed'
@@ -63,16 +65,16 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
           <Text style={styles.compactDate}>{formatDateTime(ride.dateTime)}</Text>
           <View style={styles.compactStats}>
             <View style={styles.compactStat}>
-              <MapPin size={12} color={Colors.dark.textTertiary} />
+              <MapPin size={12} color={colors.textTertiary} />
               <Text style={styles.compactStatText}>{formatMiles(ride.estimatedDistance)} mi</Text>
             </View>
             <View style={styles.compactStat}>
-              <Users size={12} color={Colors.dark.textTertiary} />
+              <Users size={12} color={colors.textTertiary} />
               <Text style={styles.compactStatText}>{ride.attendees.length}</Text>
             </View>
           </View>
         </View>
-        <ChevronRight size={20} color={Colors.dark.textTertiary} />
+        <ChevronRight size={20} color={colors.textTertiary} />
       </Pressable>
     );
   }
@@ -107,7 +109,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
         )}
         <View style={styles.imageOverlay}>
           <View style={styles.routePill}>
-            <Navigation size={12} color={Colors.dark.primary} />
+            <Navigation size={12} color={colors.primary} />
             <Text style={styles.routePillText}>{formatMiles(ride.estimatedDistance)} mi</Text>
           </View>
           <Text style={styles.title}>{ride.title}</Text>
@@ -116,18 +118,18 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
       </View>
       <View style={styles.content}>
         <View style={styles.locationRow}>
-          <MapPin size={14} color={Colors.dark.primary} />
+          <MapPin size={14} color={colors.primary} />
           <Text style={styles.locationText} numberOfLines={1}>
             {startLabel} → {endLabel}
           </Text>
         </View>
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Clock size={14} color={Colors.dark.textTertiary} />
+            <Clock size={14} color={colors.textTertiary} />
             <Text style={styles.statText}>{ride.estimatedDuration}</Text>
           </View>
           <View style={styles.stat}>
-            <MapPin size={14} color={Colors.dark.textTertiary} />
+            <MapPin size={14} color={colors.textTertiary} />
             <Text style={styles.statText}>{formatMiles(ride.estimatedDistance)} mi</Text>
           </View>
           <View style={styles.stat}>
@@ -137,7 +139,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
             </Text>
           </View>
           <View style={styles.stat}>
-            <Users size={14} color={Colors.dark.textTertiary} />
+            <Users size={14} color={colors.textTertiary} />
             <Text style={styles.statText}>{ride.attendees.length} going</Text>
           </View>
         </View>
@@ -146,7 +148,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     backgroundColor: 'rgba(18,18,19,0.92)',
     borderRadius: 22,
@@ -158,7 +160,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
     maxWidth: 720,
-    shadowColor: Colors.dark.heat,
+    shadowColor: colors.heat,
     shadowOpacity: 0.18,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 14 },
@@ -228,12 +230,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   routePillText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 12,
     fontWeight: '800',
   },
   title: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 24,
     fontWeight: '900',
     marginBottom: 4,
@@ -255,7 +257,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   locationText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     flex: 1,
   },
@@ -270,7 +272,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -292,20 +294,20 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 12,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   compactContent: {
     flex: 1,
     marginLeft: 12,
   },
   compactTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 2,
   },
   compactDate: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     marginBottom: 4,
   },
@@ -319,7 +321,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   compactStatText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
   },
 });

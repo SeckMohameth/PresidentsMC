@@ -38,6 +38,7 @@ export interface Crew {
   ownerId?: string;
   subscriptionOwnerId?: string | null;
   subscriptionStatus?: 'active' | 'inactive' | 'past_due' | 'trialing';
+  billingRequired?: boolean;
   status?: 'active' | 'archived';
   archivedAt?: string | null;
   purgeAt?: string | null;

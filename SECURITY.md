@@ -26,6 +26,7 @@ The included `firestore.rules` and `storage.rules` are designed for a single pri
 - Pending users can only create/cancel their own join request.
 - Members can update their own profile, RSVP/check in, and upload ride photos.
 - Admin/officer writes are role-gated.
+- Admin/officer billing gates are optional. The beta/open-source default is `billingRequired: false`; set it to `true` only after RevenueCat is configured.
 - Image uploads are limited to image content under 10 MB.
 
 Deploy them before inviting real users:
@@ -46,12 +47,22 @@ In Firebase Console:
 - Set Firebase budget alerts.
 - Limit Cloud Functions IAM access to project admins.
 - Add App Check before a production launch if you need stronger abuse protection.
+- Install Java locally before running Firebase emulator rules tests with `npm run test:rules`.
 
 ## First Owner Bootstrap
 
 The app can bootstrap the first owner from `EXPO_PUBLIC_OWNER_EMAILS`, but the rules only allow this before the `crews/presidents-mc` document exists.
 
 After the first club document exists, nobody can self-promote to owner/admin through client writes.
+
+## Billing Gate
+
+RevenueCat hooks are present, but billing is treated as future work. The club document controls enforcement:
+
+- `billingRequired: false` or missing: owner/admin/officer tools are available according to role.
+- `billingRequired: true`: non-owner admin/officer tools require an active or trialing subscription status.
+
+Do not enable `billingRequired` until RevenueCat products, entitlements, and the webhook secret are configured.
 
 ## Public Firebase Web Config
 

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, Images } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { formatDate } from '@/utils/helpers';
 
@@ -17,6 +17,8 @@ export default function AlbumsScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const columns = width >= 1024 ? 4 : isTablet ? 3 : 2;
   const horizontalPadding = isTablet ? 24 : 16;
   const gap = 12;
@@ -36,7 +38,7 @@ export default function AlbumsScreen() {
         <Text style={styles.title}>Albums</Text>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Images size={16} color={Colors.dark.primary} />
+            <Images size={16} color={colors.primary} />
             <Text style={styles.statText}>{crewStats.totalPhotos} photos</Text>
           </View>
         </View>
@@ -54,14 +56,14 @@ export default function AlbumsScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor={colors.primary}
           />
         }
       >
         {ridesWithPhotos.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
-              <Camera size={48} color={Colors.dark.textTertiary} />
+              <Camera size={48} color={colors.textTertiary} />
             </View>
             <Text style={styles.emptyTitle}>No Photos Yet</Text>
             <Text style={styles.emptyDescription}>
@@ -101,7 +103,7 @@ export default function AlbumsScreen() {
                 </View>
                 {ride.photos.length > 1 && (
                   <View style={styles.photoCountBadge}>
-                    <Images size={12} color={Colors.dark.text} />
+                    <Images size={12} color={colors.text} />
                     <Text style={styles.photoCountText}>{ride.photos.length}</Text>
                   </View>
                 )}
@@ -115,21 +117,21 @@ export default function AlbumsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
     letterSpacing: -0.5,
   },
   statsRow: {
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
   albumCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
   },
   pressed: {
     opacity: 0.9,
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
     right: 12,
   },
   albumTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 4,
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   photoCountText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -235,12 +237,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark.text,
+    color: colors.text,
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 15,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: 22,
   },

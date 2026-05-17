@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, KeyRound, Mail, ShieldCheck } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 
 function mapAuthError(error: any) {
@@ -40,6 +40,8 @@ function mapAuthError(error: any) {
 export default function AccountSecurityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { user, resetPassword, updateEmailAddress, updateAccountPassword } = useAuth();
 
   const [newEmail, setNewEmail] = useState(user?.email ?? '');
@@ -132,14 +134,14 @@ export default function AccountSecurityScreen() {
         >
           <View style={styles.header}>
             <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <ArrowLeft size={22} color={Colors.dark.text} />
+              <ArrowLeft size={22} color={colors.text} />
             </Pressable>
             <Text style={styles.title}>Email & Password</Text>
             <View style={styles.backButton} />
           </View>
 
           <View style={styles.heroCard}>
-            <ShieldCheck size={24} color={Colors.dark.primary} />
+            <ShieldCheck size={24} color={colors.primary} />
             <View style={styles.heroCopy}>
               <Text style={styles.heroTitle}>Email sign-in only</Text>
               <Text style={styles.heroText}>
@@ -150,7 +152,7 @@ export default function AccountSecurityScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Mail size={18} color={Colors.dark.primary} />
+              <Mail size={18} color={colors.primary} />
               <Text style={styles.cardTitle}>Change Email</Text>
             </View>
             <Text style={styles.label}>New Email</Text>
@@ -159,7 +161,7 @@ export default function AccountSecurityScreen() {
               value={newEmail}
               onChangeText={setNewEmail}
               placeholder="name@email.com"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -170,7 +172,7 @@ export default function AccountSecurityScreen() {
               value={emailPassword}
               onChangeText={setEmailPassword}
               placeholder="Required to change email"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               secureTextEntry
               autoCapitalize="none"
             />
@@ -180,7 +182,7 @@ export default function AccountSecurityScreen() {
               disabled={isUpdatingEmail}
             >
               {isUpdatingEmail ? (
-                <ActivityIndicator color={Colors.dark.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.primaryButtonText}>Update Email</Text>
               )}
@@ -189,7 +191,7 @@ export default function AccountSecurityScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <KeyRound size={18} color={Colors.dark.primary} />
+              <KeyRound size={18} color={colors.primary} />
               <Text style={styles.cardTitle}>Change Password</Text>
             </View>
             <Text style={styles.label}>Current Password</Text>
@@ -198,7 +200,7 @@ export default function AccountSecurityScreen() {
               value={currentPassword}
               onChangeText={setCurrentPassword}
               placeholder="Current password"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               secureTextEntry
               autoCapitalize="none"
             />
@@ -208,7 +210,7 @@ export default function AccountSecurityScreen() {
               value={newPassword}
               onChangeText={setNewPassword}
               placeholder="At least 6 characters"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               secureTextEntry
               autoCapitalize="none"
             />
@@ -218,7 +220,7 @@ export default function AccountSecurityScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               placeholder="Confirm password"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               secureTextEntry
               autoCapitalize="none"
             />
@@ -228,7 +230,7 @@ export default function AccountSecurityScreen() {
               disabled={isUpdatingPassword}
             >
               {isUpdatingPassword ? (
-                <ActivityIndicator color={Colors.dark.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.primaryButtonText}>Update Password</Text>
               )}
@@ -256,10 +258,10 @@ export default function AccountSecurityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   keyboard: {
     flex: 1,
@@ -284,7 +286,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 20,
     fontWeight: '900',
   },
@@ -302,21 +304,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 4,
   },
   heroText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 19,
   },
   card: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     padding: 16,
     marginBottom: 16,
   },
@@ -327,23 +329,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '800',
   },
   label: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 8,
     marginTop: 10,
   },
   input: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     borderRadius: 14,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -351,13 +353,13 @@ const styles = StyleSheet.create({
   primaryButton: {
     height: 50,
     borderRadius: 16,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
   },
   primaryButtonText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -365,13 +367,13 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 14,
   },
   secondaryButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '800',
   },
@@ -379,7 +381,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   description: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 19,
     marginTop: 8,

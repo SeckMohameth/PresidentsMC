@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { X, Pin, ImagePlus, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { ImageAttribution } from '@/types';
 
@@ -28,6 +28,8 @@ export default function CreateAnnouncementScreen() {
   const [imageAttribution, setImageAttribution] = useState<ImageAttribution | undefined>();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     if (!announcement || !isEditMode) return;
@@ -42,7 +44,7 @@ export default function CreateAnnouncementScreen() {
   if (isEditMode && !announcement) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: Colors.dark.textSecondary }}>Loading announcement...</Text>
+        <Text style={{ color: colors.textSecondary }}>Loading announcement...</Text>
       </View>
     );
   }
@@ -180,13 +182,13 @@ export default function CreateAnnouncementScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={styles.closeButton} onPress={() => router.back()}>
-          <X size={24} color={Colors.dark.text} />
+          <X size={24} color={colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>{isEditMode ? 'Edit Announcement' : 'New Announcement'}</Text>
         <View style={styles.headerActions}>
           {isEditMode && (
             <Pressable style={styles.deleteButton} onPress={handleDelete} disabled={isSaving}>
-              <Trash2 size={17} color={Colors.dark.error} />
+              <Trash2 size={17} color={colors.error} />
             </Pressable>
           )}
           <Pressable
@@ -219,7 +221,7 @@ export default function CreateAnnouncementScreen() {
             <TextInput
               style={styles.input}
               placeholder="What's the announcement about?"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={title}
               onChangeText={setTitle}
             />
@@ -230,7 +232,7 @@ export default function CreateAnnouncementScreen() {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Write your announcement..."
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={content}
               onChangeText={setContent}
               multiline
@@ -244,7 +246,7 @@ export default function CreateAnnouncementScreen() {
             <TextInput
               style={styles.input}
               placeholder="https://example.com"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={link}
               onChangeText={setLink}
               autoCapitalize="none"
@@ -262,12 +264,12 @@ export default function CreateAnnouncementScreen() {
                   contentFit="cover"
                 />
                 <Pressable style={styles.removeImageButton} onPress={removeImage}>
-                  <Trash2 size={18} color={Colors.dark.text} />
+                  <Trash2 size={18} color={colors.text} />
                 </Pressable>
               </View>
             ) : (
               <Pressable style={styles.imagePickerButton} onPress={pickImage}>
-                <ImagePlus size={24} color={Colors.dark.textTertiary} />
+                <ImagePlus size={24} color={colors.textTertiary} />
                 <Text style={styles.imagePickerText}>Add from Photos</Text>
               </Pressable>
             )}
@@ -276,7 +278,7 @@ export default function CreateAnnouncementScreen() {
           <View style={styles.optionRow}>
             <View style={styles.optionInfo}>
               <View style={styles.optionIcon}>
-                <Pin size={20} color={Colors.dark.primary} />
+                <Pin size={20} color={colors.primary} />
               </View>
               <View>
                 <Text style={styles.optionTitle}>Pin Announcement</Text>
@@ -286,8 +288,8 @@ export default function CreateAnnouncementScreen() {
             <Switch
               value={isPinned}
               onValueChange={setIsPinned}
-              trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-              thumbColor={Colors.dark.text}
+              trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+              thumbColor={colors.text}
             />
           </View>
 
@@ -302,10 +304,10 @@ export default function CreateAnnouncementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -314,7 +316,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   closeButton: {
     width: 40,
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -339,25 +341,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   createButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
   },
   createButtonDisabled: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   createButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   createButtonTextDisabled: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
   },
   scrollView: {
     flex: 1,
@@ -374,20 +376,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   textArea: {
     minHeight: 150,
@@ -397,12 +399,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   optionInfo: {
     flexDirection: 'row',
@@ -418,35 +420,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   optionTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 2,
   },
   optionDescription: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
   },
   infoCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 3,
-    borderLeftColor: Colors.dark.primary,
+    borderLeftColor: colors.primary,
   },
   infoText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
   imagePickerButton: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     borderStyle: 'dashed',
     gap: 8,
   },
@@ -454,7 +456,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   imagePickerText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
     fontWeight: '500',
   },

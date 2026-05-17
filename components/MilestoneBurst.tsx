@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Award, Camera, MapPin, Route } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 
 type Milestone = {
   id: string;
@@ -33,6 +33,8 @@ const icons = {
 };
 
 export default function MilestoneBurst({ milestones }: MilestoneBurstProps) {
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const glow = useSharedValue(0.35);
 
   React.useEffect(() => {
@@ -90,13 +92,13 @@ export default function MilestoneBurst({ milestones }: MilestoneBurstProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     overflow: 'hidden',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
-    backgroundColor: Colors.dark.surface,
+    borderColor: colors.borderLight,
+    backgroundColor: colors.surface,
     padding: 14,
     marginBottom: 18,
   },
@@ -107,7 +109,7 @@ const styles = StyleSheet.create({
     top: -18,
     height: 70,
     borderRadius: 35,
-    backgroundColor: Colors.dark.heatMuted,
+    backgroundColor: colors.heatMuted,
   },
   headerRow: {
     flexDirection: 'row',
@@ -116,14 +118,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   kicker: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
   count: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -151,12 +153,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   badgeValue: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '800',
   },
   badgeLabel: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },

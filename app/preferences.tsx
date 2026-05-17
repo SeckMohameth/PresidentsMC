@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Linking } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Settings } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 
 export default function PreferencesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const openSystemSettings = async () => {
     await Linking.openSettings();
@@ -27,7 +29,7 @@ export default function PreferencesScreen() {
         <View style={styles.card}>
           <Pressable style={styles.row} onPress={openSystemSettings}>
             <View style={styles.rowLeft}>
-              <Settings size={18} color={Colors.dark.primary} />
+              <Settings size={18} color={colors.primary} />
               <Text style={styles.label}>Open System Settings</Text>
             </View>
             <Text style={styles.link}>Open</Text>
@@ -41,10 +43,10 @@ export default function PreferencesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   content: {
     paddingHorizontal: 20,
@@ -63,21 +65,21 @@ const styles = StyleSheet.create({
     width: 60,
   },
   backText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
   },
   card: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   row: {
     flexDirection: 'row',
@@ -90,17 +92,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
   link: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700',
   },
   hint: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 8,
   },

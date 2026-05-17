@@ -27,7 +27,7 @@ The original idea was a multi-club SaaS product where any bike or motorcycle clu
 - Shared ride photo albums
 - Club/member stats
 - Admin settings, roles, and member management
-- RevenueCat-ready admin subscription flow
+- Billing-ready admin tools with RevenueCat planned for a later pass
 - Firebase Functions scaffold for invites, cleanup, analytics, notifications, subscriptions, and stats
 
 ## Access Model
@@ -40,7 +40,7 @@ The initial owner is bootstrapped from:
 EXPO_PUBLIC_OWNER_EMAILS=owner@example.com
 ```
 
-That owner/admin can approve members and manage club content. Admin tools are designed to be gated by subscription status, while basic member access remains free.
+That owner/admin can approve members and manage club content. Admin tools are usable by default for beta/open-source use. Later, RevenueCat can be enabled by setting the club document's `billingRequired` flag to `true`.
 
 ## Monetization
 
@@ -50,7 +50,7 @@ This was built as a favor-style project, not a big SaaS launch. The monetization
 - Club owner/admin: low subscription
 - Example pricing: `$1.99/month` or `$19.99/year`
 
-The subscription is meant to help cover hosting, app upkeep, Firebase usage, App Store/Play Store maintenance, and ongoing support.
+The subscription is meant to help cover hosting, app upkeep, Firebase usage, App Store/Play Store maintenance, and ongoing support. Billing is disabled by default for this beta build, so RevenueCat is future work rather than a requirement to run the app.
 
 ## Tech Stack
 
@@ -62,7 +62,7 @@ The subscription is meant to help cover hosting, app upkeep, Firebase usage, App
 - Firestore
 - Firebase Storage
 - Firebase Functions
-- RevenueCat
+- RevenueCat hooks for future paid admin access
 - Expo Notifications
 - Expo Location
 - `react-native-maps`
@@ -80,7 +80,7 @@ Important security choices:
 - Pending users can only create/cancel their own join request.
 - Users can only update their own profile/account fields.
 - Image uploads are limited to image content under 10 MB.
-- Admin/officer writes are role-gated and subscription-aware.
+- Admin/officer writes are role-gated. Subscription enforcement is optional through `billingRequired`.
 - Firebase Functions use server-side permissions for sensitive actions.
 
 See [SECURITY.md](SECURITY.md) before deploying your own clone.
@@ -122,7 +122,17 @@ EXPO_PUBLIC_OWNER_EMAILS=owner@example.com
 EXPO_PUBLIC_DEVELOPER_ADMIN_EMAILS=developer@example.com
 ```
 
-8. For Android builds, add a restricted Google Maps API key:
+8. RevenueCat is optional for this beta build. Leave these blank unless you are ready to configure paid admin subscriptions:
+
+```bash
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=
+EXPO_PUBLIC_REVENUECAT_TEST_API_KEY=
+```
+
+The app defaults to `billingRequired: false`. If you later enable RevenueCat, set `billingRequired: true` on the club document after products, entitlements, and webhooks are configured.
+
+9. For Android builds, add a restricted Google Maps API key:
 
 ```bash
 GOOGLE_MAPS_ANDROID_API_KEY=your-restricted-android-maps-key
@@ -130,19 +140,19 @@ GOOGLE_MAPS_ANDROID_API_KEY=your-restricted-android-maps-key
 
 The key should be restricted in Google Cloud to the Android package `app.mostudios.presidentsmc` and the SHA-1 certificate for the build you are shipping. iOS uses Apple Maps by default in the app.
 
-9. Set Firebase CLI project:
+10. Set Firebase CLI project:
 
 ```bash
 firebase use --add
 ```
 
-10. Deploy rules:
+11. Deploy rules:
 
 ```bash
 firebase deploy --only firestore:rules,storage --project your-firebase-project-id
 ```
 
-11. Run the app:
+12. Run the app:
 
 ```bash
 npm run start
@@ -155,10 +165,11 @@ npm run start
 npm run web
 npm run lint
 npx tsc --noEmit
+npm --prefix functions run build
 npm run test:rules
 ```
 
-`npm run test:rules` uses Firebase emulators and needs Java installed locally.
+`npm run test:rules` uses Firebase emulators and needs Java installed locally. Install a JDK and make sure `java -version` works before running it.
 
 ## Cloning and Reuse
 
@@ -168,11 +179,11 @@ Before using it for your own project:
 
 - Replace all app branding.
 - Use your own Firebase project.
-- Use your own RevenueCat project/products.
+- Use your own RevenueCat project/products if you decide to turn billing on.
 - Deploy your own Firestore and Storage rules.
 - Review the security rules for your data model.
 - Do not reuse another club's private assets, photos, names, or copy.
 
 ## Notes
 
-This app is still evolving. The current codebase started from an Expo starter, pulled in the useful parts of the earlier Crew app, then was reshaped into a single-club PresidentsMC experience with black/silver biker-club styling.
+This app is still evolving. The current codebase started from an Expo starter, pulled in the useful parts of the earlier Crew app, then was reshaped into a single-club PresidentsMC experience with black/silver biker-club styling, adaptive light/dark mode, native maps, Firebase rules, and beta-friendly admin access.

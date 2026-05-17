@@ -28,7 +28,7 @@ import {
   Check,
   Sparkles,
 } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import type { CrewAdminStatus } from '@/providers/RevenueCatProvider';
@@ -49,6 +49,8 @@ const PRIVACY_URL = 'https://www.mostudios.io/privacy';
 
 export default function CreateCrewPaywallScreen() {
   const { createCrew, isCreatingCrew } = useAuth();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { 
     monthlyPackage, 
     yearlyPackage, 
@@ -354,7 +356,7 @@ export default function CreateCrewPaywallScreen() {
               onPress={() => setStep('paywall')}
               testID="back-button"
             >
-              <ArrowLeft size={24} color={Colors.dark.text} />
+              <ArrowLeft size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Create Your Crew</Text>
             <View style={styles.placeholder} />
@@ -366,7 +368,7 @@ export default function CreateCrewPaywallScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.successBadge}>
-              <Check size={20} color={Colors.dark.success} />
+              <Check size={20} color={colors.success} />
               <Text style={styles.successText}>
                 {isUsingBetaAccess
                   ? 'Beta Access Enabled'
@@ -383,7 +385,7 @@ export default function CreateCrewPaywallScreen() {
                   <Image source={{ uri: crewLogo }} style={styles.logoPreview} contentFit="cover" />
                 ) : (
                   <View style={styles.logoPlaceholder}>
-                    <Camera size={24} color={Colors.dark.textTertiary} />
+                    <Camera size={24} color={colors.textTertiary} />
                     <Text style={styles.logoPlaceholderText}>Add Logo</Text>
                   </View>
                 )}
@@ -395,7 +397,7 @@ export default function CreateCrewPaywallScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="e.g., Iron Riders MC"
-                placeholderTextColor={Colors.dark.textTertiary}
+                placeholderTextColor={colors.textTertiary}
                 value={crewName}
                 onChangeText={setCrewName}
                 autoCapitalize="words"
@@ -408,7 +410,7 @@ export default function CreateCrewPaywallScreen() {
               <TextInput
                 style={[styles.textInput, styles.textArea]}
                 placeholder="Tell members what your crew is about..."
-                placeholderTextColor={Colors.dark.textTertiary}
+                placeholderTextColor={colors.textTertiary}
                 value={crewDescription}
                 onChangeText={setCrewDescription}
                 multiline
@@ -426,7 +428,7 @@ export default function CreateCrewPaywallScreen() {
               testID="create-crew-button"
             >
               {isCreatingCrew ? (
-                <ActivityIndicator color={Colors.dark.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.createButtonText}>Create Crew</Text>
               )}
@@ -450,7 +452,7 @@ export default function CreateCrewPaywallScreen() {
             onPress={() => router.back()}
             testID="back-button"
           >
-            <ArrowLeft size={24} color={Colors.dark.text} />
+            <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Start a Crew</Text>
           <View style={styles.placeholder} />
@@ -479,7 +481,7 @@ export default function CreateCrewPaywallScreen() {
               ]}
             >
               <LinearGradient
-                colors={[Colors.dark.primary, '#B8860B']}
+                colors={[colors.primary, '#B8860B']}
                 style={styles.crownGradient}
               >
                 <Crown size={48} color="#fff" strokeWidth={1.5} />
@@ -487,9 +489,9 @@ export default function CreateCrewPaywallScreen() {
             </Animated.View>
             <View style={styles.heroTextContainer}>
               <View style={styles.heroTitleRow}>
-                <Sparkles size={18} color={Colors.dark.primary} />
+                <Sparkles size={18} color={colors.primary} />
                 <Text style={styles.heroTitle}>Become a Crew Admin</Text>
-                <Sparkles size={18} color={Colors.dark.primary} />
+                <Sparkles size={18} color={colors.primary} />
               </View>
               <Text style={styles.heroSubtitle}>
                 Create and manage your own private crew. Members always join free.
@@ -515,17 +517,17 @@ export default function CreateCrewPaywallScreen() {
             {features.map((feature, index) => (
               <View key={index} style={styles.featureRow}>
                 <View style={styles.featureIconContainer}>
-                  <feature.icon size={20} color={Colors.dark.primary} strokeWidth={2} />
+                  <feature.icon size={20} color={colors.primary} strokeWidth={2} />
                 </View>
                 <Text style={styles.featureText}>{feature.text}</Text>
-                <Check size={18} color={Colors.dark.success} />
+                <Check size={18} color={colors.success} />
               </View>
             ))}
           </Animated.View>
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.dark.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={styles.loadingText}>Loading plans...</Text>
             </View>
           ) : (
@@ -603,7 +605,7 @@ export default function CreateCrewPaywallScreen() {
             testID="subscribe-button"
           >
             {isPurchasing ? (
-              <ActivityIndicator color={Colors.dark.background} />
+              <ActivityIndicator color={colors.background} />
             ) : (
               <Text style={styles.subscribeButtonText}>
                 {selectedPlan === 'monthly' ? 'Get First Month Free' : 'Get First Year Free'}
@@ -618,7 +620,7 @@ export default function CreateCrewPaywallScreen() {
             activeOpacity={0.7}
           >
             {isRestoring ? (
-              <ActivityIndicator size="small" color={Colors.dark.textSecondary} />
+              <ActivityIndicator size="small" color={colors.textSecondary} />
             ) : (
               <Text style={styles.restoreText}>Restore Purchases</Text>
             )}
@@ -653,10 +655,10 @@ export default function CreateCrewPaywallScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   gradientOverlay: {
     position: 'absolute',
@@ -684,7 +686,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   placeholder: {
     width: 40,
@@ -706,7 +708,7 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.dark.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
@@ -724,35 +726,35 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 26,
     fontWeight: '700' as const,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   heroSubtitle: {
     fontSize: 15,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
   },
   trialBanner: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 12,
     padding: 12,
     alignItems: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.dark.primary,
+    borderColor: colors.primary,
   },
   trialText: {
     fontSize: 15,
     fontWeight: '600' as const,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   featuresSection: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   featureRow: {
     flexDirection: 'row',
@@ -763,7 +765,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -771,7 +773,7 @@ const styles = StyleSheet.create({
   featureText: {
     flex: 1,
     fontSize: 15,
-    color: Colors.dark.text,
+    color: colors.text,
     fontWeight: '500' as const,
   },
   loadingContainer: {
@@ -781,29 +783,29 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
   },
   plansSection: {
     gap: 12,
     marginBottom: 20,
   },
   planCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     position: 'relative',
   },
   planCardSelected: {
-    borderColor: Colors.dark.primary,
-    backgroundColor: Colors.dark.surfaceElevated,
+    borderColor: colors.primary,
+    backgroundColor: colors.surfaceElevated,
   },
   bestValueBadge: {
     position: 'absolute',
     top: -10,
     right: 16,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
@@ -811,7 +813,7 @@ const styles = StyleSheet.create({
   bestValueText: {
     fontSize: 11,
     fontWeight: '700' as const,
-    color: Colors.dark.background,
+    color: colors.background,
     letterSpacing: 0.5,
   },
   planHeader: {
@@ -823,11 +825,11 @@ const styles = StyleSheet.create({
   planName: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   planSavings: {
     fontSize: 13,
-    color: Colors.dark.success,
+    color: colors.success,
     fontWeight: '500' as const,
     marginTop: 2,
   },
@@ -836,18 +838,18 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioOuterSelected: {
-    borderColor: Colors.dark.primary,
+    borderColor: colors.primary,
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
   },
   planPricing: {
     flexDirection: 'row',
@@ -857,24 +859,24 @@ const styles = StyleSheet.create({
   planPrice: {
     fontSize: 32,
     fontWeight: '700' as const,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   planPeriod: {
     fontSize: 16,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   planBilling: {
     fontSize: 13,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
   },
   subscribeButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: Colors.dark.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -883,7 +885,7 @@ const styles = StyleSheet.create({
   subscribeButtonText: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: Colors.dark.background,
+    color: colors.background,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -895,14 +897,14 @@ const styles = StyleSheet.create({
   },
   restoreText: {
     fontSize: 14,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500' as const,
   },
   betaAccessButton: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.primary,
+    borderColor: colors.primary,
     paddingVertical: 15,
     alignItems: 'center',
     marginBottom: 10,
@@ -910,23 +912,23 @@ const styles = StyleSheet.create({
   betaAccessButtonText: {
     fontSize: 15,
     fontWeight: '700' as const,
-    color: Colors.dark.primary,
+    color: colors.primary,
   },
   betaAccessText: {
     fontSize: 13,
     lineHeight: 19,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 18,
   },
   termsText: {
     fontSize: 12,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: 18,
   },
   termsLink: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     textDecorationLine: 'underline',
   },
   detailsContent: {
@@ -942,12 +944,12 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.success,
+    borderColor: colors.success,
   },
   successText: {
     fontSize: 15,
     fontWeight: '600' as const,
-    color: Colors.dark.success,
+    color: colors.success,
   },
   detailsSection: {
     marginBottom: 24,
@@ -956,9 +958,9 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -972,32 +974,32 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logoPlaceholderText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '600' as const,
   },
   inputLabel: {
     fontSize: 15,
     fontWeight: '600' as const,
-    color: Colors.dark.text,
+    color: colors.text,
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: Colors.dark.text,
+    color: colors.text,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   textArea: {
     minHeight: 100,
     paddingTop: 14,
   },
   createButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -1006,6 +1008,6 @@ const styles = StyleSheet.create({
   createButtonText: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: Colors.dark.background,
+    color: colors.background,
   },
 });

@@ -1,14 +1,15 @@
 import { Stack } from "expo-router";
-import Colors from "@/constants/colors";
+import { useThemeColors } from "@/constants/colors";
 
 export default function RidesLayout() {
+  const colors = useThemeColors();
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: Colors.dark.background },
-        headerTintColor: Colors.dark.text,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.text,
         headerTitleStyle: { fontWeight: '700' },
-        contentStyle: { backgroundColor: Colors.dark.background },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen 

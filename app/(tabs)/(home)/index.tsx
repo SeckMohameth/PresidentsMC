@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, Users, Bell, Route, Gauge, Images, ChevronRight } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { Art } from '@/constants/art';
 import { useCrew } from '@/providers/CrewProvider';
 import AnnouncementCard from '@/components/AnnouncementCard';
@@ -19,6 +19,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -29,7 +31,7 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={Colors.dark.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -47,14 +49,14 @@ export default function HomeScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor={colors.primary}
           />
         }
       >
         <View style={styles.hero}>
           <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
           <LinearGradient
-            colors={['rgba(0,0,0,0.12)', 'rgba(5,5,5,0.24)', Colors.dark.background]}
+            colors={['rgba(0,0,0,0.12)', 'rgba(5,5,5,0.24)', colors.background]}
             locations={[0, 0.55, 1]}
             style={styles.heroOverlay}
           />
@@ -92,29 +94,29 @@ export default function HomeScreen() {
               onPress={() => router.push(nextRide ? `/ride/${nextRide.id}` : '/(tabs)/rides')}
             >
               <Text style={styles.heroActionText}>{nextRide ? 'View Ride' : 'Open Rides'}</Text>
-              <ChevronRight size={18} color={Colors.dark.background} />
+              <ChevronRight size={18} color={colors.background} />
             </Pressable>
           </View>
         </View>
 
         <View style={styles.statsRail}>
           <View style={styles.statTile}>
-            <Users size={16} color={Colors.dark.primary} />
+            <Users size={16} color={colors.primary} />
             <Text style={styles.statValue}>{crew?.memberCount || 0}</Text>
             <Text style={styles.statLabel}>Members</Text>
           </View>
           <View style={styles.statTile}>
-            <Route size={16} color={Colors.dark.primary} />
+            <Route size={16} color={colors.primary} />
             <Text style={styles.statValue}>{crew?.totalRides || 0}</Text>
             <Text style={styles.statLabel}>Rides</Text>
           </View>
           <View style={styles.statTile}>
-            <Gauge size={16} color={Colors.dark.primary} />
+            <Gauge size={16} color={colors.primary} />
             <Text style={styles.statValue}>{Math.round(crew?.totalMiles || 0)}</Text>
             <Text style={styles.statLabel}>Miles</Text>
           </View>
           <View style={styles.statTile}>
-            <Images size={16} color={Colors.dark.primary} />
+            <Images size={16} color={colors.primary} />
             <Text style={styles.statValue}>{crew?.totalPhotos || 0}</Text>
             <Text style={styles.statLabel}>Photos</Text>
           </View>
@@ -135,7 +137,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Bell size={18} color={Colors.dark.primary} />
+              <Bell size={18} color={colors.primary} />
               <Text style={styles.sectionTitle}>Announcements</Text>
             </View>
             {canPost && (
@@ -143,7 +145,7 @@ export default function HomeScreen() {
                 style={styles.addButton}
                 onPress={() => router.push('/create-announcement')}
               >
-                <Plus size={18} color={Colors.dark.primary} />
+                <Plus size={18} color={colors.primary} />
               </Pressable>
             )}
           </View>
@@ -167,14 +169,14 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -193,7 +195,7 @@ const styles = StyleSheet.create({
   crewName: {
     fontSize: 30,
     fontWeight: '900',
-    color: Colors.dark.text,
+    color: colors.text,
     letterSpacing: 0,
   },
   memberBadge: {
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   memberCount: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -226,12 +228,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileInitials: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -265,10 +267,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
   },
   seeAll: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -280,17 +282,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
   },
   emptyState: {
     marginHorizontal: 16,
     padding: 32,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     alignItems: 'center',
   },
   emptyText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 15,
   },
   hero: {
@@ -319,7 +321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   eyebrow: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -333,14 +335,14 @@ const styles = StyleSheet.create({
     bottom: 26,
   },
   heroTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 34,
     fontWeight: '900',
     lineHeight: 39,
     marginBottom: 10,
   },
   heroSubtitle: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     maxWidth: 340,
@@ -351,13 +353,13 @@ const styles = StyleSheet.create({
     height: 46,
     paddingHorizontal: 18,
     borderRadius: 23,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   heroActionText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -373,17 +375,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(22,22,23,0.84)',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     padding: 12,
     justifyContent: 'space-between',
   },
   statValue: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 21,
     fontWeight: '900',
   },
   statLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',

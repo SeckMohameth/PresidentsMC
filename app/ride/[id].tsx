@@ -18,7 +18,7 @@ import {
   ChevronRight,
   Pencil
 } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, MapsApp } from '@/utils/helpers';
@@ -54,6 +54,8 @@ export default function RideDetailScreen() {
   const { ride, attendeeMembers } = useRide(id || '');
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   
   const mapRef = useRef<MapView>(null);
   const mapOpacity = useRef(new Animated.Value(0)).current;
@@ -139,12 +141,12 @@ export default function RideDetailScreen() {
           : styles.upcomingBadge;
   const statusTone =
     ride.status === 'completed'
-      ? Colors.dark.completed
+      ? colors.completed
       : ride.status === 'cancelled'
-        ? Colors.dark.cancelled
+        ? colors.cancelled
         : ride.status === 'active'
-          ? Colors.dark.info
-          : Colors.dark.upcoming;
+          ? colors.info
+          : colors.upcoming;
   
   const hasStartCoordinates = hasUsableCoordinates(ride.startLocation);
   const hasEndCoordinates = hasUsableCoordinates(ride.endLocation);
@@ -278,14 +280,14 @@ export default function RideDetailScreen() {
             style={[styles.backButton, { top: insets.top + 8 }]}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color={Colors.dark.text} />
+            <ArrowLeft size={24} color={colors.text} />
           </Pressable>
           {isAdmin && (
             <Pressable 
               style={[styles.editButton, { top: insets.top + 8 }]}
               onPress={() => router.push({ pathname: '/create-ride', params: { rideId: ride.id } })}
             >
-              <Pencil size={20} color={Colors.dark.text} />
+              <Pencil size={20} color={colors.text} />
             </Pressable>
           )}
           <View style={[styles.heroContent, { paddingBottom: 20 }]}>
@@ -302,13 +304,13 @@ export default function RideDetailScreen() {
         <View style={[styles.content, isTablet && styles.contentTablet]}>
           <View style={styles.quickStats}>
             <View style={styles.quickStat}>
-              <Clock size={18} color={Colors.dark.primary} />
+              <Clock size={18} color={colors.primary} />
               <Text style={styles.quickStatValue}>{ride.estimatedDuration}</Text>
               <Text style={styles.quickStatLabel}>Duration</Text>
             </View>
             <View style={styles.quickStatDivider} />
             <View style={styles.quickStat}>
-              <MapPin size={18} color={Colors.dark.success} />
+              <MapPin size={18} color={colors.success} />
               <Text style={styles.quickStatValue}>{formatMiles(ride.estimatedDistance)} mi</Text>
               <Text style={styles.quickStatLabel}>Distance</Text>
             </View>
@@ -349,7 +351,7 @@ export default function RideDetailScreen() {
                     }}
                     title="Start"
                     description={ride.startLocation.name}
-                    pinColor={Colors.dark.success}
+                    pinColor={colors.success}
                   />
                   <Marker
                     coordinate={{
@@ -358,11 +360,11 @@ export default function RideDetailScreen() {
                     }}
                     title="End"
                     description={ride.endLocation.name}
-                    pinColor={Colors.dark.error}
+                    pinColor={colors.error}
                   />
                   <Polyline
                     coordinates={routeCoordinates}
-                    strokeColor={Colors.dark.primary}
+                    strokeColor={colors.primary}
                     strokeWidth={4}
                     lineDashPattern={[0]}
                   />
@@ -372,7 +374,7 @@ export default function RideDetailScreen() {
             
             {(Platform.OS === 'web' || !hasRouteCoordinates) && (
               <View style={styles.mapPlaceholder}>
-                <MapPin size={32} color={Colors.dark.primary} />
+                <MapPin size={32} color={colors.primary} />
                 <Text style={styles.mapPlaceholderText}>
                   {hasRouteCoordinates ? 'Map preview available on mobile' : 'Add valid start and end addresses to preview the route'}
                 </Text>
@@ -404,7 +406,7 @@ export default function RideDetailScreen() {
                 onPress={() => handleNavigate('start')}
                 disabled={!hasStartCoordinates}
               >
-                <Navigation size={18} color={Colors.dark.text} />
+                <Navigation size={18} color={colors.text} />
                 <Text style={styles.navigateButtonText}>To Start</Text>
               </Pressable>
               <Pressable
@@ -412,7 +414,7 @@ export default function RideDetailScreen() {
                 onPress={() => handleNavigate('route')}
                 disabled={!hasRouteCoordinates}
               >
-                <Navigation size={18} color={Colors.dark.text} />
+                <Navigation size={18} color={colors.text} />
                 <Text style={styles.navigateButtonText}>Full Route</Text>
               </Pressable>
             </View>
@@ -422,7 +424,7 @@ export default function RideDetailScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Notes</Text>
               <View style={styles.notesCard}>
-                <FileText size={18} color={Colors.dark.textTertiary} />
+                <FileText size={18} color={colors.textTertiary} />
                 <Text style={styles.notesText}>{ride.notes}</Text>
               </View>
             </View>
@@ -450,7 +452,7 @@ export default function RideDetailScreen() {
                   )}
                   {ride.checkedIn.includes(member.id) && (
                     <View style={styles.checkedInBadge}>
-                      <CheckCircle2 size={10} color={Colors.dark.text} />
+                      <CheckCircle2 size={10} color={colors.text} />
                     </View>
                   )}
                 </View>
@@ -476,7 +478,7 @@ export default function RideDetailScreen() {
                 onPress={() => router.push(`/album/${ride.id}`)}
               >
                 <Text style={styles.sectionTitle}>Photos ({ride.photos.length})</Text>
-                <ChevronRight size={20} color={Colors.dark.textTertiary} />
+                <ChevronRight size={20} color={colors.textTertiary} />
               </Pressable>
               <ScrollView 
                 horizontal 
@@ -514,10 +516,10 @@ export default function RideDetailScreen() {
           {isAttending && !isCheckedIn && (
             <Pressable style={styles.checkInButton} onPress={handleCheckIn} disabled={isCheckingIn}>
               {isCheckingIn ? (
-                <ActivityIndicator color={Colors.dark.text} />
+                <ActivityIndicator color={colors.text} />
               ) : (
                 <>
-                  <CheckCircle2 size={20} color={Colors.dark.text} />
+                  <CheckCircle2 size={20} color={colors.text} />
                   <Text style={styles.checkInButtonText}>Check In</Text>
                 </>
               )}
@@ -541,17 +543,17 @@ export default function RideDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   errorText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 16,
   },
   scrollView: {
@@ -605,23 +607,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   upcomingBadge: {
-    borderColor: Colors.dark.upcoming,
+    borderColor: colors.upcoming,
   },
   activeBadge: {
-    borderColor: Colors.dark.info,
+    borderColor: colors.info,
   },
   completedBadge: {
-    borderColor: Colors.dark.completed,
+    borderColor: colors.completed,
   },
   cancelledBadge: {
-    borderColor: Colors.dark.cancelled,
+    borderColor: colors.cancelled,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
   },
   heroTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 28,
     fontWeight: '800',
     marginBottom: 4,
@@ -641,7 +643,7 @@ const styles = StyleSheet.create({
   },
   quickStats: {
     flexDirection: 'row',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
@@ -652,18 +654,18 @@ const styles = StyleSheet.create({
   },
   quickStatDivider: {
     width: 1,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: colors.border,
     marginHorizontal: 12,
   },
   quickStatValue: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
     marginTop: 8,
     marginBottom: 2,
   },
   quickStatLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
   },
   section: {
@@ -676,13 +678,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 12,
   },
   routeCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -699,15 +701,15 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   startDot: {
-    backgroundColor: Colors.dark.success,
+    backgroundColor: colors.success,
   },
   endDot: {
-    backgroundColor: Colors.dark.error,
+    backgroundColor: colors.error,
   },
   routeLine: {
     width: 2,
     height: 24,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: colors.border,
     marginLeft: 5,
     marginVertical: 4,
   },
@@ -715,19 +717,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   routeLabel: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 2,
   },
   routeName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 2,
   },
   routeAddress: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
   },
   directionsRow: {
@@ -740,17 +742,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 12,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   navigateButtonDisabled: {
     opacity: 0.45,
   },
   navigateButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -765,7 +767,7 @@ const styles = StyleSheet.create({
   },
   mapPlaceholder: {
     height: 160,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -773,27 +775,27 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   mapPlaceholderText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
   },
   notesCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
   },
   notesText: {
     flex: 1,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
   },
   attendeesCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
   },
@@ -805,20 +807,20 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: Colors.dark.surface,
+    borderColor: colors.surface,
   },
   attendeePlaceholder: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Colors.dark.surface,
+    borderColor: colors.surface,
   },
   attendeeInitials: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -826,24 +828,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: Colors.dark.success,
+    backgroundColor: colors.success,
     borderRadius: 8,
     padding: 2,
     borderWidth: 2,
-    borderColor: Colors.dark.surface,
+    borderColor: colors.surface,
   },
   moreAttendees: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: Colors.dark.surface,
+    borderColor: colors.surface,
   },
   moreAttendeesText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -852,7 +854,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   attendeeNamesText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   photosScroll: {
@@ -863,7 +865,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
   },
   photoImage: {
     width: '100%',
@@ -876,7 +878,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   photoOverlayText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -888,22 +890,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     padding: 16,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: colors.border,
   },
   checkInButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.dark.success,
+    backgroundColor: colors.success,
     borderRadius: 28,
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
   checkInButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -911,21 +913,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     borderRadius: 28,
     paddingVertical: 16,
   },
   leaveButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   attendButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   leaveButtonText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
   },
 });

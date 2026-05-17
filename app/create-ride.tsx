@@ -9,7 +9,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import MapView, { MapPressEvent, Marker, Polyline } from 'react-native-maps';
 import { X, MapPin, Calendar, Clock, Gauge, FileText, ImagePlus, Image as ImageIcon, Trash2, MapPinned, LocateFixed } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import AddressAutocomplete, { AddressSelection } from '@/components/AddressAutocomplete';
 import { ImageAttribution } from '@/types';
@@ -66,6 +66,8 @@ export default function CreateRideScreen() {
   const [isResolvingPin, setIsResolvingPin] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     if (!ride || !isEditMode || isInitialized) return;
@@ -153,7 +155,7 @@ export default function CreateRideScreen() {
   if (isEditMode && !ride) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: Colors.dark.textSecondary }}>Loading ride...</Text>
+        <Text style={{ color: colors.textSecondary }}>Loading ride...</Text>
       </View>
     );
   }
@@ -378,22 +380,22 @@ export default function CreateRideScreen() {
   };
 
   const paceOptions: { value: PaceType; label: string; color: string }[] = [
-    { value: 'casual', label: 'Casual', color: Colors.dark.success },
-    { value: 'moderate', label: 'Moderate', color: Colors.dark.warning },
-    { value: 'spirited', label: 'Spirited', color: Colors.dark.error },
+    { value: 'casual', label: 'Casual', color: colors.success },
+    { value: 'moderate', label: 'Moderate', color: colors.warning },
+    { value: 'spirited', label: 'Spirited', color: colors.error },
   ];
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={styles.closeButton} onPress={() => router.back()}>
-          <X size={24} color={Colors.dark.text} />
+          <X size={24} color={colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>{isEditMode ? 'Edit Ride' : 'New Ride'}</Text>
         <View style={styles.headerActions}>
           {isEditMode && (
             <Pressable style={styles.deleteButton} onPress={handleDelete} disabled={isSaving}>
-              <Trash2 size={17} color={Colors.dark.error} />
+              <Trash2 size={17} color={colors.error} />
             </Pressable>
           )}
           <Pressable
@@ -426,7 +428,7 @@ export default function CreateRideScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g., Sunday Morning Cruise"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={title}
               onChangeText={setTitle}
             />
@@ -437,7 +439,7 @@ export default function CreateRideScreen() {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="What's this ride about?"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -447,14 +449,14 @@ export default function CreateRideScreen() {
 
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <ImageIcon size={16} color={Colors.dark.primary} />
+              <ImageIcon size={16} color={colors.primary} />
               <Text style={styles.label}>Cover Image</Text>
             </View>
             {coverImage ? (
               <View style={styles.coverPreview}>
                 <Image source={{ uri: coverImage }} style={styles.coverImage} contentFit="cover" />
                 <Pressable style={styles.coverRemove} onPress={() => setCoverImage('')}>
-                  <X size={16} color={Colors.dark.text} />
+                  <X size={16} color={colors.text} />
                 </Pressable>
               </View>
             ) : (
@@ -464,7 +466,7 @@ export default function CreateRideScreen() {
             )}
             <View style={styles.coverActions}>
               <Pressable style={styles.coverButton} onPress={pickCoverImage}>
-                <ImagePlus size={18} color={Colors.dark.text} />
+                <ImagePlus size={18} color={colors.text} />
                 <Text style={styles.coverButtonText}>Photos</Text>
               </Pressable>
             </View>
@@ -472,13 +474,13 @@ export default function CreateRideScreen() {
 
           <View style={[styles.section, { zIndex: 3 }]}>
             <View style={styles.labelRow}>
-              <MapPin size={16} color={Colors.dark.success} />
+              <MapPin size={16} color={colors.success} />
               <Text style={styles.label}>Start Location *</Text>
             </View>
             <TextInput
               style={styles.input}
               placeholder="Location name (e.g., Joe's Garage)"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={startName}
               onChangeText={setStartName}
             />
@@ -499,13 +501,13 @@ export default function CreateRideScreen() {
 
           <View style={[styles.section, { zIndex: 2 }]}>
             <View style={styles.labelRow}>
-              <MapPin size={16} color={Colors.dark.error} />
+              <MapPin size={16} color={colors.error} />
               <Text style={styles.label}>End Location *</Text>
             </View>
             <TextInput
               style={styles.input}
               placeholder="Location name (e.g., Hill Country BBQ)"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={endName}
               onChangeText={setEndName}
             />
@@ -526,7 +528,7 @@ export default function CreateRideScreen() {
 
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <MapPinned size={16} color={Colors.dark.primary} />
+              <MapPinned size={16} color={colors.primary} />
               <Text style={styles.label}>Map Pins</Text>
             </View>
             <View style={styles.mapPanel}>
@@ -550,7 +552,7 @@ export default function CreateRideScreen() {
                   </Pressable>
                 </View>
                 <View style={styles.pinStatus}>
-                  <LocateFixed size={14} color={isResolvingPin ? Colors.dark.warning : Colors.dark.textTertiary} />
+                  <LocateFixed size={14} color={isResolvingPin ? colors.warning : colors.textTertiary} />
                   <Text style={styles.pinStatusText}>
                     {isResolvingPin ? 'Resolving pin...' : `Tap map to set ${mapTarget}`}
                   </Text>
@@ -570,7 +572,7 @@ export default function CreateRideScreen() {
                     coordinate={startCoords}
                     title="Start"
                     description={startAddress || startName || 'Ride start'}
-                    pinColor={Colors.dark.success}
+                    pinColor={colors.success}
                     draggable
                     onDragEnd={(event) => void setDroppedPin('start', event.nativeEvent.coordinate)}
                   />
@@ -580,7 +582,7 @@ export default function CreateRideScreen() {
                     coordinate={endCoords}
                     title="End"
                     description={endAddress || endName || 'Ride end'}
-                    pinColor={Colors.dark.error}
+                    pinColor={colors.error}
                     draggable
                     onDragEnd={(event) => void setDroppedPin('end', event.nativeEvent.coordinate)}
                   />
@@ -588,7 +590,7 @@ export default function CreateRideScreen() {
                 {startCoords && endCoords && (
                   <Polyline
                     coordinates={[startCoords, endCoords]}
-                    strokeColor={Colors.dark.primary}
+                    strokeColor={colors.primary}
                     strokeWidth={4}
                     lineDashPattern={[10, 6]}
                   />
@@ -596,11 +598,11 @@ export default function CreateRideScreen() {
               </MapView>
               <View style={styles.mapLegend}>
                 <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: Colors.dark.success }]} />
+                  <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
                   <Text style={styles.legendText}>Start</Text>
                 </View>
                 <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: Colors.dark.error }]} />
+                  <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
                   <Text style={styles.legendText}>End</Text>
                 </View>
                 <Text style={styles.mapHint}>Drag either pin to adjust the route estimate.</Text>
@@ -611,7 +613,7 @@ export default function CreateRideScreen() {
           <View style={styles.row}>
             <View style={[styles.section, { flex: 1 }]}>
               <View style={styles.labelRow}>
-                <Calendar size={16} color={Colors.dark.primary} />
+                <Calendar size={16} color={colors.primary} />
                 <Text style={styles.label}>Date *</Text>
               </View>
               <Pressable style={styles.pickerButton} onPress={() => setShowDatePicker(true)}>
@@ -623,7 +625,7 @@ export default function CreateRideScreen() {
             <View style={{ width: 12 }} />
             <View style={[styles.section, { flex: 1 }]}>
               <View style={styles.labelRow}>
-                <Clock size={16} color={Colors.dark.primary} />
+                <Clock size={16} color={colors.primary} />
                 <Text style={styles.label}>Time *</Text>
               </View>
               <Pressable style={styles.pickerButton} onPress={() => setShowTimePicker(true)}>
@@ -646,7 +648,7 @@ export default function CreateRideScreen() {
                 onChange={handleDateChange}
                 minimumDate={new Date()}
                 themeVariant="dark"
-                accentColor={Colors.dark.primary}
+                accentColor={colors.primary}
               />
             </View>
           )}
@@ -662,7 +664,7 @@ export default function CreateRideScreen() {
                 display="spinner"
                 onChange={handleTimeChange}
                 themeVariant="dark"
-                accentColor={Colors.dark.primary}
+                accentColor={colors.primary}
               />
             </View>
           )}
@@ -690,7 +692,7 @@ export default function CreateRideScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., 3 hours"
-                placeholderTextColor={Colors.dark.textTertiary}
+                placeholderTextColor={colors.textTertiary}
                 value={duration}
                 onChangeText={setDuration}
               />
@@ -701,7 +703,7 @@ export default function CreateRideScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g., 85"
-                placeholderTextColor={Colors.dark.textTertiary}
+                placeholderTextColor={colors.textTertiary}
                 value={distance}
                 onChangeText={setDistance}
                 keyboardType="numeric"
@@ -713,7 +715,7 @@ export default function CreateRideScreen() {
 
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <Gauge size={16} color={Colors.dark.textSecondary} />
+              <Gauge size={16} color={colors.textSecondary} />
               <Text style={styles.label}>Pace</Text>
             </View>
             <View style={styles.paceOptions}>
@@ -737,13 +739,13 @@ export default function CreateRideScreen() {
 
           <View style={styles.section}>
             <View style={styles.labelRow}>
-              <FileText size={16} color={Colors.dark.textSecondary} />
+              <FileText size={16} color={colors.textSecondary} />
               <Text style={styles.label}>Notes</Text>
             </View>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Any rules, stops, or things riders should know..."
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -756,10 +758,10 @@ export default function CreateRideScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -768,7 +770,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   closeButton: {
     width: 40,
@@ -777,7 +779,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -793,25 +795,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   createButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
   },
   createButtonDisabled: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   createButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   createButtonTextDisabled: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
   },
   scrollView: {
     flex: 1,
@@ -841,7 +843,7 @@ const styles = StyleSheet.create({
     height: 160,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
   },
   coverImage: {
     width: '100%',
@@ -862,12 +864,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     borderRadius: 12,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   coverPlaceholderText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
   },
   coverActions: {
@@ -879,55 +881,55 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   coverButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   label: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   mapPanel: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   mapToolbar: {
     padding: 12,
     gap: 10,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 4,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   segmentButton: {
     flex: 1,
@@ -937,15 +939,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentButtonActive: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
   },
   segmentText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
   segmentTextActive: {
-    color: Colors.dark.text,
+    color: colors.text,
   },
   pinStatus: {
     flexDirection: 'row',
@@ -953,7 +955,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   pinStatusText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -968,7 +970,7 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: colors.border,
   },
   legendItem: {
     flexDirection: 'row',
@@ -981,12 +983,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   legendText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
   },
   mapHint: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     flexShrink: 1,
   },
@@ -1006,9 +1008,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   paceDot: {
     width: 8,
@@ -1016,54 +1018,54 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   paceLabel: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
   pickerButton: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     justifyContent: 'center',
   },
   pickerButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
   },
   pickerPlaceholder: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
   },
   iosPickerContainer: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     marginBottom: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   iosPickerDone: {
     alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   iosPickerDoneText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
   coordsHint: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 6,
     fontStyle: 'italic',
   },
   autoDistanceHint: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 11,
     marginTop: 6,
   },

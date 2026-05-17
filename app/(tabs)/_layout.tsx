@@ -2,9 +2,10 @@ import { Tabs } from "expo-router";
 import { Home, Route, Images, BarChart3, Menu } from "lucide-react-native";
 import React from "react";
 import { Platform, View, StyleSheet, useWindowDimensions } from "react-native";
-import Colors from "@/constants/colors";
+import Colors, { useThemeColors } from "@/constants/colors";
 
 export default function TabLayout() {
+  const colors = useThemeColors();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const tabBarWidth = isTablet ? Math.min(width - 48, 640) : undefined;
@@ -13,22 +14,22 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.dark.primary,
-        tabBarInactiveTintColor: Colors.dark.tabIconDefault,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.tabIconDefault,
         tabBarStyle: {
           position: 'absolute',
           left: tabBarSide,
           right: tabBarSide,
           bottom: Platform.OS === 'ios' ? 18 : 12,
-          backgroundColor: 'rgba(12,12,13,0.92)',
-          borderTopColor: Colors.dark.borderLight,
+          backgroundColor: colors.background === Colors.light.background ? 'rgba(255,255,255,0.94)' : 'rgba(12,12,13,0.92)',
+          borderTopColor: colors.borderLight,
           borderTopWidth: 1,
           borderLeftWidth: 1,
           borderRightWidth: 1,
           borderBottomWidth: 1,
-          borderLeftColor: Colors.dark.border,
-          borderRightColor: Colors.dark.border,
-          borderBottomColor: '#050505',
+          borderLeftColor: colors.border,
+          borderRightColor: colors.border,
+          borderBottomColor: colors.background,
           borderRadius: 28,
           paddingTop: 10,
           height: Platform.OS === 'ios' ? 74 : 66,

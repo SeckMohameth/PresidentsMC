@@ -27,7 +27,7 @@ import {
   Bike
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useCrew } from '@/providers/CrewProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -47,6 +47,9 @@ interface MenuItemProps {
 }
 
 function MenuItem({ icon, label, onPress, showBadge, badgeText, destructive }: MenuItemProps) {
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
   return (
     <Pressable 
       style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
@@ -62,7 +65,7 @@ function MenuItem({ icon, label, onPress, showBadge, badgeText, destructive }: M
             <Text style={styles.badgeText}>{badgeText}</Text>
           </View>
         )}
-        <ChevronRight size={20} color={Colors.dark.textTertiary} />
+        <ChevronRight size={20} color={colors.textTertiary} />
       </View>
     </Pressable>
   );
@@ -100,6 +103,8 @@ function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { currentUser, crew, isAdmin, members, leaveCrew, getInviteCode } = useCrew();
   const { signOut, deleteAccount, updateProfile, resendVerificationEmail, user } = useAuth();
   const { width } = useWindowDimensions();
@@ -456,7 +461,7 @@ export default function MoreScreen() {
             )}
             {isAdmin && (
               <View style={styles.adminBadge}>
-                <Crown size={12} color={Colors.dark.text} />
+                <Crown size={12} color={colors.text} />
               </View>
             )}
           </View>
@@ -465,7 +470,7 @@ export default function MoreScreen() {
             <Text style={styles.profileEmail}>{currentUser?.email}</Text>
             {currentUser?.bike ? (
               <View style={styles.bikeLine}>
-                <Bike size={13} color={Colors.dark.textTertiary} />
+                <Bike size={13} color={colors.textTertiary} />
                 <Text style={styles.profileBike}>{currentUser.bike}</Text>
               </View>
             ) : null}
@@ -475,7 +480,7 @@ export default function MoreScreen() {
               </Text>
             </View>
           </View>
-          <Pencil size={18} color={Colors.dark.textTertiary} />
+          <Pencil size={18} color={colors.textTertiary} />
         </Pressable>
 
         {user && !user.emailVerified && (
@@ -513,7 +518,7 @@ export default function MoreScreen() {
             <View style={styles.inviteHeader}>
               <Text style={styles.inviteTitle}>Invite Code</Text>
               <Pressable style={styles.shareButton} onPress={handleShareInvite}>
-                <Share2 size={16} color={Colors.dark.primary} />
+                <Share2 size={16} color={colors.primary} />
                 <Text style={styles.shareButtonText}>Share</Text>
               </Pressable>
             </View>
@@ -522,7 +527,7 @@ export default function MoreScreen() {
                 {crewInviteCode || (isInviteCodeLoading ? 'Loading...' : 'Unavailable')}
               </Text>
               <Pressable style={styles.copyButton} onPress={handleCopyInviteCode}>
-                <Copy size={18} color={Colors.dark.text} />
+                <Copy size={18} color={colors.text} />
               </Pressable>
             </View>
             <Text style={styles.inviteHint}>Share this code to invite new members</Text>
@@ -533,7 +538,7 @@ export default function MoreScreen() {
           <Text style={styles.menuSectionTitle}>Club</Text>
           <View style={styles.menuCard}>
             <MenuItem 
-              icon={<Users size={20} color={Colors.dark.primary} />}
+              icon={<Users size={20} color={colors.primary} />}
               label="Members"
               onPress={() => router.push('/members')}
               showBadge
@@ -541,7 +546,7 @@ export default function MoreScreen() {
             />
             {isAdmin && (
               <MenuItem 
-                icon={<Shield size={20} color={Colors.dark.warning} />}
+                icon={<Shield size={20} color={colors.warning} />}
                 label="Admin Settings"
                 onPress={() => router.push('/admin-settings')}
               />
@@ -553,12 +558,12 @@ export default function MoreScreen() {
           <Text style={styles.menuSectionTitle}>Settings</Text>
           <View style={styles.menuCard}>
             <MenuItem 
-              icon={<Bell size={20} color={Colors.dark.textSecondary} />}
+              icon={<Bell size={20} color={colors.textSecondary} />}
               label="Notifications"
               onPress={() => router.push('/notifications')}
             />
             <MenuItem 
-              icon={<Settings size={20} color={Colors.dark.textSecondary} />}
+              icon={<Settings size={20} color={colors.textSecondary} />}
               label="Preferences"
               onPress={() => router.push('/preferences')}
             />
@@ -570,7 +575,7 @@ export default function MoreScreen() {
             <Text style={styles.menuSectionTitle}>Subscription</Text>
             <View style={styles.menuCard}>
             <MenuItem 
-              icon={<CreditCard size={20} color={Colors.dark.success} />}
+              icon={<CreditCard size={20} color={colors.success} />}
               label="Manage Subscription"
               onPress={handleManageSubscription}
             />
@@ -582,7 +587,7 @@ export default function MoreScreen() {
           <Text style={styles.menuSectionTitle}>Support</Text>
           <View style={styles.menuCard}>
             <MenuItem 
-              icon={<HelpCircle size={20} color={Colors.dark.textSecondary} />}
+              icon={<HelpCircle size={20} color={colors.textSecondary} />}
               label="Help & Support"
               onPress={() => setSupportModalVisible(true)}
             />
@@ -592,13 +597,13 @@ export default function MoreScreen() {
         <View style={styles.menuSection}>
           <View style={styles.menuCard}>
             <MenuItem 
-              icon={<LogOut size={20} color={Colors.dark.error} />}
+              icon={<LogOut size={20} color={colors.error} />}
               label="Leave Club"
               onPress={handleLeaveCrew}
               destructive
             />
             <MenuItem 
-              icon={<LogOut size={20} color={Colors.dark.error} />}
+              icon={<LogOut size={20} color={colors.error} />}
               label="Delete Account"
               onPress={handleDeleteAccount}
               destructive
@@ -610,12 +615,12 @@ export default function MoreScreen() {
           <Text style={styles.menuSectionTitle}>Account</Text>
           <View style={styles.menuCard}>
             <MenuItem
-              icon={<KeyRound size={20} color={Colors.dark.textSecondary} />}
+              icon={<KeyRound size={20} color={colors.textSecondary} />}
               label="Email & Password"
               onPress={() => router.push('/account-security' as any)}
             />
             <MenuItem
-              icon={<LogOut size={20} color={Colors.dark.textSecondary} />}
+              icon={<LogOut size={20} color={colors.textSecondary} />}
               label="Sign Out"
               onPress={handleSignOut}
             />
@@ -649,7 +654,7 @@ export default function MoreScreen() {
                 </View>
               )}
               <View style={styles.editAvatarBadge}>
-                <Camera size={14} color={Colors.dark.text} />
+                <Camera size={14} color={colors.text} />
               </View>
             </Pressable>
 
@@ -659,7 +664,7 @@ export default function MoreScreen() {
               value={editName}
               onChangeText={setEditName}
               placeholder="Your name"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
             />
 
             <Text style={[styles.editLabel, styles.editLabelSpaced]}>Bike</Text>
@@ -668,7 +673,7 @@ export default function MoreScreen() {
               value={editBike}
               onChangeText={setEditBike}
               placeholder="Harley-Davidson Street Glide"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               maxLength={80}
             />
           </View>
@@ -688,7 +693,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.supportRow} onPress={() => openSupportLink('mailto:support@mostudios.io')}>
               <View style={styles.supportIcon}>
-                <Mail size={18} color={Colors.dark.primary} />
+                <Mail size={18} color={colors.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>support@mostudios.io</Text>
@@ -698,7 +703,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.supportRow} onPress={() => openSupportLink('mailto:info@mostudios.io')}>
               <View style={styles.supportIcon}>
-                <Mail size={18} color={Colors.dark.primary} />
+                <Mail size={18} color={colors.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>info@mostudios.io</Text>
@@ -708,7 +713,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.supportRow} onPress={() => openSupportLink('https://instagram.com/mostudios.io')}>
               <View style={styles.supportIcon}>
-                <AtSign size={18} color={Colors.dark.primary} />
+                <AtSign size={18} color={colors.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>@mostudios.io</Text>
@@ -718,7 +723,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.supportRow} onPress={() => openSupportLink(WEBSITE_URL)}>
               <View style={styles.supportIcon}>
-                <Globe size={18} color={Colors.dark.primary} />
+                <Globe size={18} color={colors.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>www.mostudios.io</Text>
@@ -728,7 +733,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.supportRow} onPress={() => openSupportLink(TERMS_URL)}>
               <View style={styles.supportIcon}>
-                <Shield size={18} color={Colors.dark.primary} />
+                <Shield size={18} color={colors.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>Terms of Use</Text>
@@ -738,7 +743,7 @@ export default function MoreScreen() {
 
             <Pressable style={styles.supportRow} onPress={() => openSupportLink(PRIVACY_URL)}>
               <View style={styles.supportIcon}>
-                <Shield size={18} color={Colors.dark.primary} />
+                <Shield size={18} color={colors.primary} />
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>Privacy Policy</Text>
@@ -752,10 +757,10 @@ export default function MoreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
@@ -772,45 +777,45 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
     letterSpacing: -0.5,
     marginBottom: 24,
   },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   verificationCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     gap: 12,
   },
   verificationCopy: {
     gap: 4,
   },
   verificationTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   verificationText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
   verificationButton: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
@@ -819,7 +824,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   verificationButtonText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -836,12 +841,12 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileInitials: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 24,
     fontWeight: '700',
   },
@@ -849,23 +854,23 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     borderRadius: 10,
     padding: 4,
     borderWidth: 2,
-    borderColor: Colors.dark.surface,
+    borderColor: colors.surface,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 2,
   },
   profileEmail: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
     marginBottom: 8,
   },
@@ -876,7 +881,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   profileBike: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -888,17 +893,17 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   roleTagText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '600',
   },
   inviteCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   inviteHeader: {
     flexDirection: 'row',
@@ -907,7 +912,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   inviteTitle: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -917,21 +922,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   shareButtonText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
   },
   inviteCodeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 12,
     paddingLeft: 16,
     marginBottom: 8,
   },
   inviteCode: {
     flex: 1,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 24,
     fontWeight: '700',
     letterSpacing: 2,
@@ -940,14 +945,14 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   inviteHint: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
   },
   menuSection: {
     marginBottom: 24,
   },
   menuSectionTitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -956,11 +961,11 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   menuCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   menuItem: {
     flexDirection: 'row',
@@ -969,10 +974,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   menuItemPressed: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -980,12 +985,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuItemLabel: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '500',
   },
   destructiveText: {
-    color: Colors.dark.error,
+    color: colors.error,
   },
   menuItemRight: {
     flexDirection: 'row',
@@ -993,18 +998,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   badge: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   badgeText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 12,
     fontWeight: '700',
   },
   version: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 8,
@@ -1015,7 +1020,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -1027,16 +1032,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   modalTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 17,
     fontWeight: '600',
   },
   modalCancel: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 16,
   },
   modalSave: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1045,14 +1050,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
     gap: 12,
   },
   supportIcon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1060,12 +1065,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   supportTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   supportSubtitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     marginTop: 2,
   },
@@ -1083,12 +1088,12 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   editAvatarInitials: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 36,
     fontWeight: '700',
   },
@@ -1096,14 +1101,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: 16,
     padding: 8,
     borderWidth: 2,
-    borderColor: Colors.dark.background,
+    borderColor: colors.background,
   },
   editLabel: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
@@ -1112,13 +1117,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   editInput: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
 });

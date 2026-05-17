@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindo
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, Calendar, History } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import RideCard from '@/components/RideCard';
 
@@ -17,6 +17,8 @@ export default function RidesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -36,7 +38,7 @@ export default function RidesScreen() {
               style={styles.createButton}
               onPress={() => router.push('/create-ride')}
             >
-              <Plus size={20} color={Colors.dark.text} />
+              <Plus size={20} color={colors.text} />
               <Text style={styles.createButtonText}>New Ride</Text>
             </Pressable>
           )}
@@ -46,7 +48,7 @@ export default function RidesScreen() {
             style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
             onPress={() => setActiveTab('upcoming')}
           >
-            <Calendar size={16} color={activeTab === 'upcoming' ? Colors.dark.primary : Colors.dark.textTertiary} />
+            <Calendar size={16} color={activeTab === 'upcoming' ? colors.primary : colors.textTertiary} />
             <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
               Upcoming
             </Text>
@@ -60,7 +62,7 @@ export default function RidesScreen() {
             style={[styles.tab, activeTab === 'past' && styles.activeTab]}
             onPress={() => setActiveTab('past')}
           >
-            <History size={16} color={activeTab === 'past' ? Colors.dark.primary : Colors.dark.textTertiary} />
+            <History size={16} color={activeTab === 'past' ? colors.primary : colors.textTertiary} />
             <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>
               Past
             </Text>
@@ -76,7 +78,7 @@ export default function RidesScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor={colors.primary}
           />
         }
       >
@@ -84,9 +86,9 @@ export default function RidesScreen() {
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
               {activeTab === 'upcoming' ? (
-                <Calendar size={48} color={Colors.dark.textTertiary} />
+                <Calendar size={48} color={colors.textTertiary} />
               ) : (
-                <History size={48} color={Colors.dark.textTertiary} />
+                <History size={48} color={colors.textTertiary} />
               )}
             </View>
             <Text style={styles.emptyTitle}>
@@ -102,7 +104,7 @@ export default function RidesScreen() {
                 style={styles.emptyButton}
                 onPress={() => router.push('/create-ride')}
               >
-                <Plus size={18} color={Colors.dark.text} />
+                <Plus size={18} color={colors.text} />
                 <Text style={styles.emptyButtonText}>Schedule a Ride</Text>
               </Pressable>
             )}
@@ -121,10 +123,10 @@ export default function RidesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
@@ -139,26 +141,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
     letterSpacing: -0.5,
   },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 24,
   },
   createButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -173,24 +175,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeTab: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   tabText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
     fontWeight: '600',
   },
   activeTabText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
   },
   tabBadge: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   tabBadgeText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -216,7 +218,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -224,12 +226,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark.text,
+    color: colors.text,
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 15,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
@@ -238,13 +240,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 28,
   },
   emptyButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },

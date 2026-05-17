@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Modal, Linking } from 'react-native'
 import { Image } from 'expo-image';
 import { Heart, Pin, Shield, Star, Pencil, X, Link as LinkIcon } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { Announcement } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { getAvatarSource } from '@/utils/avatar';
@@ -17,6 +17,8 @@ interface AnnouncementCardProps {
 
 export default function AnnouncementCard({ announcement, onEdit, onToggleLike }: AnnouncementCardProps) {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
   const [isImageOpen, setIsImageOpen] = useState(false);
   const [isOpeningLink, setIsOpeningLink] = useState(false);
@@ -27,7 +29,7 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
     if (announcement.authorRole === 'admin') {
       return (
         <View style={[styles.badge, styles.adminBadge]}>
-          <Shield size={10} color={Colors.dark.primary} />
+          <Shield size={10} color={colors.primary} />
           <Text style={styles.badgeText}>Admin</Text>
         </View>
       );
@@ -35,8 +37,8 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
     if (announcement.authorRole === 'officer') {
       return (
         <View style={[styles.badge, styles.officerBadge]}>
-          <Star size={10} color={Colors.dark.warning} />
-          <Text style={[styles.badgeText, { color: Colors.dark.warning }]}>Officer</Text>
+          <Star size={10} color={colors.warning} />
+          <Text style={[styles.badgeText, { color: colors.warning }]}>Officer</Text>
         </View>
       );
     }
@@ -47,13 +49,13 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
     <Pressable style={({ pressed }) => [styles.container, pressed && styles.pressed]}>
       {announcement.isPinned && (
         <View style={styles.pinnedBanner}>
-          <Pin size={12} color={Colors.dark.primary} />
+          <Pin size={12} color={colors.primary} />
           <Text style={styles.pinnedText}>Pinned</Text>
         </View>
       )}
       {onEdit && (
         <Pressable style={styles.editButton} onPress={onEdit} hitSlop={6}>
-          <Pencil size={16} color={Colors.dark.textSecondary} />
+          <Pencil size={16} color={colors.textSecondary} />
         </Pressable>
       )}
       <View style={styles.header}>
@@ -95,7 +97,7 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
             }
           }}
         >
-          <LinkIcon size={14} color={Colors.dark.primary} />
+          <LinkIcon size={14} color={colors.primary} />
           <Text style={styles.linkText} numberOfLines={1}>{announcement.link}</Text>
         </Pressable>
       ) : null}
@@ -119,8 +121,8 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
         >
           <Heart
             size={16}
-            color={hasLiked ? Colors.dark.primary : Colors.dark.textSecondary}
-            fill={hasLiked ? Colors.dark.primary : 'transparent'}
+            color={hasLiked ? colors.primary : colors.textSecondary}
+            fill={hasLiked ? colors.primary : 'transparent'}
           />
           <Text style={[styles.likeText, hasLiked && styles.likeTextActive]}>
             {likedBy.length}
@@ -131,7 +133,7 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
       <Modal visible={isImageOpen} transparent animationType="fade" onRequestClose={() => setIsImageOpen(false)}>
         <View style={styles.modalOverlay}>
           <Pressable style={[styles.modalClose, { top: insets.top + 12, right: insets.right + 12 }]} onPress={() => setIsImageOpen(false)}>
-            <X size={22} color={Colors.dark.text} />
+            <X size={22} color={colors.text} />
           </Pressable>
           <View style={[styles.modalContent, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
             <Image source={{ uri: announcement.imageUrl }} style={styles.modalImage} contentFit="contain" />
@@ -142,15 +144,15 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     alignSelf: 'center',
     width: '100%',
     maxWidth: 720,
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   editButton: {
     position: 'absolute',
@@ -180,7 +182,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   pinnedText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -196,18 +198,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   avatarPlaceholder: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   authorName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -239,24 +241,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
   },
   badgeText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '600',
   },
   timestamp: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     marginTop: 2,
   },
   title: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 8,
     lineHeight: 22,
   },
   content: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -267,7 +269,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   linkText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
@@ -292,7 +294,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     backgroundColor: 'rgba(255,255,255,0.04)',
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,12 +307,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(249, 115, 22, 0.12)',
   },
   likeText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
   likeTextActive: {
-    color: Colors.dark.primary,
+    color: colors.primary,
   },
   modalOverlay: {
     flex: 1,

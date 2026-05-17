@@ -16,7 +16,7 @@ import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import { ArrowLeft, Hash, Search } from 'lucide-react-native';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAt, endAt, where } from 'firebase/firestore';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
 import { trackAnalyticsEvent } from '@/utils/analytics';
@@ -32,6 +32,8 @@ type CrewSearchResult = {
 
 export default function JoinCrewScreen() {
   const { joinCrew, isJoiningCrew, requestJoin, user } = useAuth();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [inviteCode, setInviteCode] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CrewSearchResult[]>([]);
@@ -196,7 +198,7 @@ export default function JoinCrewScreen() {
             onPress={() => router.back()}
             testID="back-button"
           >
-            <ArrowLeft size={24} color={Colors.dark.text} />
+            <ArrowLeft size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Join a Crew</Text>
           <View style={styles.placeholder} />
@@ -218,11 +220,11 @@ export default function JoinCrewScreen() {
               </Text>
 
               <View style={styles.codeInputContainer}>
-                <Hash size={24} color={Colors.dark.primary} />
+                <Hash size={24} color={colors.primary} />
                 <TextInput
                   style={styles.codeInput}
                   placeholder="ABCD1234"
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={inviteCode}
                   onChangeText={(text) => setInviteCode(formatInviteCode(text))}
                   autoCapitalize="characters"
@@ -240,7 +242,7 @@ export default function JoinCrewScreen() {
                 testID="join-button"
               >
                 {isJoiningCrew ? (
-                  <ActivityIndicator color={Colors.dark.background} />
+                  <ActivityIndicator color={colors.background} />
                 ) : (
                   <Text style={styles.joinButtonText}>Join Crew</Text>
                 )}
@@ -260,11 +262,11 @@ export default function JoinCrewScreen() {
               </Text>
 
               <View style={styles.searchInputContainer}>
-                <Search size={20} color={Colors.dark.textTertiary} />
+                <Search size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search crews..."
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   autoCapitalize="none"
@@ -277,7 +279,7 @@ export default function JoinCrewScreen() {
                 <View style={styles.searchResults}>
                   {isSearching ? (
                     <View style={styles.emptyResults}>
-                      <ActivityIndicator color={Colors.dark.primary} />
+                      <ActivityIndicator color={colors.primary} />
                     </View>
                   ) : searchResults.length > 0 ? (
                     searchResults.map((result) => (
@@ -334,10 +336,10 @@ export default function JoinCrewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   safeArea: {
     flex: 1,
@@ -349,7 +351,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: Colors.dark.text,
+    color: colors.text,
   },
   placeholder: {
     width: 40,
@@ -381,36 +383,36 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600' as const,
-    color: Colors.dark.text,
+    color: colors.text,
     marginBottom: 6,
   },
   sectionDescription: {
     fontSize: 14,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 20,
   },
   codeInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderWidth: 2,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 16,
   },
   codeInput: {
     flex: 1,
     fontSize: 24,
     fontWeight: '700' as const,
-    color: Colors.dark.text,
+    color: colors.text,
     marginLeft: 12,
     letterSpacing: 4,
     textAlign: 'center',
   },
   joinButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -421,7 +423,7 @@ const styles = StyleSheet.create({
   joinButtonText: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: Colors.dark.background,
+    color: colors.background,
   },
   divider: {
     flexDirection: 'row',
@@ -431,27 +433,27 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: colors.border,
   },
   dividerText: {
     fontSize: 14,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     marginHorizontal: 16,
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: Colors.dark.text,
+    color: colors.text,
     paddingVertical: 14,
     marginLeft: 12,
   },
@@ -459,30 +461,30 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptyResults: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 24,
     alignItems: 'center',
   },
   emptyResultsText: {
     fontSize: 15,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: 8,
   },
   emptyResultsHint: {
     fontSize: 13,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
   },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 10,
   },
   resultLogo: {
@@ -495,13 +497,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   resultLogoText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700' as const,
   },
@@ -509,26 +511,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   resultName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700' as const,
   },
   resultDescription: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     marginTop: 2,
   },
   resultMeta: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 4,
   },
   resultJoin: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '700' as const,
   },
   resultJoinPending: {
-    color: Colors.dark.pending,
+    color: colors.pending,
   },
 });

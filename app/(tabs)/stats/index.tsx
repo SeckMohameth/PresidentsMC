@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike } from 'lucide-react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import MilestoneBurst from '@/components/MilestoneBurst';
 import StatCard from '@/components/StatCard';
@@ -21,23 +21,25 @@ export default function StatsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const crewMilestones = [
     crewStats.totalRides >= 1
-      ? { id: 'first-club-ride', label: 'First club ride completed', value: `${crewStats.totalRides} rides`, tone: Colors.dark.primary, icon: 'rides' as const }
+      ? { id: 'first-club-ride', label: 'First club ride completed', value: `${crewStats.totalRides} rides`, tone: colors.primary, icon: 'rides' as const }
       : null,
     crewStats.totalMiles >= 100
-      ? { id: 'hundred-club-miles', label: 'Club crossed 100 miles', value: formatMiles(crewStats.totalMiles), tone: Colors.dark.success, icon: 'miles' as const }
+      ? { id: 'hundred-club-miles', label: 'Club crossed 100 miles', value: formatMiles(crewStats.totalMiles), tone: colors.success, icon: 'miles' as const }
       : null,
     crewStats.totalPhotos >= 10
-      ? { id: 'ten-club-photos', label: 'Ride memories are building', value: `${formatNumber(crewStats.totalPhotos)} photos`, tone: Colors.dark.accent, icon: 'photos' as const }
+      ? { id: 'ten-club-photos', label: 'Ride memories are building', value: `${formatNumber(crewStats.totalPhotos)} photos`, tone: colors.accent, icon: 'photos' as const }
       : null,
   ].filter(Boolean) as React.ComponentProps<typeof MilestoneBurst>['milestones'];
   const personalMilestones = [
     memberStats.ridesAttended >= 1
-      ? { id: 'first-personal-ride', label: 'First ride attended', value: `${memberStats.ridesAttended} rides`, tone: Colors.dark.primary, icon: 'award' as const }
+      ? { id: 'first-personal-ride', label: 'First ride attended', value: `${memberStats.ridesAttended} rides`, tone: colors.primary, icon: 'award' as const }
       : null,
     memberStats.milesTraveled >= 50
-      ? { id: 'fifty-personal-miles', label: 'Personal mileage milestone', value: formatMiles(memberStats.milesTraveled), tone: Colors.dark.success, icon: 'miles' as const }
+      ? { id: 'fifty-personal-miles', label: 'Personal mileage milestone', value: formatMiles(memberStats.milesTraveled), tone: colors.success, icon: 'miles' as const }
       : null,
   ].filter(Boolean) as React.ComponentProps<typeof MilestoneBurst>['milestones'];
 
@@ -56,7 +58,7 @@ export default function StatsScreen() {
             style={[styles.tab, activeTab === 'crew' && styles.activeTab]}
             onPress={() => setActiveTab('crew')}
           >
-            <Users size={16} color={activeTab === 'crew' ? Colors.dark.primary : Colors.dark.textTertiary} />
+            <Users size={16} color={activeTab === 'crew' ? colors.primary : colors.textTertiary} />
             <Text style={[styles.tabText, activeTab === 'crew' && styles.activeTabText]}>
               Crew Stats
             </Text>
@@ -65,7 +67,7 @@ export default function StatsScreen() {
             style={[styles.tab, activeTab === 'personal' && styles.activeTab]}
             onPress={() => setActiveTab('personal')}
           >
-            <TrendingUp size={16} color={activeTab === 'personal' ? Colors.dark.primary : Colors.dark.textTertiary} />
+            <TrendingUp size={16} color={activeTab === 'personal' ? colors.primary : colors.textTertiary} />
             <Text style={[styles.tabText, activeTab === 'personal' && styles.activeTabText]}>
               My Stats
             </Text>
@@ -85,7 +87,7 @@ export default function StatsScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor={colors.primary}
           />
         }
       >
@@ -115,13 +117,13 @@ export default function StatsScreen() {
                 icon={Route} 
                 label="Total Rides" 
                 value={crewStats.totalRides}
-                color={Colors.dark.primary}
+                color={colors.primary}
               />
               <StatCard 
                 icon={MapPin} 
                 label="Miles Traveled" 
                 value={formatMiles(crewStats.totalMiles)}
-                color={Colors.dark.success}
+                color={colors.success}
               />
             </View>
             <View style={styles.statsGrid}>
@@ -129,7 +131,7 @@ export default function StatsScreen() {
                 icon={Camera} 
                 label="Photos" 
                 value={formatNumber(crewStats.totalPhotos)}
-                color={Colors.dark.accent}
+                color={colors.accent}
               />
               <StatCard 
                 icon={Users} 
@@ -146,14 +148,14 @@ export default function StatsScreen() {
                 label="Rides" 
                 value={crewStats.ridesThisMonth}
                 subtitle="rides completed"
-                color={Colors.dark.primary}
+                color={colors.primary}
               />
               <StatCard 
                 icon={MapPin} 
                 label="Miles" 
                 value={formatMiles(crewStats.milesThisMonth)}
                 subtitle="this month"
-                color={Colors.dark.success}
+                color={colors.success}
               />
             </View>
 
@@ -174,7 +176,7 @@ export default function StatsScreen() {
             <View style={styles.historyList}>
               {statsHistory.filter((item) => item.period === historyPeriod).length === 0 ? (
                 <View style={styles.historyEmpty}>
-                  <History size={20} color={Colors.dark.textTertiary} />
+                  <History size={20} color={colors.textTertiary} />
                   <Text style={styles.historyEmptyText}>No archived stats yet</Text>
                 </View>
               ) : (
@@ -229,7 +231,7 @@ export default function StatsScreen() {
                 {currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'officer' ? 'Officer' : 'Member'}
               </Text>
               <View style={styles.bikePill}>
-                <Bike size={14} color={Colors.dark.textSecondary} />
+                <Bike size={14} color={colors.textSecondary} />
                 <Text style={styles.bikePillText}>
                   {currentUser?.bike || 'Add your bike in Profile'}
                 </Text>
@@ -247,13 +249,13 @@ export default function StatsScreen() {
                 icon={Route} 
                 label="Rides Attended" 
                 value={memberStats.ridesAttended}
-                color={Colors.dark.primary}
+                color={colors.primary}
               />
               <StatCard 
                 icon={MapPin} 
                 label="Miles Traveled" 
                 value={formatMiles(memberStats.milesTraveled)}
-                color={Colors.dark.success}
+                color={colors.success}
               />
             </View>
 
@@ -264,14 +266,14 @@ export default function StatsScreen() {
                 label="Current Streak" 
                 value={memberStats.currentStreak}
                 subtitle="consecutive rides"
-                color={Colors.dark.error}
+                color={colors.error}
               />
               <StatCard 
                 icon={Trophy} 
                 label="Longest Streak" 
                 value={memberStats.longestStreak}
                 subtitle="personal best"
-                color={Colors.dark.warning}
+                color={colors.warning}
               />
             </View>
           </>
@@ -281,10 +283,10 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
@@ -293,13 +295,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
     letterSpacing: -0.5,
     marginBottom: 20,
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -314,15 +316,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   activeTab: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   tabText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
     fontWeight: '600',
   },
   activeTabText: {
-    color: Colors.dark.primary,
+    color: colors.primary,
   },
   scrollView: {
     flex: 1,
@@ -362,10 +364,10 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     marginBottom: 10,
     borderWidth: 2,
-    borderColor: Colors.dark.background,
+    borderColor: colors.background,
   },
   heroTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 24,
     fontWeight: '800',
   },
@@ -378,7 +380,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
     marginBottom: 24,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
   },
   profileImage: {
@@ -387,16 +389,16 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     marginBottom: 16,
     borderWidth: 3,
-    borderColor: Colors.dark.primary,
+    borderColor: colors.primary,
   },
   profileName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 4,
   },
   profileRole: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 10,
@@ -408,22 +410,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 10,
   },
   bikePillText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
   memberSince: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
   },
   sectionTitle: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -438,7 +440,7 @@ const styles = StyleSheet.create({
   },
   historyTabs: {
     flexDirection: 'row',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 4,
     marginBottom: 12,
@@ -450,36 +452,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   historyTabActive: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   historyTabText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     fontWeight: '600',
   },
   historyTabTextActive: {
-    color: Colors.dark.text,
+    color: colors.text,
   },
   historyList: {
     marginBottom: 16,
   },
   historyEmpty: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     gap: 6,
   },
   historyEmptyText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
   },
   historyCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 10,
   },
   historyHeader: {
@@ -489,12 +491,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   historyRange: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '700',
   },
   historyPeriod: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -503,7 +505,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   historyStat: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -511,21 +513,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   rideHistoryCard: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 10,
   },
   rideHistoryTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 4,
   },
   rideHistoryMeta: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
   },
 });

@@ -1,3 +1,5 @@
+import { useColorScheme } from 'react-native';
+
 function adaptive(_light: string, dark: string, _androidAttr?: string): string {
   // Keep exported colors as plain strings. Reanimated and Expo LinearGradient
   // cannot safely consume iOS DynamicColorIOS/Android PlatformColor objects.
@@ -102,3 +104,10 @@ const Colors = {
 };
 
 export default Colors;
+
+export type AppColors = typeof Colors.dark;
+
+export function useThemeColors(): AppColors {
+  const scheme = useColorScheme();
+  return scheme === 'light' ? Colors.light : Colors.dark;
+}

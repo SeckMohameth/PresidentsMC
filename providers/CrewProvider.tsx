@@ -96,15 +96,17 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
   const isSubscriptionActive =
     crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing';
-  const canPost = isDeveloperSupport || isOwner || isAdmin || (isOfficer && isSubscriptionActive);
+  const isBillingRequired = crew?.billingRequired === true;
+  const canUseAdminTools = !isBillingRequired || isSubscriptionActive || isOwner || isDeveloperSupport;
+  const canPost = isDeveloperSupport || isOwner || (isAdmin && canUseAdminTools) || (isOfficer && canUseAdminTools);
 
   const assertAdminActive = useCallback(() => {
     if (isDeveloperSupport) return;
     if (isOwner) return;
-    if (!isSubscriptionActive) {
+    if (isBillingRequired && !isSubscriptionActive) {
       throw new Error('SUBSCRIPTION_INACTIVE');
     }
-  }, [isDeveloperSupport, isOwner, isSubscriptionActive]);
+  }, [isBillingRequired, isDeveloperSupport, isOwner, isSubscriptionActive]);
 
   const assertAdminOrOfficer = useCallback(() => {
     if (!isAdmin && !isOfficer) {
@@ -865,6 +867,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     isAdmin,
     isOfficer,
     isOwner,
+    isBillingRequired,
+    canUseAdminTools,
     canPost,
     isSubscriptionActive,
     isLoading,

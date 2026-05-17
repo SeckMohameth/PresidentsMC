@@ -14,13 +14,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
 export default function SignUpScreen() {
   const { signUp, isSigningUp } = useAuth();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -119,11 +121,11 @@ export default function SignUpScreen() {
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
-                <User size={20} color={Colors.dark.textTertiary} />
+                <User size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
                   placeholder="Full Name"
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -132,11 +134,11 @@ export default function SignUpScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Mail size={20} color={Colors.dark.textTertiary} />
+                <Mail size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
                   placeholder="Email"
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -147,11 +149,11 @@ export default function SignUpScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Lock size={20} color={Colors.dark.textTertiary} />
+                <Lock size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -163,19 +165,19 @@ export default function SignUpScreen() {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {showPassword ? (
-                    <EyeOff size={20} color={Colors.dark.textTertiary} />
+                    <EyeOff size={20} color={colors.textTertiary} />
                   ) : (
-                    <Eye size={20} color={Colors.dark.textTertiary} />
+                    <Eye size={20} color={colors.textTertiary} />
                   )}
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputContainer}>
-                <Lock size={20} color={Colors.dark.textTertiary} />
+                <Lock size={20} color={colors.textTertiary} />
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm Password"
-                  placeholderTextColor={Colors.dark.textTertiary}
+                  placeholderTextColor={colors.textTertiary}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -187,9 +189,9 @@ export default function SignUpScreen() {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {showConfirmPassword ? (
-                    <EyeOff size={20} color={Colors.dark.textTertiary} />
+                    <EyeOff size={20} color={colors.textTertiary} />
                   ) : (
-                    <Eye size={20} color={Colors.dark.textTertiary} />
+                    <Eye size={20} color={colors.textTertiary} />
                   )}
                 </TouchableOpacity>
               </View>
@@ -202,7 +204,7 @@ export default function SignUpScreen() {
                 testID="sign-up-button"
               >
                 {isSigningUp ? (
-                  <ActivityIndicator color={Colors.dark.background} />
+                  <ActivityIndicator color={colors.background} />
                 ) : (
                   <Text style={styles.buttonText}>Create Account</Text>
                 )}
@@ -223,10 +225,10 @@ export default function SignUpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   safeArea: {
     flex: 1,
@@ -249,19 +251,19 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 28,
     fontWeight: '800' as const,
-    color: Colors.dark.primary,
+    color: colors.primary,
     letterSpacing: 1,
     marginBottom: 24,
   },
   title: {
     fontSize: 28,
     fontWeight: '700' as const,
-    color: Colors.dark.text,
+    color: colors.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   form: {
@@ -270,22 +272,22 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: Colors.dark.text,
+    color: colors.text,
     paddingVertical: 14,
     marginLeft: 12,
   },
   button: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -297,7 +299,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: Colors.dark.background,
+    color: colors.background,
   },
   footer: {
     flexDirection: 'row',
@@ -308,11 +310,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
   },
   footerLink: {
     fontSize: 15,
     fontWeight: '600' as const,
-    color: Colors.dark.primary,
+    color: colors.primary,
   },
 });

@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, Hash, LogOut, ShieldCheck, UserPlus } from 'lucide-react-native';
 import { doc, getDoc } from 'firebase/firestore';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_ID, CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
@@ -24,6 +24,8 @@ const WAITING_ROOM_IMAGE = require('../assets/images/waiting-room.jpg');
 
 export default function CrewSelectionScreen() {
   const { user, signOut, requestJoin, cancelJoinRequest, joinCrew, isJoiningCrew } = useAuth();
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [clubName, setClubName] = useState(CLUB_NAME);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
@@ -99,13 +101,13 @@ export default function CrewSelectionScreen() {
     <View style={styles.container}>
       <ImageBackground source={WAITING_ROOM_IMAGE} style={styles.background} resizeMode="cover">
         <LinearGradient
-          colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)', Colors.dark.background]}
+          colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)', colors.background]}
           style={styles.backgroundOverlay}
         />
       </ImageBackground>
       <SafeAreaView style={styles.safeArea}>
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <LogOut size={20} color={Colors.dark.textTertiary} />
+          <LogOut size={20} color={colors.textTertiary} />
         </TouchableOpacity>
 
         <KeyboardAvoidingView
@@ -115,7 +117,7 @@ export default function CrewSelectionScreen() {
         <View style={styles.content}>
           <View style={styles.header}>
             <View style={styles.iconContainer}>
-              <ShieldCheck size={48} color={Colors.dark.primary} strokeWidth={1.6} />
+              <ShieldCheck size={48} color={colors.primary} strokeWidth={1.6} />
             </View>
             <Text style={styles.title}>{clubName}</Text>
             <Text style={styles.subtitle}>
@@ -126,7 +128,7 @@ export default function CrewSelectionScreen() {
           <View style={styles.glassPanel}>
           {hasPendingRequest ? (
             <View style={styles.pendingCard}>
-              <Clock size={22} color={Colors.dark.pending} />
+              <Clock size={22} color={colors.pending} />
               <View style={styles.pendingText}>
                 <Text style={styles.pendingTitle}>Request Pending</Text>
                 <Text style={styles.pendingSubtitle}>
@@ -142,10 +144,10 @@ export default function CrewSelectionScreen() {
               activeOpacity={0.85}
             >
               {isSubmitting ? (
-                <ActivityIndicator color={Colors.dark.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <>
-                  <UserPlus size={20} color={Colors.dark.background} />
+                  <UserPlus size={20} color={colors.background} />
                   <Text style={styles.primaryButtonText}>Request Access</Text>
                 </>
               )}
@@ -170,13 +172,13 @@ export default function CrewSelectionScreen() {
               Enter it here to skip the approval wait.
             </Text>
             <View style={styles.inviteInputRow}>
-              <Hash size={18} color={Colors.dark.textTertiary} />
+              <Hash size={18} color={colors.textTertiary} />
               <TextInput
                 style={styles.inviteInput}
                 value={inviteCode}
                 onChangeText={(text) => setInviteCode(formatInviteCode(text))}
                 placeholder="ABCD1234"
-                placeholderTextColor={Colors.dark.textTertiary}
+                placeholderTextColor={colors.textTertiary}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={16}
@@ -192,7 +194,7 @@ export default function CrewSelectionScreen() {
               activeOpacity={0.85}
             >
               {isJoiningCrew ? (
-                <ActivityIndicator color={Colors.dark.background} />
+                <ActivityIndicator color={colors.background} />
               ) : (
                 <Text style={styles.inviteButtonText}>Use Invite Code</Text>
               )}
@@ -210,10 +212,10 @@ export default function CrewSelectionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   background: {
     ...StyleSheet.absoluteFillObject,
@@ -258,13 +260,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 23,
     paddingHorizontal: 16,
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.pending,
+    borderColor: colors.pending,
     marginBottom: 16,
     gap: 12,
   },
@@ -297,25 +299,25 @@ const styles = StyleSheet.create({
   pendingTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark.pending,
+    color: colors.pending,
   },
   pendingSubtitle: {
     fontSize: 13,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     marginTop: 3,
     lineHeight: 18,
   },
   primaryButton: {
     height: 56,
     borderRadius: 20,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 10,
   },
   primaryButtonText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 17,
     fontWeight: '800',
   },
@@ -326,12 +328,12 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -342,13 +344,13 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(229,229,229,0.12)',
   },
   inviteTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '800',
     textAlign: 'center',
   },
   inviteSubtitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
@@ -359,7 +361,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     backgroundColor: 'rgba(0,0,0,0.34)',
     flexDirection: 'row',
     alignItems: 'center',
@@ -369,7 +371,7 @@ const styles = StyleSheet.create({
   },
   inviteInput: {
     flex: 1,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 17,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -377,17 +379,17 @@ const styles = StyleSheet.create({
   inviteButton: {
     height: 48,
     borderRadius: 18,
-    backgroundColor: Colors.dark.text,
+    backgroundColor: colors.text,
     alignItems: 'center',
     justifyContent: 'center',
   },
   inviteButtonText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 15,
     fontWeight: '800',
   },
   note: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',

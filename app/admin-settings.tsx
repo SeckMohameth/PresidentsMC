@@ -15,7 +15,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { Camera, Copy, RefreshCcw, Shield, Star, UserMinus, UserPlus } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { CrewMember, JoinRequest } from '@/types';
 
@@ -47,6 +47,8 @@ function getInviteExpirationLabel(expiresAt: string | null) {
 export default function AdminSettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const {
     crew,
     members,
@@ -60,6 +62,7 @@ export default function AdminSettingsScreen() {
     updateInviteSettings,
     isAdmin,
     isOwner,
+    isBillingRequired,
     isSubscriptionActive,
   } = useCrew();
 
@@ -243,9 +246,9 @@ export default function AdminSettingsScreen() {
           <View style={styles.backButton} />
         </View>
 
-        {!isOwner && !isSubscriptionActive && (
+        {isBillingRequired && !isOwner && !isSubscriptionActive && (
           <View style={styles.banner}>
-            <Shield size={16} color={Colors.dark.warning} />
+            <Shield size={16} color={colors.warning} />
             <Text style={styles.bannerText}>
               Subscription inactive. Admin actions are locked until the club subscription is active.
             </Text>
@@ -270,10 +273,10 @@ export default function AdminSettingsScreen() {
                 </View>
                 <View style={styles.rowActions}>
                   <Pressable style={[styles.iconButton, styles.approveButton]} onPress={() => handleApprove(request)}>
-                    <UserPlus size={16} color={Colors.dark.created} />
+                    <UserPlus size={16} color={colors.created} />
                   </Pressable>
                   <Pressable style={[styles.iconButton, styles.denyButton]} onPress={() => handleDeny(request)}>
-                    <UserMinus size={16} color={Colors.dark.deleted} />
+                    <UserMinus size={16} color={colors.deleted} />
                   </Pressable>
                 </View>
               </View>
@@ -289,7 +292,7 @@ export default function AdminSettingsScreen() {
                 <Image source={{ uri: logoUrl }} style={styles.logo} contentFit="cover" />
               ) : (
                 <View style={styles.logoPlaceholder}>
-                  <Camera size={18} color={Colors.dark.text} />
+                  <Camera size={18} color={colors.text} />
                 </View>
               )}
               <Text style={styles.logoText}>Change club logo</Text>
@@ -301,7 +304,7 @@ export default function AdminSettingsScreen() {
               value={name}
               onChangeText={setName}
               placeholder="Club name"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
             />
 
             <Text style={styles.label}>Description</Text>
@@ -310,7 +313,7 @@ export default function AdminSettingsScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder="Club description"
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               multiline
             />
 
@@ -319,8 +322,8 @@ export default function AdminSettingsScreen() {
               <Switch
                 value={isDiscoverable}
                 onValueChange={setIsDiscoverable}
-                trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-                thumbColor={Colors.dark.text}
+                trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+                thumbColor={colors.text}
               />
             </View>
 
@@ -329,8 +332,8 @@ export default function AdminSettingsScreen() {
               <Switch
                 value={requiresApproval}
                 onValueChange={setRequiresApproval}
-                trackColor={{ false: Colors.dark.surfaceElevated, true: Colors.dark.primary }}
-                thumbColor={Colors.dark.text}
+                trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+                thumbColor={colors.text}
               />
             </View>
 
@@ -355,11 +358,11 @@ export default function AdminSettingsScreen() {
                 editable={!isInviteLoading && !isInviteSaving}
                 autoCapitalize="characters"
                 placeholder="INVITE"
-                placeholderTextColor={Colors.dark.textTertiary}
+                placeholderTextColor={colors.textTertiary}
                 maxLength={16}
               />
               <Pressable style={styles.iconButton} onPress={copyInviteCode} disabled={!inviteCode}>
-                <Copy size={16} color={Colors.dark.text} />
+                <Copy size={16} color={colors.text} />
               </Pressable>
             </View>
             <Text style={styles.inviteExpiryText}>{getInviteExpirationLabel(inviteExpiresAt)}</Text>
@@ -393,7 +396,7 @@ export default function AdminSettingsScreen() {
                 onPress={() => saveInviteSettings({ rotate: true })}
                 disabled={isInviteSaving}
               >
-                <RefreshCcw size={16} color={Colors.dark.text} />
+                <RefreshCcw size={16} color={colors.text} />
                 <Text style={styles.secondaryActionText}>Rotate</Text>
               </Pressable>
               <Pressable
@@ -420,10 +423,10 @@ export default function AdminSettingsScreen() {
               {isAdmin && member.id !== crew?.ownerId ? (
                 <View style={styles.rowActions}>
                   <Pressable style={styles.iconButton} onPress={() => toggleOfficer(member)}>
-                    <Star size={16} color={Colors.dark.text} />
+                    <Star size={16} color={colors.text} />
                   </Pressable>
                   <Pressable style={styles.iconButton} onPress={() => handleRemove(member)}>
-                    <UserMinus size={16} color={Colors.dark.error} />
+                    <UserMinus size={16} color={colors.error} />
                   </Pressable>
                 </View>
               ) : null}
@@ -435,10 +438,10 @@ export default function AdminSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   content: {
     paddingHorizontal: 20,
@@ -457,51 +460,51 @@ const styles = StyleSheet.create({
     width: 60,
   },
   backText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   title: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.dark.text,
+    color: colors.text,
   },
   banner: {
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 16,
   },
   bannerText: {
     flex: 1,
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
   card: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     marginBottom: 16,
     gap: 12,
   },
   sectionTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   emptyText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
   },
   helperText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -526,10 +529,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     backgroundColor: 'rgba(245,158,11,0.14)',
     borderWidth: 1,
-    borderColor: Colors.dark.pending,
+    borderColor: colors.pending,
   },
   pendingPillText: {
-    color: Colors.dark.pending,
+    color: colors.pending,
     fontSize: 11,
     fontWeight: '800',
   },
@@ -543,15 +546,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   approveButton: {
     borderWidth: 1,
-    borderColor: Colors.dark.created,
+    borderColor: colors.created,
   },
   denyButton: {
     borderWidth: 1,
-    borderColor: Colors.dark.deleted,
+    borderColor: colors.deleted,
   },
   memberRow: {
     flexDirection: 'row',
@@ -560,12 +563,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   memberName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
   memberMeta: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     textTransform: 'capitalize',
   },
@@ -583,28 +586,28 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
   label: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
   },
   inputMultiline: {
@@ -619,18 +622,18 @@ const styles = StyleSheet.create({
   inviteInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
     borderRadius: 12,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: 1,
   },
   inviteExpiryText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
   },
   expirationOptions: {
@@ -641,22 +644,22 @@ const styles = StyleSheet.create({
   expirationChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.surfaceElevated,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   expirationChipSelected: {
-    borderColor: Colors.dark.primary,
+    borderColor: colors.primary,
     backgroundColor: 'rgba(229,229,229,0.12)',
   },
   expirationChipText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
   expirationChipTextSelected: {
-    color: Colors.dark.text,
+    color: colors.text,
   },
   inviteActions: {
     flexDirection: 'row',
@@ -667,15 +670,15 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
-    backgroundColor: Colors.dark.surfaceElevated,
+    borderColor: colors.borderLight,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
   },
   secondaryActionText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -692,13 +695,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   saveButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
   },
   saveButtonText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 15,
     fontWeight: '700',
   },

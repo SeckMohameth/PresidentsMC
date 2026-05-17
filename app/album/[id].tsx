@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X, Camera, Plus } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
 import { RidePhoto } from '@/types';
@@ -19,6 +19,8 @@ export default function AlbumScreen() {
   const { ride } = useRide(id || '');
   const [selectedPhoto, setSelectedPhoto] = useState<RidePhoto | null>(null);
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   const columnCount = isTablet ? 5 : 3;
   const gridWidth = Math.min(width, 980);
   const gridPadding = isTablet ? 24 : 16;
@@ -70,28 +72,28 @@ export default function AlbumScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color={Colors.dark.text} />
+          <ArrowLeft size={24} color={colors.text} />
         </Pressable>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>{ride.title}</Text>
           <Text style={styles.headerSubtitle}>{formatDate(ride.dateTime)} • {ride.photos.length} photos</Text>
         </View>
         <Pressable style={styles.addButton} onPress={handleAddPhoto}>
-          <Plus size={20} color={Colors.dark.text} />
+          <Plus size={20} color={colors.text} />
         </Pressable>
       </View>
 
       {ride.photos.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
-            <Camera size={48} color={Colors.dark.textTertiary} />
+            <Camera size={48} color={colors.textTertiary} />
           </View>
           <Text style={styles.emptyTitle}>No Photos Yet</Text>
           <Text style={styles.emptyDescription}>
             Be the first to add photos from this ride!
           </Text>
           <Pressable style={styles.emptyButton} onPress={handleAddPhoto}>
-            <Plus size={18} color={Colors.dark.text} />
+            <Plus size={18} color={colors.text} />
             <Text style={styles.emptyButtonText}>Add Photos</Text>
           </Pressable>
         </View>
@@ -125,7 +127,7 @@ export default function AlbumScreen() {
             style={[styles.modalClose, { top: insets.top + 16 }]}
             onPress={() => setSelectedPhoto(null)}
           >
-            <X size={24} color={Colors.dark.text} />
+            <X size={24} color={colors.text} />
           </Pressable>
           {selectedPhoto && (
             <>
@@ -146,17 +148,17 @@ export default function AlbumScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   centered: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   errorText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 16,
   },
   header: {
@@ -165,7 +167,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -178,12 +180,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   headerTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   headerSubtitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     marginTop: 2,
   },
@@ -191,7 +193,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -201,7 +203,7 @@ const styles = StyleSheet.create({
   photoItem: {
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
   },
   gridList: {
     width: '100%',
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
@@ -228,12 +230,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark.text,
+    color: colors.text,
     marginBottom: 8,
   },
   emptyDescription: {
     fontSize: 15,
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
@@ -242,13 +244,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 28,
   },
   emptyButtonText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -281,13 +283,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalAuthor: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
   modalDate: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 14,
   },
 });

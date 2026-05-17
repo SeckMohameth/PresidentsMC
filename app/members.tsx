@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { ArrowLeft, Crown, Edit3, Search, Shield, Star, UserRound, Users, X } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import MemberRow from '@/components/MemberRow';
 import { CrewMember } from '@/types';
@@ -62,6 +62,8 @@ export default function MembersScreen() {
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const visibleMembers = useMemo(
     () => members.filter((member) => !member.isDeveloperSupport),
@@ -202,7 +204,7 @@ export default function MembersScreen() {
             <Text style={styles.hierarchyTitle}>Chain of Command</Text>
             <Text style={styles.hierarchySubtitle}>Club titles and leadership roles</Text>
           </View>
-          <Crown size={20} color={Colors.dark.primary} />
+          <Crown size={20} color={colors.primary} />
         </View>
         <ScrollView
           horizontal
@@ -219,11 +221,11 @@ export default function MembersScreen() {
               <View style={styles.hierarchyTopRow}>
                 <Text style={styles.hierarchyRank}>{String(index + 1).padStart(2, '0')}</Text>
                 {member.role === 'admin' ? (
-                  <Shield size={16} color={Colors.dark.primary} />
+                  <Shield size={16} color={colors.primary} />
                 ) : member.role === 'officer' ? (
-                  <Star size={16} color={Colors.dark.warning} />
+                  <Star size={16} color={colors.warning} />
                 ) : (
-                  <UserRound size={16} color={Colors.dark.textTertiary} />
+                  <UserRound size={16} color={colors.textTertiary} />
                 )}
               </View>
               <Text style={styles.hierarchyName} numberOfLines={1}>{member.name}</Text>
@@ -241,18 +243,18 @@ export default function MembersScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerTop}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color={Colors.dark.text} />
+            <ArrowLeft size={24} color={colors.text} />
           </Pressable>
           <Text style={styles.headerTitle}>Members</Text>
           <View style={{ width: 40 }} />
         </View>
         
         <View style={styles.searchContainer}>
-          <Search size={18} color={Colors.dark.textTertiary} />
+          <Search size={18} color={colors.textTertiary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search members..."
-            placeholderTextColor={Colors.dark.textTertiary}
+            placeholderTextColor={colors.textTertiary}
             value={search}
             onChangeText={setSearch}
           />
@@ -263,7 +265,7 @@ export default function MembersScreen() {
             style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
             onPress={() => setFilter('all')}
           >
-            <Users size={14} color={filter === 'all' ? Colors.dark.text : Colors.dark.textTertiary} />
+            <Users size={14} color={filter === 'all' ? colors.text : colors.textTertiary} />
             <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
               All ({visibleMembers.length})
             </Text>
@@ -272,7 +274,7 @@ export default function MembersScreen() {
             style={[styles.filterChip, filter === 'admin' && styles.filterChipActive]}
             onPress={() => setFilter('admin')}
           >
-            <Shield size={14} color={filter === 'admin' ? Colors.dark.text : Colors.dark.primary} />
+            <Shield size={14} color={filter === 'admin' ? colors.text : colors.primary} />
             <Text style={[styles.filterText, filter === 'admin' && styles.filterTextActive]}>
               Admins ({stats.admins})
             </Text>
@@ -281,7 +283,7 @@ export default function MembersScreen() {
             style={[styles.filterChip, filter === 'officer' && styles.filterChipActive]}
             onPress={() => setFilter('officer')}
           >
-            <Star size={14} color={filter === 'officer' ? Colors.dark.text : Colors.dark.warning} />
+            <Star size={14} color={filter === 'officer' ? colors.text : colors.warning} />
             <Text style={[styles.filterText, filter === 'officer' && styles.filterTextActive]}>
               Officers ({stats.officers})
             </Text>
@@ -339,7 +341,7 @@ export default function MembersScreen() {
                 <Text style={styles.modalSubtitle}>{editingMember?.name}</Text>
               </View>
               <Pressable style={styles.modalClose} onPress={() => setEditingMember(null)}>
-                <X size={20} color={Colors.dark.text} />
+                <X size={20} color={colors.text} />
               </Pressable>
             </View>
 
@@ -348,7 +350,7 @@ export default function MembersScreen() {
               value={titleDraft}
               onChangeText={setTitleDraft}
               placeholder="President, Road Captain, Treasurer..."
-              placeholderTextColor={Colors.dark.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               maxLength={48}
               autoCapitalize="words"
             />
@@ -377,7 +379,7 @@ export default function MembersScreen() {
                 onPress={saveLeadershipTitle}
                 disabled={isSavingTitle}
               >
-                <Edit3 size={16} color={Colors.dark.background} />
+                <Edit3 size={16} color={colors.background} />
                 <Text style={styles.saveTitleText}>{isSavingTitle ? 'Saving...' : 'Save Title'}</Text>
               </Pressable>
             </View>
@@ -388,16 +390,16 @@ export default function MembersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.dark.border,
+    borderBottomColor: colors.border,
   },
   headerTop: {
     flexDirection: 'row',
@@ -412,25 +414,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
     paddingVertical: 12,
     marginLeft: 10,
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
   },
   filters: {
@@ -441,11 +443,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   crewLogo: {
     width: 48,
@@ -457,13 +459,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   crewLogoText: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700' as const,
   },
@@ -471,12 +473,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   crewName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   crewMeta: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -484,7 +486,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   roleStatText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
   },
   filterChip: {
@@ -494,21 +496,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   filterChipActive: {
-    backgroundColor: Colors.dark.primary,
-    borderColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
   filterTextActive: {
-    color: Colors.dark.text,
+    color: colors.text,
   },
   listContent: {
     paddingVertical: 8,
@@ -520,7 +522,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: colors.border,
     marginLeft: 76,
   },
   emptyState: {
@@ -528,7 +530,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 15,
   },
   hierarchySection: {
@@ -546,12 +548,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   hierarchyTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '800',
   },
   hierarchySubtitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -562,9 +564,9 @@ const styles = StyleSheet.create({
   hierarchyCard: {
     width: 156,
     minHeight: 116,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     borderRadius: 8,
     padding: 12,
   },
@@ -575,23 +577,23 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   hierarchyRank: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
     fontWeight: '700',
   },
   hierarchyName: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 15,
     fontWeight: '800',
   },
   hierarchyRole: {
-    color: Colors.dark.primary,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 4,
   },
   hierarchyType: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 11,
     marginTop: 8,
     textTransform: 'uppercase',
@@ -606,10 +608,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 520,
     alignSelf: 'center',
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     padding: 18,
   },
   modalHeader: {
@@ -619,12 +621,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '800',
   },
   modalSubtitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
     marginTop: 2,
   },
@@ -634,14 +636,14 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   titleInput: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.background,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 13,
@@ -656,12 +658,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   suggestionText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -677,11 +679,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.dark.borderLight,
+    borderColor: colors.borderLight,
     paddingVertical: 13,
   },
   clearTitleText: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -692,14 +694,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderRadius: 8,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 13,
   },
   saveTitleDisabled: {
     opacity: 0.65,
   },
   saveTitleText: {
-    color: Colors.dark.background,
+    color: colors.background,
     fontSize: 14,
     fontWeight: '800',
   },

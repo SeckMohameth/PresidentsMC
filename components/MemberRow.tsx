@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Shield, Star, ChevronRight, UserMinus } from 'lucide-react-native';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 import { CrewMember } from '@/types';
 import { getAvatarSource } from '@/utils/avatar';
 import { getInitials, formatMiles } from '@/utils/helpers';
@@ -16,12 +16,15 @@ interface MemberRowProps {
 }
 
 export default function MemberRow({ member, onPress, showStats = true, showRemove, onRemove }: MemberRowProps) {
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
   const getRoleIcon = () => {
     if (member.role === 'admin') {
-      return <Shield size={14} color={Colors.dark.primary} />;
+      return <Shield size={14} color={colors.primary} />;
     }
     if (member.role === 'officer') {
-      return <Star size={14} color={Colors.dark.warning} />;
+      return <Star size={14} color={colors.warning} />;
     }
     return null;
   };
@@ -81,24 +84,24 @@ export default function MemberRow({ member, onPress, showStats = true, showRemov
       </View>
       {showRemove && onRemove && (
         <Pressable style={styles.removeButton} onPress={onRemove}>
-          <UserMinus size={18} color={Colors.dark.error} />
+          <UserMinus size={18} color={colors.error} />
         </Pressable>
       )}
-      {onPress && <ChevronRight size={20} color={Colors.dark.textTertiary} />}
+      {onPress && <ChevronRight size={20} color={colors.textTertiary} />}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
   },
   pressed: {
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   avatarContainer: {
     position: 'relative',
@@ -108,18 +111,18 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.dark.surfaceElevated,
+    backgroundColor: colors.surfaceElevated,
   },
   avatarPlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -127,7 +130,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 3,
   },
@@ -135,7 +138,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   name: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 2,
@@ -145,22 +148,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   role: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
   },
   roleKind: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 12,
   },
   dot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: Colors.dark.textTertiary,
+    backgroundColor: colors.textTertiary,
     marginHorizontal: 8,
   },
   stats: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 13,
   },
   removeButton: {

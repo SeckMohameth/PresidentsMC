@@ -51,6 +51,15 @@ service cloud.firestore {
       return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
     }
 
+    function canUseAdminTools(crewId) {
+      return isDeveloperSupport(crewId)
+        || isCrewOwner(crewId)
+        || (
+          isCrewLeader(crewId)
+          && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
+        );
+    }
+
     function isDeveloperAdminEmail() {
       return signedIn()
         && request.auth.token.email != null
@@ -151,6 +160,7 @@ service cloud.firestore {
           'logoUrl',
           'isDiscoverable',
           'requiresApproval',
+          'billingRequired',
           'nameLower'
         ]);
       allow delete: if false;
@@ -222,12 +232,10 @@ service cloud.firestore {
       match /announcements/{announcementId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
         allow create, delete: if isPresidentsClub(crewId)
-          && (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+          && canUseAdminTools(crewId);
         allow update: if isPresidentsClub(crewId)
           && (
-            isDeveloperSupport(crewId)
-            || isCrewOwner(crewId)
-            || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+            canUseAdminTools(crewId)
             || (
               isCrewMember(crewId)
               && request.resource.data.diff(resource.data).changedKeys().hasOnly(['likedBy'])
@@ -238,13 +246,10 @@ service cloud.firestore {
       match /rides/{rideId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
         allow create, delete: if isPresidentsClub(crewId)
-          && (isDeveloperSupport(crewId) || isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId)));
+          && canUseAdminTools(crewId);
         allow update: if isPresidentsClub(crewId)
           && (
-            isDeveloperSupport(crewId)
-            ||
-            isCrewOwner(crewId)
-            || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+            canUseAdminTools(crewId)
             || (
               isCrewMember(crewId)
               && request.resource.data.diff(resource.data).changedKeys().hasOnly([

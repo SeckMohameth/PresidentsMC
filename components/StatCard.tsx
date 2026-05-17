@@ -10,7 +10,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Colors from '@/constants/colors';
+import { AppColors, useThemeColors } from '@/constants/colors';
 
 interface StatCardProps {
   icon: LucideIcon;
@@ -20,7 +20,10 @@ interface StatCardProps {
   color?: string;
 }
 
-export default function StatCard({ icon: Icon, label, value, subtitle, color = Colors.dark.primary }: StatCardProps) {
+export default function StatCard({ icon: Icon, label, value, subtitle, color }: StatCardProps) {
+  const colors = useThemeColors();
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const accentColor = color ?? colors.primary;
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -40,8 +43,8 @@ export default function StatCard({ icon: Icon, label, value, subtitle, color = C
       layout={Layout.springify().damping(18)}
       style={[styles.container, animatedStyle]}
     >
-      <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
-        <Icon size={22} color={color} />
+      <View style={[styles.iconContainer, { backgroundColor: `${accentColor}15` }]}>
+        <Icon size={22} color={accentColor} />
       </View>
       <Text style={styles.value}>{value}</Text>
       <Text style={styles.label}>{label}</Text>
@@ -50,16 +53,16 @@ export default function StatCard({ icon: Icon, label, value, subtitle, color = C
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
-    backgroundColor: Colors.dark.surface,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
     flex: 1,
     minWidth: 100,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: colors.border,
   },
   iconContainer: {
     width: 44,
@@ -70,19 +73,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   value: {
-    color: Colors.dark.text,
+    color: colors.text,
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 4,
   },
   label: {
-    color: Colors.dark.textSecondary,
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
   },
   subtitle: {
-    color: Colors.dark.textTertiary,
+    color: colors.textTertiary,
     fontSize: 11,
     marginTop: 4,
     textAlign: 'center',

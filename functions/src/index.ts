@@ -37,6 +37,7 @@ type CrewDoc = {
   ownerId?: string | null;
   subscriptionOwnerId?: string | null;
   subscriptionStatus?: SubscriptionStatus;
+  billingRequired?: boolean;
   status?: 'active' | 'archived';
   archivedAt?: string | null;
   purgeAt?: string | null;
@@ -757,7 +758,7 @@ function requireActiveLeadership(member: CrewMemberDoc, crew: CrewDoc) {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
   }
   if (member.isDeveloperSupport) return;
-  if (crew.ownerId !== member.id && !isActiveSubscription(crew.subscriptionStatus)) {
+  if (crew.billingRequired === true && crew.ownerId !== member.id && !isActiveSubscription(crew.subscriptionStatus)) {
     throw new HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
   }
 }
@@ -767,7 +768,7 @@ function requireAdmin(member: CrewMemberDoc, crew: CrewDoc) {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
   }
   if (member.isDeveloperSupport) return;
-  if (crew.ownerId !== member.id && !isActiveSubscription(crew.subscriptionStatus)) {
+  if (crew.billingRequired === true && crew.ownerId !== member.id && !isActiveSubscription(crew.subscriptionStatus)) {
     throw new HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
   }
 }
@@ -848,6 +849,7 @@ async function exitCrew(userId: string, deleteAccount: boolean): Promise<ExitCre
           ownerId: null,
           subscriptionOwnerId: null,
           subscriptionStatus: 'inactive',
+          billingRequired: false,
           status: 'archived',
           archivedAt: archiveFields.archivedAt,
           purgeAt: archiveFields.purgeAt,
@@ -862,6 +864,7 @@ async function exitCrew(userId: string, deleteAccount: boolean): Promise<ExitCre
           ownerId: nextOwner.id,
           subscriptionOwnerId: null,
           subscriptionStatus: 'inactive',
+          billingRequired: false,
           status: 'active',
           archivedAt: null,
           purgeAt: null,
