@@ -101,7 +101,7 @@ export default function CrewSelectionScreen() {
     <View style={styles.container}>
       <ImageBackground source={WAITING_ROOM_IMAGE} style={styles.background} resizeMode="cover">
         <LinearGradient
-          colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.62)', colors.background]}
+          colors={['rgba(0,0,0,0.34)', 'rgba(0,0,0,0.72)', 'rgba(0,0,0,0.92)']}
           style={styles.backgroundOverlay}
         />
       </ImageBackground>
@@ -144,10 +144,10 @@ export default function CrewSelectionScreen() {
               activeOpacity={0.85}
             >
               {isSubmitting ? (
-                <ActivityIndicator color={colors.background} />
+                <ActivityIndicator color={colors.onPrimary} />
               ) : (
                 <>
-                  <UserPlus size={20} color={colors.background} />
+                  <UserPlus size={20} color={colors.onPrimary} />
                   <Text style={styles.primaryButtonText}>Request Access</Text>
                 </>
               )}
@@ -194,7 +194,7 @@ export default function CrewSelectionScreen() {
               activeOpacity={0.85}
             >
               {isJoiningCrew ? (
-                <ActivityIndicator color={colors.background} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.inviteButtonText}>Use Invite Code</Text>
               )}
@@ -260,13 +260,13 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: '800',
-    color: colors.text,
+    color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.72)',
     textAlign: 'center',
     lineHeight: 23,
     paddingHorizontal: 16,
@@ -303,7 +303,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   pendingSubtitle: {
     fontSize: 13,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.72)',
     marginTop: 3,
     lineHeight: 18,
   },
@@ -317,7 +317,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     gap: 10,
   },
   primaryButtonText: {
-    color: colors.background,
+    color: colors.onPrimary,
     fontSize: 17,
     fontWeight: '800',
   },
@@ -333,7 +333,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.76)',
     fontSize: 15,
     fontWeight: '700',
   },
@@ -344,13 +344,13 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderTopColor: 'rgba(229,229,229,0.12)',
   },
   inviteTitle: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
     textAlign: 'center',
   },
   inviteSubtitle: {
-    color: colors.textTertiary,
+    color: 'rgba(255,255,255,0.56)',
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
@@ -371,7 +371,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   inviteInput: {
     flex: 1,
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '800',
     letterSpacing: 1.2,
@@ -379,17 +379,17 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   inviteButton: {
     height: 48,
     borderRadius: 18,
-    backgroundColor: colors.text,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   inviteButtonText: {
-    color: colors.background,
+    color: '#050505',
     fontSize: 15,
     fontWeight: '800',
   },
   note: {
-    color: colors.textTertiary,
+    color: 'rgba(255,255,255,0.52)',
     fontSize: 13,
     lineHeight: 19,
     textAlign: 'center',

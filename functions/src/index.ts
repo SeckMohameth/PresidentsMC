@@ -14,6 +14,7 @@ import {
   WriteBatch,
 } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
+import { defineSecret } from 'firebase-functions/params';
 
 initializeApp();
 
@@ -22,6 +23,7 @@ const adminAuth = getAuth();
 const storage = getStorage();
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
+const GOOGLE_PLACES_API_KEY = defineSecret('GOOGLE_PLACES_API_KEY');
 const FORMER_MEMBER_NAME = 'Former Member';
 const FORMER_MEMBER_AVATAR = '';
 const SYSTEM_ACTOR = 'system';
@@ -145,6 +147,38 @@ type AnalyticsEventInput = {
   properties?: Record<string, unknown>;
 };
 
+type PlaceSuggestion = {
+  placeId: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
+};
+
+type PlaceDetails = {
+  placeId: string;
+  address: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+};
+
+type RouteCoordinate = {
+  latitude: number;
+  longitude: number;
+};
+
+type WeatherSummary = {
+  available: boolean;
+  date: string;
+  condition: string;
+  highTempF: number | null;
+  lowTempF: number | null;
+  precipitationProbability: number | null;
+  thunderstormProbability: number | null;
+  windSpeedMph: number | null;
+  source: 'google-weather';
+};
+
 const isExpoPushToken = (token: string) =>
   token.startsWith('ExpoPushToken[') || token.startsWith('ExponentPushToken[');
 
@@ -167,6 +201,118 @@ function normalizeIso(value: unknown, fallback = new Date(0).toISOString()) {
     return (value as { toDate: () => Date }).toDate().toISOString();
   }
   return fallback;
+}
+
+function assertPlacesKey() {
+  const key = GOOGLE_PLACES_API_KEY.value();
+  if (!key) {
+    throw new HttpsError('failed-precondition', 'GOOGLE_PLACES_API_KEY_NOT_CONFIGURED');
+  }
+  return key;
+}
+
+function normalizePlacesQuery(value: unknown) {
+  const query = String(value ?? '').trim();
+  if (query.length < 3) {
+    throw new HttpsError('invalid-argument', 'QUERY_TOO_SHORT');
+  }
+  if (query.length > 160) {
+    throw new HttpsError('invalid-argument', 'QUERY_TOO_LONG');
+  }
+  return query;
+}
+
+function normalizePlaceId(value: unknown) {
+  const placeId = String(value ?? '').trim();
+  if (!placeId) {
+    throw new HttpsError('invalid-argument', 'PLACE_ID_REQUIRED');
+  }
+  if (placeId.length > 256) {
+    throw new HttpsError('invalid-argument', 'PLACE_ID_TOO_LONG');
+  }
+  return placeId;
+}
+
+function normalizeCoordinate(value: unknown): RouteCoordinate | null {
+  if (!value || typeof value !== 'object') return null;
+  const coordinate = value as { latitude?: unknown; longitude?: unknown };
+  const latitude = Number(coordinate.latitude);
+  const longitude = Number(coordinate.longitude);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180 ||
+    (latitude === 0 && longitude === 0)
+  ) {
+    return null;
+  }
+  return { latitude, longitude };
+}
+
+function decodePolyline(encoded: string): RouteCoordinate[] {
+  const coordinates: RouteCoordinate[] = [];
+  let index = 0;
+  let latitude = 0;
+  let longitude = 0;
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let byte = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < encoded.length);
+
+    latitude += result & 1 ? ~(result >> 1) : result >> 1;
+    result = 0;
+    shift = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < encoded.length);
+
+    longitude += result & 1 ? ~(result >> 1) : result >> 1;
+    coordinates.push({ latitude: latitude / 1e5, longitude: longitude / 1e5 });
+  }
+
+  return coordinates;
+}
+
+function parseDurationSeconds(value: unknown): number {
+  if (typeof value !== 'string') return 0;
+  const match = value.match(/^(\d+(?:\.\d+)?)s$/);
+  return match ? Math.round(Number(match[1])) : 0;
+}
+
+function normalizeRideDate(value: unknown) {
+  const date = new Date(String(value ?? ''));
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpsError('invalid-argument', 'VALID_DATE_REQUIRED');
+  }
+  return date;
+}
+
+function formatDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function fahrenheit(value: any): number | null {
+  const degrees = Number(value?.degrees);
+  if (!Number.isFinite(degrees)) return null;
+  const unit = String(value?.unit || '').toUpperCase();
+  const f = unit === 'CELSIUS' ? degrees * 9 / 5 + 32 : degrees;
+  return Math.round(f);
+}
+
+function percent(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.round(numeric) : null;
 }
 
 function resolveRideStatus(ride: { status?: string; dateTime?: unknown }) {
@@ -1001,6 +1147,222 @@ export const recordAnalyticsEvents = onCall(async (request) => {
   return { recorded: events.length };
 });
 
+export const searchPlaces = onCall({ secrets: [GOOGLE_PLACES_API_KEY] }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const query = normalizePlacesQuery(request.data?.query);
+  const apiKey = assertPlacesKey();
+  const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask':
+        'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
+    },
+    body: JSON.stringify({
+      input: query,
+      includedRegionCodes: ['us'],
+    }),
+  });
+
+  if (!response.ok) {
+    console.log('[Places] Autocomplete failed:', response.status, await response.text());
+    throw new HttpsError('internal', 'PLACES_AUTOCOMPLETE_FAILED');
+  }
+
+  const data = (await response.json()) as any;
+  const suggestions: PlaceSuggestion[] = (data.suggestions || [])
+    .map((item: any) => item?.placePrediction)
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((prediction: any) => ({
+      placeId: String(prediction.placeId || ''),
+      description: String(prediction.text?.text || ''),
+      mainText: String(prediction.structuredFormat?.mainText?.text || prediction.text?.text || ''),
+      secondaryText: String(prediction.structuredFormat?.secondaryText?.text || ''),
+    }))
+    .filter((item: PlaceSuggestion) => item.placeId && item.description);
+
+  return { suggestions };
+});
+
+export const getPlaceDetails = onCall({ secrets: [GOOGLE_PLACES_API_KEY] }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const placeId = normalizePlaceId(request.data?.placeId);
+  const apiKey = assertPlacesKey();
+  const response = await fetch(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, {
+    method: 'GET',
+    headers: {
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'id,formattedAddress,displayName,location',
+    },
+  });
+
+  if (!response.ok) {
+    console.log('[Places] Details failed:', response.status, await response.text());
+    throw new HttpsError('internal', 'PLACE_DETAILS_FAILED');
+  }
+
+  const data = (await response.json()) as any;
+  const latitude = Number(data.location?.latitude);
+  const longitude = Number(data.location?.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new HttpsError('internal', 'PLACE_LOCATION_MISSING');
+  }
+
+  const place: PlaceDetails = {
+    placeId: String(data.id || placeId),
+    address: String(data.formattedAddress || data.displayName?.text || ''),
+    name: String(data.displayName?.text || data.formattedAddress || ''),
+    latitude,
+    longitude,
+  };
+
+  return { place };
+});
+
+export const getRoutePreview = onCall({ secrets: [GOOGLE_PLACES_API_KEY] }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const origin = normalizeCoordinate(request.data?.origin);
+  const destination = normalizeCoordinate(request.data?.destination);
+  if (!origin || !destination) {
+    throw new HttpsError('invalid-argument', 'VALID_ORIGIN_AND_DESTINATION_REQUIRED');
+  }
+
+  const apiKey = assertPlacesKey();
+  const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+    },
+    body: JSON.stringify({
+      origin: { location: { latLng: { latitude: origin.latitude, longitude: origin.longitude } } },
+      destination: {
+        location: {
+          latLng: { latitude: destination.latitude, longitude: destination.longitude },
+        },
+      },
+      travelMode: 'DRIVE',
+      routingPreference: 'TRAFFIC_UNAWARE',
+      computeAlternativeRoutes: false,
+      polylineQuality: 'HIGH_QUALITY',
+      polylineEncoding: 'ENCODED_POLYLINE',
+      units: 'IMPERIAL',
+    }),
+  });
+
+  if (!response.ok) {
+    console.log('[Routes] Preview failed:', response.status, await response.text());
+    throw new HttpsError('internal', 'ROUTE_PREVIEW_FAILED');
+  }
+
+  const data = (await response.json()) as any;
+  const route = data.routes?.[0];
+  const encodedPolyline = String(route?.polyline?.encodedPolyline || '');
+  const coordinates = encodedPolyline ? decodePolyline(encodedPolyline) : [];
+  if (coordinates.length < 2) {
+    throw new HttpsError('internal', 'ROUTE_POLYLINE_MISSING');
+  }
+
+  return {
+    route: {
+      coordinates,
+      distanceMeters: Number(route.distanceMeters || 0),
+      durationSeconds: parseDurationSeconds(route.duration),
+    },
+  };
+});
+
+export const getRideWeather = onCall({ secrets: [GOOGLE_PLACES_API_KEY] }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const location = normalizeCoordinate(request.data?.location);
+  const rideDate = normalizeRideDate(request.data?.dateTime);
+  if (!location) {
+    throw new HttpsError('invalid-argument', 'VALID_LOCATION_REQUIRED');
+  }
+
+  const now = new Date();
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysOut = Math.floor(
+    (Date.UTC(rideDate.getUTCFullYear(), rideDate.getUTCMonth(), rideDate.getUTCDate()) -
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) /
+      msPerDay
+  );
+
+  if (daysOut < 0 || daysOut > 9) {
+    return {
+      weather: {
+        available: false,
+        date: formatDateKey(rideDate),
+        condition: daysOut < 0 ? 'Forecast unavailable for past rides' : 'Forecast available within 10 days',
+        highTempF: null,
+        lowTempF: null,
+        precipitationProbability: null,
+        thunderstormProbability: null,
+        windSpeedMph: null,
+        source: 'google-weather',
+      } satisfies WeatherSummary,
+    };
+  }
+
+  const apiKey = assertPlacesKey();
+  const params = new URLSearchParams({
+    key: apiKey,
+    'location.latitude': String(location.latitude),
+    'location.longitude': String(location.longitude),
+    days: String(Math.min(10, Math.max(1, daysOut + 1))),
+    pageSize: String(Math.min(10, Math.max(1, daysOut + 1))),
+    unitsSystem: 'IMPERIAL',
+  });
+
+  const response = await fetch(`https://weather.googleapis.com/v1/forecast/days:lookup?${params.toString()}`);
+  if (!response.ok) {
+    console.log('[Weather] Daily forecast failed:', response.status, await response.text());
+    throw new HttpsError('internal', 'WEATHER_FORECAST_FAILED');
+  }
+
+  const data = (await response.json()) as any;
+  const forecastDay = data.forecastDays?.find((day: any) => {
+    const displayDate = day.displayDate;
+    if (!displayDate) return false;
+    const key = [
+      String(displayDate.year).padStart(4, '0'),
+      String(displayDate.month).padStart(2, '0'),
+      String(displayDate.day).padStart(2, '0'),
+    ].join('-');
+    return key === formatDateKey(rideDate);
+  }) || data.forecastDays?.[daysOut];
+
+  const daytime = forecastDay?.daytimeForecast || forecastDay?.daytime || {};
+  const weather: WeatherSummary = {
+    available: !!forecastDay,
+    date: formatDateKey(rideDate),
+    condition: String(daytime.weatherCondition?.description?.text || daytime.weatherCondition?.type || 'Forecast unavailable'),
+    highTempF: fahrenheit(forecastDay?.maxTemperature),
+    lowTempF: fahrenheit(forecastDay?.minTemperature),
+    precipitationProbability: percent(daytime.precipitation?.probability?.percent ?? daytime.precipitationProbability),
+    thunderstormProbability: percent(daytime.thunderstormProbability),
+    windSpeedMph: percent(daytime.wind?.speed?.value),
+    source: 'google-weather',
+  };
+
+  return { weather };
+});
+
 export const joinCrewByInvite = onCall(async (request) => {
   const userId = request.auth?.uid;
   if (!userId) {
@@ -1118,7 +1480,15 @@ export const joinCrewByInvite = onCall(async (request) => {
         );
       }
 
-      transaction.set(userRef, { crewId: crewDoc.id, role: 'member' }, { merge: true });
+      transaction.set(
+        userRef,
+        {
+          crewId: crewDoc.id,
+          role: 'member',
+          pendingCrewId: null,
+        },
+        { merge: true }
+      );
       transaction.set(
         joinRequestRef,
         {
@@ -1287,7 +1657,15 @@ export const approveJoinRequest = onCall(async (request) => {
       );
     }
 
-    transaction.set(targetUserRef, { crewId: context.crewRef.id, role: 'member' }, { merge: true });
+    transaction.set(
+      targetUserRef,
+      {
+        crewId: context.crewRef.id,
+        role: 'member',
+        pendingCrewId: null,
+      },
+      { merge: true }
+    );
     transaction.set(
       joinRequestRef,
       {
@@ -1316,14 +1694,29 @@ export const denyJoinRequest = onCall(async (request) => {
   const context = await getActingMemberContext(userId);
   requireActiveLeadership(context.member, context.crew);
 
-  await context.crewRef.collection('joinRequests').doc(requestId).set(
+  const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
+  const joinRequestSnap = await joinRequestRef.get();
+  if (!joinRequestSnap.exists) {
+    throw new HttpsError('not-found', 'JOIN_REQUEST_NOT_FOUND');
+  }
+
+  const joinRequest = joinRequestSnap.data() as JoinRequestDoc;
+  await Promise.all([
+    adminDb.collection('users').doc(joinRequest.userId).set(
+      {
+        pendingCrewId: null,
+      },
+      { merge: true }
+    ),
+    joinRequestRef.set(
     {
       status: 'denied',
       decidedAt: new Date().toISOString(),
       decidedBy: userId,
     },
     { merge: true }
-  );
+    ),
+  ]);
 
   return { ok: true };
 });

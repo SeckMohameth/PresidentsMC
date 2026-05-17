@@ -8,12 +8,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
-import { formatDate } from '@/utils/helpers';
+import { formatDate, isToday } from '@/utils/helpers';
 
 export default function AlbumsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { pastRides, crewStats } = useCrew();
+  const { rides, crewStats } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -30,7 +30,9 @@ export default function AlbumsScreen() {
     setRefreshing(false);
   }, []);
 
-  const ridesWithPhotos = pastRides.filter(ride => ride.photos.length > 0);
+  const albumRides = rides
+    .filter((ride) => ride.status === 'completed' || isToday(ride.dateTime))
+    .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 
   return (
     <View style={styles.container}>
@@ -60,19 +62,19 @@ export default function AlbumsScreen() {
           />
         }
       >
-        {ridesWithPhotos.length === 0 ? (
+        {albumRides.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
               <Camera size={48} color={colors.textTertiary} />
             </View>
-            <Text style={styles.emptyTitle}>No Photos Yet</Text>
+            <Text style={styles.emptyTitle}>No Albums Yet</Text>
             <Text style={styles.emptyDescription}>
-              Photos from completed rides will appear here. Complete a ride and upload some memories!
+              Ride albums appear here on ride day and stay available after the ride.
             </Text>
           </View>
         ) : (
           <View style={styles.albumGrid}>
-            {ridesWithPhotos.map((ride, index) => (
+            {albumRides.map((ride, index) => (
               <Animated.View
                 key={ride.id}
                 entering={FadeInDown.delay(index * 55).duration(320)}

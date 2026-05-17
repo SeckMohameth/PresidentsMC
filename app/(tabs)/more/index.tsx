@@ -24,7 +24,8 @@ import {
   Globe,
   AtSign,
   KeyRound,
-  Bike
+  Bike,
+  UserPlus
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { AppColors, useThemeColors } from '@/constants/colors';
@@ -105,7 +106,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { currentUser, crew, isAdmin, members, leaveCrew, getInviteCode } = useCrew();
+  const { currentUser, crew, isAdmin, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
   const { signOut, deleteAccount, updateProfile, resendVerificationEmail, user } = useAuth();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -113,6 +114,7 @@ export default function MoreScreen() {
   const isSubscriptionOwner =
     !!currentUser?.id &&
     (crew?.subscriptionOwnerId === currentUser.id || crew?.ownerId === currentUser.id);
+  const pendingJoinRequests = joinRequests.filter((request) => request.status === 'pending');
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -513,6 +515,21 @@ export default function MoreScreen() {
           </View>
         )}
 
+        {isAdmin && pendingJoinRequests.length > 0 && (
+          <Pressable style={styles.joinRequestsCard} onPress={() => router.push('/admin-settings')}>
+            <View style={styles.joinRequestsIcon}>
+              <UserPlus size={22} color={colors.pending} />
+            </View>
+            <View style={styles.joinRequestsCopy}>
+              <Text style={styles.joinRequestsTitle}>
+                {pendingJoinRequests.length} pending join {pendingJoinRequests.length === 1 ? 'request' : 'requests'}
+              </Text>
+              <Text style={styles.joinRequestsText}>Review, approve, or deny access to the club.</Text>
+            </View>
+            <ChevronRight size={20} color={colors.textTertiary} />
+          </Pressable>
+        )}
+
         {isAdmin && (
           <View style={styles.inviteCard}>
             <View style={styles.inviteHeader}>
@@ -549,6 +566,8 @@ export default function MoreScreen() {
                 icon={<Shield size={20} color={colors.warning} />}
                 label="Admin Settings"
                 onPress={() => router.push('/admin-settings')}
+                showBadge={pendingJoinRequests.length > 0}
+                badgeText={`${pendingJoinRequests.length}`}
               />
             )}
           </View>
@@ -905,6 +924,39 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  joinRequestsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.pending,
+  },
+  joinRequestsIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245,158,11,0.14)',
+  },
+  joinRequestsCopy: {
+    flex: 1,
+  },
+  joinRequestsTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  joinRequestsText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 3,
+  },
   inviteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1004,7 +1056,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 10,
   },
   badgeText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 12,
     fontWeight: '700',
   },

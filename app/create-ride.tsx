@@ -7,16 +7,23 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import MapView, { MapPressEvent, Marker, Polyline } from 'react-native-maps';
+import { httpsCallable } from 'firebase/functions';
 import { X, MapPin, Calendar, Clock, Gauge, FileText, ImagePlus, Image as ImageIcon, Trash2, MapPinned, LocateFixed } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import AddressAutocomplete, { AddressSelection } from '@/components/AddressAutocomplete';
-import { ImageAttribution } from '@/types';
+import { ImageAttribution, RouteCoordinate } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
+import { functions } from '@/utils/firebase';
 
 type PaceType = 'casual' | 'moderate' | 'spirited';
 type MapTarget = 'start' | 'end';
+type RoutePreview = {
+  coordinates: RouteCoordinate[];
+  distanceMeters: number;
+  durationSeconds: number;
+};
 const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=400&fit=crop';
 const DEFAULT_REGION = {
   latitude: 41.7658,
@@ -64,10 +71,18 @@ export default function CreateRideScreen() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [mapTarget, setMapTarget] = useState<MapTarget>('start');
   const [isResolvingPin, setIsResolvingPin] = useState(false);
+  const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [routeError, setRouteError] = useState('');
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const durationRef = useRef(duration);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
 
   useEffect(() => {
     if (!ride || !isEditMode || isInitialized) return;
@@ -91,6 +106,15 @@ export default function CreateRideScreen() {
     setTimeSelected(true);
     setDuration(ride.estimatedDuration || '');
     setDistance(String(ride.estimatedDistance || ''));
+    setRoutePreview(
+      ride.routeCoordinates?.length
+        ? {
+            coordinates: ride.routeCoordinates,
+            distanceMeters: ride.routeDistanceMeters || Math.round((ride.estimatedDistance || 0) * 1609.344),
+            durationSeconds: ride.routeDurationSeconds || 0,
+          }
+        : null
+    );
     setPace(ride.pace || 'moderate');
     setNotes(ride.notes || '');
     setCoverImage(ride.coverImage || '');
@@ -99,12 +123,56 @@ export default function CreateRideScreen() {
   }, [ride, isEditMode, isInitialized]);
 
   useEffect(() => {
-    if (!startCoords || !endCoords) return;
-    const computed = calculateDistanceMiles(startCoords, endCoords);
-    if (Number.isFinite(computed)) {
-      setDistance(String(Math.round(computed * 10) / 10));
-    }
-  }, [startCoords, endCoords]);
+    let isCurrent = true;
+
+    const loadRoutePreview = async () => {
+      if (!startCoords || !endCoords) {
+        setRoutePreview(null);
+        setRouteError('');
+        return;
+      }
+
+      setIsLoadingRoute(true);
+      setRouteError('');
+      try {
+        const callable = httpsCallable<
+          { origin: RouteCoordinate; destination: RouteCoordinate },
+          { route: RoutePreview }
+        >(functions, 'getRoutePreview');
+        const result = await callable({ origin: startCoords, destination: endCoords });
+        if (!isCurrent) return;
+
+        const route = result.data.route;
+        setRoutePreview(route);
+        if (Number.isFinite(route.distanceMeters) && route.distanceMeters > 0) {
+          setDistance(String(Math.round((route.distanceMeters / 1609.344) * 10) / 10));
+        }
+        if (!durationRef.current.trim() && route.durationSeconds > 0) {
+          const minutes = Math.max(1, Math.round(route.durationSeconds / 60));
+          const hours = Math.floor(minutes / 60);
+          const remainingMinutes = minutes % 60;
+          setDuration(hours > 0 ? `${hours} hr ${remainingMinutes} min` : `${minutes} min`);
+        }
+      } catch (error) {
+        console.log('[CreateRide] Route preview failed:', error);
+        if (!isCurrent) return;
+        const computed = calculateDistanceMiles(startCoords, endCoords);
+        setRoutePreview(null);
+        setRouteError('Road route unavailable. Showing a direct estimate until the route service responds.');
+        if (Number.isFinite(computed)) {
+          setDistance(String(Math.round(computed * 10) / 10));
+        }
+      } finally {
+        if (isCurrent) setIsLoadingRoute(false);
+      }
+    };
+
+    void loadRoutePreview();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [endCoords, startCoords]);
 
   const mapRegion = useMemo(() => {
     if (startCoords && endCoords) {
@@ -286,6 +354,9 @@ export default function CreateRideScreen() {
           dateTime: rideDate.toISOString(),
           estimatedDuration: duration || '2 hours',
           estimatedDistance: parseFloat(distance) || 0,
+          routeCoordinates: routePreview?.coordinates || [],
+          routeDistanceMeters: routePreview?.distanceMeters || 0,
+          routeDurationSeconds: routePreview?.durationSeconds || 0,
           pace,
           notes: notes.trim(),
           coverImage: coverValue,
@@ -317,6 +388,9 @@ export default function CreateRideScreen() {
       dateTime: rideDate.toISOString(),
       estimatedDuration: duration || '2 hours',
       estimatedDistance: parseFloat(distance) || 0,
+      routeCoordinates: routePreview?.coordinates || [],
+      routeDistanceMeters: routePreview?.distanceMeters || 0,
+      routeDurationSeconds: routePreview?.durationSeconds || 0,
       pace,
       notes: notes.trim(),
       coverImage: coverValue,
@@ -589,10 +663,10 @@ export default function CreateRideScreen() {
                 )}
                 {startCoords && endCoords && (
                   <Polyline
-                    coordinates={[startCoords, endCoords]}
+                    coordinates={routePreview?.coordinates?.length ? routePreview.coordinates : [startCoords, endCoords]}
                     strokeColor={colors.primary}
                     strokeWidth={4}
-                    lineDashPattern={[10, 6]}
+                    lineDashPattern={routePreview?.coordinates?.length ? undefined : [10, 6]}
                   />
                 )}
               </MapView>
@@ -605,7 +679,11 @@ export default function CreateRideScreen() {
                   <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
                   <Text style={styles.legendText}>End</Text>
                 </View>
-                <Text style={styles.mapHint}>Drag either pin to adjust the route estimate.</Text>
+                <Text style={styles.mapHint}>
+                  {isLoadingRoute
+                    ? 'Mapping road route...'
+                    : routeError || (routePreview ? 'Road route mapped with Google Routes.' : 'Drag either pin to adjust the route estimate.')}
+                </Text>
               </View>
             </View>
           </View>

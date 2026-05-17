@@ -15,7 +15,8 @@ interface RideCardProps {
 
 export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   const colors = useThemeColors();
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const isLight = colors.background === '#FFFFFF';
+  const styles = React.useMemo(() => createStyles(colors, isLight), [colors, isLight]);
   const router = useRouter();
   const daysUntil = getDaysUntil(ride.dateTime);
   const isRideToday = isToday(ride.dateTime);
@@ -109,7 +110,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
         )}
         <View style={styles.imageOverlay}>
           <View style={styles.routePill}>
-            <Navigation size={12} color={colors.primary} />
+            <Navigation size={12} color="#FFFFFF" />
             <Text style={styles.routePillText}>{formatMiles(ride.estimatedDistance)} mi</Text>
           </View>
           <Text style={styles.title}>{ride.title}</Text>
@@ -148,23 +149,23 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   );
 }
 
-const createStyles = (colors: AppColors) => StyleSheet.create({
+const createStyles = (colors: AppColors, isLight: boolean) => StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(18,18,19,0.92)',
+    backgroundColor: colors.surface,
     borderRadius: 22,
     marginHorizontal: 16,
     marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(229,229,229,0.12)',
+    borderColor: colors.border,
     alignSelf: 'center',
     width: '100%',
     maxWidth: 720,
     shadowColor: colors.heat,
-    shadowOpacity: 0.18,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 10,
+    shadowOpacity: isLight ? 0.08 : 0.18,
+    shadowRadius: isLight ? 14 : 22,
+    shadowOffset: { width: 0, height: isLight ? 8 : 14 },
+    elevation: isLight ? 4 : 10,
   },
   pressed: {
     opacity: 0.95,
@@ -230,12 +231,12 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     marginBottom: 10,
   },
   routePillText: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
   },
   title: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '900',
     marginBottom: 4,
@@ -248,7 +249,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   content: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(229,229,229,0.08)',
+    borderTopColor: colors.border,
   },
   locationRow: {
     flexDirection: 'row',
@@ -277,7 +278,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '500',
   },
   compactContainer: {
-    backgroundColor: 'rgba(17,17,17,0.92)',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 12,
     marginHorizontal: 16,
@@ -285,7 +286,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(229,229,229,0.12)',
+    borderColor: colors.border,
     alignSelf: 'center',
     width: '100%',
     maxWidth: 720,

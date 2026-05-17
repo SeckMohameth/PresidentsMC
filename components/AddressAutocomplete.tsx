@@ -8,12 +8,21 @@ import {
   StyleSheet,
   Keyboard,
 } from 'react-native';
-import * as Location from 'expo-location';
+import { httpsCallable } from 'firebase/functions';
 import { AppColors, useThemeColors } from '@/constants/colors';
+import { functions } from '@/utils/firebase';
 
-type NativeGeocodeResult = {
-  id: string;
+type PlaceSuggestion = {
+  placeId: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
+};
+
+type PlaceDetails = {
+  placeId: string;
   address: string;
+  name: string;
   latitude: number;
   longitude: number;
 };
@@ -40,7 +49,7 @@ export default function AddressAutocomplete({
   onSelect,
   placeholder = 'Search address...',
 }: AddressAutocompleteProps) {
-  const [results, setResults] = useState<NativeGeocodeResult[]>([]);
+  const [results, setResults] = useState<PlaceSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,15 +68,14 @@ export default function AddressAutocomplete({
 
     setIsLoading(true);
     try {
-      const geocoded = await Location.geocodeAsync(trimmed);
+      const callable = httpsCallable<
+        { query: string },
+        { suggestions: PlaceSuggestion[] }
+      >(functions, 'searchPlaces');
+      const response = await callable({ query: trimmed });
       if (latestQueryRef.current !== trimmed) return;
 
-      const nextResults = geocoded.slice(0, 5).map((item, index) => ({
-        id: `${trimmed}-${index}-${item.latitude}-${item.longitude}`,
-        address: trimmed,
-        latitude: item.latitude,
-        longitude: item.longitude,
-      }));
+      const nextResults = response.data.suggestions || [];
       setResults(nextResults);
       setShowDropdown(nextResults.length > 0);
     } catch {
@@ -92,17 +100,31 @@ export default function AddressAutocomplete({
     }, DEBOUNCE_MS);
   };
 
-  const handleSelect = (result: NativeGeocodeResult) => {
-    const formatted = result.address;
-    onChangeText(formatted);
-    onSelect({
-      address: formatted,
-      latitude: result.latitude,
-      longitude: result.longitude,
-    });
+  const handleSelect = async (result: PlaceSuggestion) => {
+    onChangeText(result.description);
     setShowDropdown(false);
     setResults([]);
-    Keyboard.dismiss();
+    setIsLoading(true);
+    try {
+      const callable = httpsCallable<
+        { placeId: string },
+        { place: PlaceDetails }
+      >(functions, 'getPlaceDetails');
+      const response = await callable({ placeId: result.placeId });
+      const place = response.data.place;
+      const formatted = place.address || result.description;
+      onChangeText(formatted);
+      onSelect({
+        address: formatted,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+      Keyboard.dismiss();
+    } catch {
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -134,16 +156,20 @@ export default function AddressAutocomplete({
         <View style={styles.dropdown}>
           {results.map((item) => (
             <Pressable
-              key={item.id}
+              key={item.placeId}
               style={styles.dropdownItem}
-              onPress={() => handleSelect(item)}
+              onPress={() => {
+                void handleSelect(item);
+              }}
             >
               <Text style={styles.dropdownText} numberOfLines={2}>
-                {item.address}
+                {item.mainText || item.description}
               </Text>
-              <Text style={styles.dropdownSubtext} numberOfLines={1}>
-                {item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}
-              </Text>
+              {!!item.secondaryText && (
+                <Text style={styles.dropdownSubtext} numberOfLines={1}>
+                  {item.secondaryText}
+                </Text>
+              )}
             </Pressable>
           ))}
         </View>

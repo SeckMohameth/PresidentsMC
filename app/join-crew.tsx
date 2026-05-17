@@ -242,7 +242,7 @@ export default function JoinCrewScreen() {
                 testID="join-button"
               >
                 {isJoiningCrew ? (
-                  <ActivityIndicator color={colors.background} />
+                  <ActivityIndicator color={colors.onPrimary} />
                 ) : (
                   <Text style={styles.joinButtonText}>Join Crew</Text>
                 )}
@@ -423,7 +423,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   joinButtonText: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: colors.background,
+    color: colors.onPrimary,
   },
   divider: {
     flexDirection: 'row',
@@ -503,7 +503,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     marginRight: 12,
   },
   resultLogoText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 18,
     fontWeight: '700' as const,
   },

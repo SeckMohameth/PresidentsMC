@@ -34,7 +34,8 @@ const icons = {
 
 export default function MilestoneBurst({ milestones }: MilestoneBurstProps) {
   const colors = useThemeColors();
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const isLight = colors.background === '#FFFFFF';
+  const styles = React.useMemo(() => createStyles(colors, isLight), [colors, isLight]);
   const glow = useSharedValue(0.35);
 
   React.useEffect(() => {
@@ -92,7 +93,7 @@ export default function MilestoneBurst({ milestones }: MilestoneBurstProps) {
   );
 }
 
-const createStyles = (colors: AppColors) => StyleSheet.create({
+const createStyles = (colors: AppColors, isLight: boolean) => StyleSheet.create({
   container: {
     overflow: 'hidden',
     borderRadius: 8,
@@ -109,7 +110,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     top: -18,
     height: 70,
     borderRadius: 35,
-    backgroundColor: colors.heatMuted,
+    backgroundColor: isLight ? 'rgba(216,58,46,0.18)' : colors.heatMuted,
   },
   headerRow: {
     flexDirection: 'row',
@@ -138,7 +139,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     gap: 10,
     padding: 10,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    backgroundColor: isLight ? 'rgba(0,0,0,0.035)' : 'rgba(255,255,255,0.045)',
   },
   iconWrap: {
     width: 34,
@@ -147,7 +148,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.28)',
+    backgroundColor: isLight ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.28)',
   },
   badgeTextWrap: {
     flex: 1,

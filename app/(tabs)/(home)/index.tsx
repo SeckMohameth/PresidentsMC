@@ -56,7 +56,7 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
           <LinearGradient
-            colors={['rgba(0,0,0,0.12)', 'rgba(5,5,5,0.24)', colors.background]}
+            colors={['rgba(0,0,0,0.38)', 'rgba(0,0,0,0.58)', colors.background]}
             locations={[0, 0.55, 1]}
             style={styles.heroOverlay}
           />
@@ -94,7 +94,7 @@ export default function HomeScreen() {
               onPress={() => router.push(nextRide ? `/ride/${nextRide.id}` : '/(tabs)/rides')}
             >
               <Text style={styles.heroActionText}>{nextRide ? 'View Ride' : 'Open Rides'}</Text>
-              <ChevronRight size={18} color={colors.background} />
+              <ChevronRight size={18} color={colors.onPrimary} />
             </Pressable>
           </View>
         </View>
@@ -195,7 +195,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   crewName: {
     fontSize: 30,
     fontWeight: '900',
-    color: colors.text,
+    color: '#FFFFFF',
     letterSpacing: 0,
   },
   memberBadge: {
@@ -321,7 +321,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     alignItems: 'center',
   },
   eyebrow: {
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.82)',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -335,14 +335,14 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     bottom: 26,
   },
   heroTitle: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 34,
     fontWeight: '900',
     lineHeight: 39,
     marginBottom: 10,
   },
   heroSubtitle: {
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.84)',
     fontSize: 15,
     lineHeight: 22,
     maxWidth: 340,
@@ -359,7 +359,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     gap: 6,
   },
   heroActionText: {
-    color: colors.background,
+    color: colors.onPrimary,
     fontSize: 15,
     fontWeight: '900',
   },
@@ -372,7 +372,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   statTile: {
     flex: 1,
     minHeight: 86,
-    backgroundColor: 'rgba(22,22,23,0.84)',
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
@@ -385,7 +385,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '900',
   },
   statLabel: {
-    color: colors.textTertiary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     textTransform: 'uppercase',

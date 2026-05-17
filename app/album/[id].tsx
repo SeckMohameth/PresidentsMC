@@ -79,7 +79,7 @@ export default function AlbumScreen() {
           <Text style={styles.headerSubtitle}>{formatDate(ride.dateTime)} • {ride.photos.length} photos</Text>
         </View>
         <Pressable style={styles.addButton} onPress={handleAddPhoto}>
-          <Plus size={20} color={colors.text} />
+          <Plus size={20} color={colors.onPrimary} />
         </Pressable>
       </View>
 
@@ -93,7 +93,7 @@ export default function AlbumScreen() {
             Be the first to add photos from this ride!
           </Text>
           <Pressable style={styles.emptyButton} onPress={handleAddPhoto}>
-            <Plus size={18} color={colors.text} />
+            <Plus size={18} color={colors.onPrimary} />
             <Text style={styles.emptyButtonText}>Add Photos</Text>
           </Pressable>
         </View>
@@ -250,7 +250,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 28,
   },
   emptyButtonText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

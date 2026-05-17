@@ -48,6 +48,11 @@ export default function StatsScreen() {
     await new Promise(resolve => setTimeout(resolve, 1000));
     setRefreshing(false);
   }, []);
+  const crewCreatedAt = crew?.createdAt ? new Date(crew.createdAt) : null;
+  const crewEstablishedYear =
+    crewCreatedAt && !Number.isNaN(crewCreatedAt.getTime())
+      ? crewCreatedAt.getFullYear()
+      : null;
 
   return (
     <View style={styles.container}>
@@ -105,7 +110,9 @@ export default function StatsScreen() {
                   <Image source={{ uri: crew.logoUrl }} style={styles.heroLogo} contentFit="cover" />
                 ) : null}
                 <Text style={styles.heroTitle}>{crew?.name}</Text>
-                <Text style={styles.heroSubtitle}>Est. {new Date(crew?.createdAt || '').getFullYear()}</Text>
+                {crewEstablishedYear ? (
+                  <Text style={styles.heroSubtitle}>Est. {crewEstablishedYear}</Text>
+                ) : null}
               </View>
             </Animated.View>
 
@@ -367,7 +374,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderColor: colors.background,
   },
   heroTitle: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 24,
     fontWeight: '800',
   },

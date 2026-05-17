@@ -209,7 +209,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     justifyContent: 'center',
   },
   avatarInitials: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
   },

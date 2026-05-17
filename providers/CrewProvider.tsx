@@ -362,9 +362,10 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         Number.isFinite(ride.startLocation?.longitude) &&
         Number.isFinite(ride.endLocation?.latitude) &&
         Number.isFinite(ride.endLocation?.longitude);
-      const distanceAuto = hasCoords
+      const routeDistance = ride.routeDistanceMeters ? ride.routeDistanceMeters / 1609.344 : 0;
+      const distanceAuto = routeDistance || (hasCoords
         ? calculateDistanceMiles(ride.startLocation, ride.endLocation)
-        : ride.estimatedDistance;
+        : ride.estimatedDistance);
       const coverImage = await uploadImageIfNeeded(
         ride.coverImage,
         `crews/${crewId}/rides/${docRef.id}/cover.jpg`
@@ -399,7 +400,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const updateRide = useCallback(async (
     rideId: string,
-    updates: Partial<Pick<Ride, 'title' | 'description' | 'startLocation' | 'endLocation' | 'dateTime' | 'estimatedDuration' | 'estimatedDistance' | 'pace' | 'notes' | 'coverImage' | 'coverAttribution'>>
+    updates: Partial<Pick<Ride, 'title' | 'description' | 'startLocation' | 'endLocation' | 'dateTime' | 'estimatedDuration' | 'estimatedDistance' | 'routeCoordinates' | 'routeDistanceMeters' | 'routeDurationSeconds' | 'pace' | 'notes' | 'coverImage' | 'coverAttribution'>>
   ) => {
     if (!crewId) throw new Error('No crew');
     assertAdminOrOfficer();
@@ -407,7 +408,9 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     const rideRef = doc(db, 'crews', crewId, 'rides', rideId);
 
     let estimatedDistance = updates.estimatedDistance;
-    if (
+    if (updates.routeDistanceMeters) {
+      estimatedDistance = Math.round((updates.routeDistanceMeters / 1609.344) * 10) / 10;
+    } else if (
       updates.startLocation &&
       updates.endLocation &&
       Number.isFinite(updates.startLocation.latitude) &&
@@ -469,6 +472,40 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       properties: { rideId },
     });
   }, [crewId, rides, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+
+  const cancelRide = useCallback(async (rideId: string) => {
+    if (!crewId) throw new Error('No crew');
+    assertAdminOrOfficer();
+    assertAdminActive();
+    await updateDoc(doc(db, 'crews', crewId, 'rides', rideId), {
+      status: 'cancelled',
+    });
+
+    void trackAnalyticsEvent({
+      eventName: 'ride_cancel_success',
+      actorUserId: currentUser?.id ?? null,
+      crewId,
+      route: `/ride/${rideId}`,
+      properties: { rideId },
+    });
+  }, [crewId, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+
+  const reopenRide = useCallback(async (rideId: string) => {
+    if (!crewId) throw new Error('No crew');
+    assertAdminOrOfficer();
+    assertAdminActive();
+    await updateDoc(doc(db, 'crews', crewId, 'rides', rideId), {
+      status: 'upcoming',
+    });
+
+    void trackAnalyticsEvent({
+      eventName: 'ride_reopen_success',
+      actorUserId: currentUser?.id ?? null,
+      crewId,
+      route: `/ride/${rideId}`,
+      properties: { rideId },
+    });
+  }, [crewId, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
 
   const joinRide = useCallback(async (rideId: string) => {
     if (!crewId || !user?.id) return;
@@ -879,6 +916,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     createRide,
     updateRide,
     deleteRide,
+    cancelRide,
+    reopenRide,
     joinRide,
     leaveRide,
     checkIn,

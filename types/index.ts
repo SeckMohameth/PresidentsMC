@@ -68,6 +68,11 @@ export interface Location {
   longitude: number;
 }
 
+export interface RouteCoordinate {
+  latitude: number;
+  longitude: number;
+}
+
 export interface Ride {
   id: string;
   crewId: string;
@@ -78,6 +83,9 @@ export interface Ride {
   dateTime: string;
   estimatedDuration: string;
   estimatedDistance: number;
+  routeCoordinates?: RouteCoordinate[];
+  routeDistanceMeters?: number;
+  routeDurationSeconds?: number;
   pace: 'casual' | 'moderate' | 'spirited';
   notes: string;
   coverImage: string;

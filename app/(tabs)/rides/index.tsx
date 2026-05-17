@@ -38,7 +38,7 @@ export default function RidesScreen() {
               style={styles.createButton}
               onPress={() => router.push('/create-ride')}
             >
-              <Plus size={20} color={colors.text} />
+              <Plus size={20} color={colors.onPrimary} />
               <Text style={styles.createButtonText}>New Ride</Text>
             </Pressable>
           )}
@@ -104,7 +104,7 @@ export default function RidesScreen() {
                 style={styles.emptyButton}
                 onPress={() => router.push('/create-ride')}
               >
-                <Plus size={18} color={colors.text} />
+                <Plus size={18} color={colors.onPrimary} />
                 <Text style={styles.emptyButtonText}>Schedule a Ride</Text>
               </Pressable>
             )}
@@ -154,7 +154,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 24,
   },
   createButtonText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -192,7 +192,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 10,
   },
   tabBadgeText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -246,7 +246,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 28,
   },
   emptyButtonText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
   },

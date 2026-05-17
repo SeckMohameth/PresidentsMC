@@ -30,6 +30,8 @@ export type AnalyticsEventName =
   | 'ride_create_success'
   | 'ride_update_success'
   | 'ride_delete_success'
+  | 'ride_cancel_success'
+  | 'ride_reopen_success'
   | 'ride_join'
   | 'ride_leave'
   | 'ride_check_in'

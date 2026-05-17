@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
+import { httpsCallable } from 'firebase/functions';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -16,12 +17,27 @@ import {
   CheckCircle2,
   FileText,
   ChevronRight,
-  Pencil
+  Pencil,
+  Camera,
+  CloudSun,
+  XCircle
 } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { getAvatarSource } from '@/utils/avatar';
-import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, MapsApp } from '@/utils/helpers';
+import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, isToday, MapsApp } from '@/utils/helpers';
+import { functions } from '@/utils/firebase';
+
+type RideWeather = {
+  available: boolean;
+  date: string;
+  condition: string;
+  highTempF: number | null;
+  lowTempF: number | null;
+  precipitationProbability: number | null;
+  thunderstormProbability: number | null;
+  windSpeedMph: number | null;
+};
 
 const getRouteCoordinates = (start: { latitude: number; longitude: number }, end: { latitude: number; longitude: number }) => {
   const points: { latitude: number; longitude: number }[] = [];
@@ -50,7 +66,7 @@ export default function RideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { currentUser, joinRide, leaveRide, checkIn, isAdmin } = useCrew();
+  const { currentUser, joinRide, leaveRide, checkIn, cancelRide, reopenRide, isAdmin } = useCrew();
   const { ride, attendeeMembers } = useRide(id || '');
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -61,6 +77,8 @@ export default function RideDetailScreen() {
   const mapOpacity = useRef(new Animated.Value(0)).current;
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [hasPromptedCheckIn, setHasPromptedCheckIn] = useState(false);
+  const [weather, setWeather] = useState<RideWeather | null>(null);
+  const [isWeatherLoading, setIsWeatherLoading] = useState(false);
   
   useEffect(() => {
     if (ride) {
@@ -72,6 +90,44 @@ export default function RideDetailScreen() {
       }).start();
     }
   }, [ride, mapOpacity]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const loadWeather = async () => {
+      if (!ride || !hasUsableCoordinates(ride.startLocation)) {
+        setWeather(null);
+        return;
+      }
+
+      setIsWeatherLoading(true);
+      try {
+        const callable = httpsCallable<
+          { location: { latitude: number; longitude: number }; dateTime: string },
+          { weather: RideWeather }
+        >(functions, 'getRideWeather');
+        const result = await callable({
+          location: {
+            latitude: ride.startLocation.latitude,
+            longitude: ride.startLocation.longitude,
+          },
+          dateTime: ride.dateTime,
+        });
+        if (isCurrent) setWeather(result.data.weather);
+      } catch (error) {
+        console.log('[RideDetail] Weather unavailable:', error);
+        if (isCurrent) setWeather(null);
+      } finally {
+        if (isCurrent) setIsWeatherLoading(false);
+      }
+    };
+
+    void loadWeather();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [ride]);
 
   useEffect(() => {
     const maybePromptCheckIn = async () => {
@@ -123,6 +179,9 @@ export default function RideDetailScreen() {
   const isCheckedIn = currentUser ? ride.checkedIn.includes(currentUser.id) : false;
   const isUpcoming = ride.status === 'upcoming';
   const isCompleted = ride.status === 'completed';
+  const isRideToday = isToday(ride.dateTime);
+  const hasOpenAlbum = isCompleted || isRideToday;
+  const emptyAlbumSubtitle = isRideToday ? "Add photos from today's ride." : 'Add photos from this ride.';
   const statusLabel =
     ride.status === 'completed'
       ? 'Completed'
@@ -152,10 +211,12 @@ export default function RideDetailScreen() {
   const hasEndCoordinates = hasUsableCoordinates(ride.endLocation);
   const hasRouteCoordinates = hasStartCoordinates && hasEndCoordinates;
   const routeCoordinates = hasRouteCoordinates
-    ? getRouteCoordinates(
-        { latitude: ride.startLocation.latitude, longitude: ride.startLocation.longitude },
-        { latitude: ride.endLocation.latitude, longitude: ride.endLocation.longitude }
-      )
+    ? ride.routeCoordinates?.length
+      ? ride.routeCoordinates
+      : getRouteCoordinates(
+          { latitude: ride.startLocation.latitude, longitude: ride.startLocation.longitude },
+          { latitude: ride.endLocation.latitude, longitude: ride.endLocation.longitude }
+        )
     : [];
 
   const midLat = hasRouteCoordinates
@@ -258,6 +319,27 @@ export default function RideDetailScreen() {
     ]);
   };
 
+  const handleCancelRide = () => {
+    Alert.alert('Cancel Ride', 'Cancel this ride for everyone? Members will still be able to view the ride details.', [
+      { text: 'Keep Ride', style: 'cancel' },
+      {
+        text: 'Cancel Ride',
+        style: 'destructive',
+        onPress: () => void cancelRide(ride.id),
+      },
+    ]);
+  };
+
+  const handleReopenRide = () => {
+    Alert.alert('Reopen Ride', 'Put this ride back on the upcoming schedule?', [
+      { text: 'Not Now', style: 'cancel' },
+      {
+        text: 'Reopen',
+        onPress: () => void reopenRide(ride.id),
+      },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -280,14 +362,14 @@ export default function RideDetailScreen() {
             style={[styles.backButton, { top: insets.top + 8 }]}
             onPress={() => router.back()}
           >
-            <ArrowLeft size={24} color={colors.text} />
+            <ArrowLeft size={24} color="#FFFFFF" />
           </Pressable>
           {isAdmin && (
             <Pressable 
               style={[styles.editButton, { top: insets.top + 8 }]}
               onPress={() => router.push({ pathname: '/create-ride', params: { rideId: ride.id } })}
             >
-              <Pencil size={20} color={colors.text} />
+              <Pencil size={20} color="#FFFFFF" />
             </Pressable>
           )}
           <View style={[styles.heroContent, { paddingBottom: 20 }]}>
@@ -323,6 +405,61 @@ export default function RideDetailScreen() {
               <Text style={styles.quickStatLabel}>Pace</Text>
             </View>
           </View>
+
+          {(isWeatherLoading || weather) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Ride Weather</Text>
+              <View style={styles.weatherCard}>
+                <View style={styles.weatherIcon}>
+                  <CloudSun size={24} color={colors.primary} />
+                </View>
+                <View style={styles.weatherBody}>
+                  <Text style={styles.weatherTitle}>
+                    {isWeatherLoading ? 'Checking forecast...' : weather?.condition || 'Forecast unavailable'}
+                  </Text>
+                  <Text style={styles.weatherSubtitle}>
+                    {weather?.available
+                      ? [
+                          weather.highTempF !== null && weather.lowTempF !== null
+                            ? `${weather.lowTempF}-${weather.highTempF}F`
+                            : null,
+                          weather.precipitationProbability !== null
+                            ? `${weather.precipitationProbability}% rain`
+                            : null,
+                          weather.windSpeedMph !== null ? `${weather.windSpeedMph} mph wind` : null,
+                        ].filter(Boolean).join('  ')
+                      : weather?.condition || 'Google forecast appears here within 10 days of the ride.'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {isAdmin && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Admin</Text>
+              <View style={styles.adminActions}>
+                <Pressable
+                  style={styles.adminActionButton}
+                  onPress={() => router.push({ pathname: '/create-ride', params: { rideId: ride.id } })}
+                >
+                  <Pencil size={18} color={colors.text} />
+                  <Text style={styles.adminActionText}>Reschedule / Edit</Text>
+                </Pressable>
+                {ride.status === 'cancelled' ? (
+                  <Pressable style={styles.adminActionButton} onPress={handleReopenRide}>
+                    <CheckCircle2 size={18} color={colors.success} />
+                    <Text style={styles.adminActionText}>Reopen Ride</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={[styles.adminActionButton, styles.cancelActionButton]} onPress={handleCancelRide}>
+                    <XCircle size={18} color={colors.error} />
+                    <Text style={[styles.adminActionText, { color: colors.error }]}>Cancel Ride</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          )}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Route</Text>
@@ -471,7 +608,7 @@ export default function RideDetailScreen() {
             </View>
           </View>
 
-          {isCompleted && ride.photos.length > 0 && (
+          {hasOpenAlbum && (
             <View style={styles.section}>
               <Pressable 
                 style={styles.sectionHeader}
@@ -480,30 +617,41 @@ export default function RideDetailScreen() {
                 <Text style={styles.sectionTitle}>Photos ({ride.photos.length})</Text>
                 <ChevronRight size={20} color={colors.textTertiary} />
               </Pressable>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.photosScroll}
-              >
-                {ride.photos.slice(0, 4).map((photo, index) => (
-                  <Pressable 
-                    key={photo.id}
-                    style={styles.photoThumb}
-                    onPress={() => router.push(`/album/${ride.id}`)}
-                  >
-                    <Image 
-                      source={{ uri: photo.imageUrl }}
-                      style={styles.photoImage}
-                      contentFit="cover"
-                    />
-                    {index === 3 && ride.photos.length > 4 && (
-                      <View style={styles.photoOverlay}>
-                        <Text style={styles.photoOverlayText}>+{ride.photos.length - 4}</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
+              {ride.photos.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.photosScroll}
+                >
+                  {ride.photos.slice(0, 4).map((photo, index) => (
+                    <Pressable
+                      key={photo.id}
+                      style={styles.photoThumb}
+                      onPress={() => router.push(`/album/${ride.id}`)}
+                    >
+                      <Image
+                        source={{ uri: photo.imageUrl }}
+                        style={styles.photoImage}
+                        contentFit="cover"
+                      />
+                      {index === 3 && ride.photos.length > 4 && (
+                        <View style={styles.photoOverlay}>
+                          <Text style={styles.photoOverlayText}>+{ride.photos.length - 4}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : (
+                <Pressable style={styles.emptyPhotosCard} onPress={() => router.push(`/album/${ride.id}`)}>
+                  <Camera size={22} color={colors.primary} />
+                  <View style={styles.emptyPhotosText}>
+                    <Text style={styles.emptyPhotosTitle}>Start the album</Text>
+                    <Text style={styles.emptyPhotosSubtitle}>{emptyAlbumSubtitle}</Text>
+                  </View>
+                  <ChevronRight size={20} color={colors.textTertiary} />
+                </Pressable>
+              )}
             </View>
           )}
 
@@ -516,10 +664,10 @@ export default function RideDetailScreen() {
           {isAttending && !isCheckedIn && (
             <Pressable style={styles.checkInButton} onPress={handleCheckIn} disabled={isCheckingIn}>
               {isCheckingIn ? (
-                <ActivityIndicator color={colors.text} />
+                <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <CheckCircle2 size={20} color={colors.text} />
+                  <CheckCircle2 size={20} color="#FFFFFF" />
                   <Text style={styles.checkInButtonText}>Check In</Text>
                 </>
               )}
@@ -623,7 +771,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '600',
   },
   heroTitle: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 28,
     fontWeight: '800',
     marginBottom: 4,
@@ -778,6 +926,62 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textTertiary,
     fontSize: 14,
   },
+  weatherCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  weatherIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  weatherBody: {
+    flex: 1,
+  },
+  weatherTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  weatherSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  adminActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  adminActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cancelActionButton: {
+    borderColor: colors.error,
+  },
+  adminActionText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
   notesCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -820,7 +1024,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderColor: colors.surface,
   },
   attendeeInitials: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -882,6 +1086,27 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  emptyPhotosCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+  },
+  emptyPhotosText: {
+    flex: 1,
+  },
+  emptyPhotosTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyPhotosSubtitle: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    marginTop: 2,
+  },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -905,7 +1130,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     paddingVertical: 16,
   },
   checkInButtonText: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -923,7 +1148,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderColor: colors.border,
   },
   attendButtonText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
