@@ -3,17 +3,19 @@ import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindo
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Camera, Images } from 'lucide-react-native';
+import { Camera, Images, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { formatDate, isToday } from '@/utils/helpers';
 
+const DEFAULT_ALBUM_IMAGE = require('../../../assets/images/helmet.jpg');
+
 export default function AlbumsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { rides, crewStats } = useCrew();
+  const { rides, albums, crewStats, canManageAlbums } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -33,11 +35,35 @@ export default function AlbumsScreen() {
   const albumRides = rides
     .filter((ride) => ride.status === 'completed' || isToday(ride.dateTime))
     .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
+  const albumItems = [
+    ...albums.map((album) => ({
+      id: album.id,
+      title: album.title,
+      date: album.createdAt,
+      photoCount: album.photos.length,
+      imageUrl: album.photos[0]?.imageUrl || album.coverImage || '',
+    })),
+    ...albumRides.map((ride) => ({
+      id: ride.id,
+      title: ride.title,
+      date: ride.dateTime,
+      photoCount: ride.photos.length,
+      imageUrl: ride.photos[0]?.imageUrl || ride.coverImage,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.title}>Albums</Text>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.title}>Albums</Text>
+          {canManageAlbums && (
+            <Pressable style={styles.createButton} onPress={() => router.push('/create-album' as any)}>
+              <Plus size={18} color={colors.onPrimary} />
+              <Text style={styles.createButtonText}>New</Text>
+            </Pressable>
+          )}
+        </View>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Images size={16} color={colors.primary} />
@@ -62,21 +88,21 @@ export default function AlbumsScreen() {
           />
         }
       >
-        {albumRides.length === 0 ? (
+        {albumItems.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
               <Camera size={48} color={colors.textTertiary} />
             </View>
             <Text style={styles.emptyTitle}>No Albums Yet</Text>
             <Text style={styles.emptyDescription}>
-              Ride albums appear here on ride day and stay available after the ride.
+              Ride albums appear here on ride day. Admins can also create club albums anytime.
             </Text>
           </View>
         ) : (
           <View style={styles.albumGrid}>
-            {albumRides.map((ride, index) => (
+            {albumItems.map((album, index) => (
               <Animated.View
-                key={ride.id}
+                key={album.id}
                 entering={FadeInDown.delay(index * 55).duration(320)}
                 layout={Layout.springify().damping(18)}
               >
@@ -86,10 +112,10 @@ export default function AlbumsScreen() {
                   { width: albumSize, height: albumSize * 1.2 },
                   pressed && styles.pressed,
                 ]}
-                onPress={() => router.push(`/album/${ride.id}`)}
+                onPress={() => router.push(`/album/${album.id}`)}
               >
                 <Image 
-                  source={{ uri: ride.photos[0]?.imageUrl || ride.coverImage }}
+                  source={album.imageUrl ? { uri: album.imageUrl } : DEFAULT_ALBUM_IMAGE}
                   style={styles.albumImage}
                   contentFit="cover"
                 />
@@ -98,15 +124,15 @@ export default function AlbumsScreen() {
                   style={styles.albumGradient}
                 />
                 <View style={styles.albumInfo}>
-                  <Text style={styles.albumTitle} numberOfLines={2}>{ride.title}</Text>
+                  <Text style={styles.albumTitle} numberOfLines={2}>{album.title}</Text>
                   <Text style={styles.albumMeta}>
-                    {formatDate(ride.dateTime)} • {ride.photos.length} photos
+                    {formatDate(album.date)} • {album.photoCount} photos
                   </Text>
                 </View>
-                {ride.photos.length > 1 && (
+                {album.photoCount > 1 && (
                   <View style={styles.photoCountBadge}>
                     <Images size={12} color={colors.text} />
-                    <Text style={styles.photoCountText}>{ride.photos.length}</Text>
+                    <Text style={styles.photoCountText}>{album.photoCount}</Text>
                   </View>
                 )}
               </Pressable>
@@ -129,6 +155,26 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  createButton: {
+    height: 38,
+    borderRadius: 19,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+  },
+  createButtonText: {
+    color: colors.onPrimary,
+    fontSize: 13,
+    fontWeight: '800',
   },
   title: {
     fontSize: 28,

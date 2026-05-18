@@ -161,6 +161,7 @@ export default function MembersScreen() {
         permissions: {
           manageRides: permissionsDraft.manageRides === true,
           manageAnnouncements: permissionsDraft.manageAnnouncements === true,
+          manageAlbums: permissionsDraft.manageAlbums === true,
           manageJoinRequests: permissionsDraft.manageJoinRequests === true,
         },
       });
@@ -190,7 +191,7 @@ export default function MembersScreen() {
     };
 
     const actions = [
-      { text: 'Edit Club Title', onPress: () => openTitleEditor(member) },
+      { text: 'Edit Title & Permissions', onPress: () => openTitleEditor(member) },
       member.role !== 'admin'
         ? { text: 'Make Admin', onPress: () => handleUpdateRole('admin') }
         : { text: 'Keep as Admin', style: 'default' as const },
@@ -348,7 +349,7 @@ export default function MembersScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Club Title</Text>
+                <Text style={styles.modalTitle}>Title & Permissions</Text>
                 <Text style={styles.modalSubtitle}>{editingMember?.name}</Text>
               </View>
               <Pressable style={styles.modalClose} onPress={() => setEditingMember(null)}>
@@ -415,6 +416,20 @@ export default function MembersScreen() {
                 </View>
                 <View style={styles.permissionRow}>
                   <View style={styles.permissionCopy}>
+                    <Text style={styles.permissionLabel}>Manage albums</Text>
+                    <Text style={styles.permissionHint}>Create standalone club albums.</Text>
+                  </View>
+                  <Switch
+                    value={permissionsDraft.manageAlbums === true}
+                    onValueChange={(value) =>
+                      setPermissionsDraft((current) => ({ ...current, manageAlbums: value }))
+                    }
+                    trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+                    thumbColor={colors.text}
+                  />
+                </View>
+                <View style={styles.permissionRow}>
+                  <View style={styles.permissionCopy}>
                     <Text style={styles.permissionLabel}>Review join requests</Text>
                     <Text style={styles.permissionHint}>Approve or reject pending members.</Text>
                   </View>
@@ -443,7 +458,7 @@ export default function MembersScreen() {
                 disabled={isSavingTitle}
               >
                 <Edit3 size={16} color={colors.background} />
-                <Text style={styles.saveTitleText}>{isSavingTitle ? 'Saving...' : 'Save Title'}</Text>
+                <Text style={styles.saveTitleText}>{isSavingTitle ? 'Saving...' : 'Save Changes'}</Text>
               </Pressable>
             </View>
           </View>

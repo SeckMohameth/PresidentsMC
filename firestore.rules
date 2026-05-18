@@ -289,6 +289,23 @@ service cloud.firestore {
           );
       }
 
+      match /albums/{albumId} {
+        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow create, delete: if isPresidentsClub(crewId)
+          && canUseDelegatedTool(crewId, 'manageAlbums');
+        allow update: if isPresidentsClub(crewId)
+          && (
+            canUseDelegatedTool(crewId, 'manageAlbums')
+            || (
+              isCrewMember(crewId)
+              && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+                'photos',
+                'updatedAt'
+              ])
+            )
+          );
+      }
+
       match /joinRequests/{requestId} {
         allow read: if isPresidentsClub(crewId)
           && (

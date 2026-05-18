@@ -150,6 +150,13 @@ function RootLayoutNav() {
         }} 
       />
       <Stack.Screen 
+        name="create-album" 
+        options={{ 
+          presentation: 'modal',
+          headerShown: false,
+        }} 
+      />
+      <Stack.Screen 
         name="members" 
         options={{ 
           headerShown: false,

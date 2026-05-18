@@ -116,6 +116,19 @@ service firebase.storage {
       allow delete: if canUseAdminTools(crewId);
     }
 
+    match /crews/{crewId}/albums/{albumId}/cover.jpg {
+      allow read: if isCrewMember(crewId);
+      allow write: if canUseDelegatedTool(crewId, 'manageAlbums')
+        && isImage();
+      allow delete: if canUseDelegatedTool(crewId, 'manageAlbums');
+    }
+
+    match /crews/{crewId}/albums/{albumId}/photos/{fileName} {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewMember(crewId) && isImage();
+      allow delete: if canUseAdminTools(crewId);
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

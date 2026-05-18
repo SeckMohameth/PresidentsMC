@@ -3,6 +3,7 @@ export type UserRole = 'admin' | 'officer' | 'member';
 export interface MemberPermissions {
   manageRides?: boolean;
   manageAnnouncements?: boolean;
+  manageAlbums?: boolean;
   manageJoinRequests?: boolean;
 }
 
@@ -119,6 +120,19 @@ export interface RidePhoto {
   uploadedByName: string;
   imageUrl: string;
   uploadedAt: string;
+}
+
+export interface CrewAlbum {
+  id: string;
+  crewId: string;
+  title: string;
+  description?: string;
+  coverImage?: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt?: string;
+  photos: RidePhoto[];
 }
 
 export interface AttendanceRecord {

@@ -27,6 +27,7 @@ import {
   RidePhoto,
   CrewStatsSnapshot,
   JoinRequest,
+  CrewAlbum,
 } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 
@@ -85,6 +86,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const [members, setMembers] = useState<CrewMember[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [rides, setRides] = useState<Ride[]>([]);
+  const [albums, setAlbums] = useState<CrewAlbum[]>([]);
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingRide, setIsCreatingRide] = useState(false);
@@ -104,6 +106,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageRides === true) && hasActiveDelegation);
   const canManageAnnouncements =
     isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAnnouncements === true) && hasActiveDelegation);
+  const canManageAlbums =
+    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAlbums === true) && hasActiveDelegation);
   const canManageJoinRequests =
     isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageJoinRequests === true) && hasActiveDelegation);
   const canPost = canManageRides || canManageAnnouncements;
@@ -146,6 +150,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       setMembers([]);
       setAnnouncements([]);
       setRides([]);
+      setAlbums([]);
       setJoinRequests([]);
       setCurrentUser(null);
       setIsLoading(false);
@@ -158,6 +163,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     const membersRef = collection(db, 'crews', crewId, 'members');
     const announcementsRef = collection(db, 'crews', crewId, 'announcements');
     const ridesRef = collection(db, 'crews', crewId, 'rides');
+    const albumsRef = collection(db, 'crews', crewId, 'albums');
     const joinRequestsRef = collection(db, 'crews', crewId, 'joinRequests');
 
     const unsubCrew = onSnapshot(crewRef, (snap) => {
@@ -234,6 +240,24 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       setJoinRequests(list);
     });
 
+    const albumsQuery = query(albumsRef, orderBy('createdAt', 'desc'));
+    const unsubAlbums = onSnapshot(albumsQuery, (snap) => {
+      const list = snap.docs.map((docSnap) => {
+        const data = docSnap.data() as CrewAlbum;
+        return {
+          ...data,
+          id: docSnap.id,
+          createdAt: normalizeDate(data.createdAt),
+          updatedAt: data.updatedAt ? normalizeDate(data.updatedAt) : undefined,
+          photos: (data.photos || []).map((photo) => ({
+            ...photo,
+            uploadedAt: normalizeDate(photo.uploadedAt),
+          })),
+        };
+      });
+      setAlbums(list);
+    });
+
     const statsHistoryRef = collection(db, 'crews', crewId, 'statsHistory');
     const statsHistoryQuery = query(statsHistoryRef, orderBy('periodStart', 'desc'));
     const unsubStatsHistory = onSnapshot(statsHistoryQuery, (snap) => {
@@ -256,6 +280,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       unsubAnnouncements();
       unsubRides();
       unsubJoinRequests();
+      unsubAlbums();
       unsubStatsHistory();
     };
   }, [crewId, user?.id]);
@@ -765,18 +790,16 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (!crewId) throw new Error('No crew');
     assertAdmin();
     assertAdminActive();
-    const crewRef = doc(db, 'crews', crewId);
 
     let logoUrl = updates.logoUrl;
     if (logoUrl) {
       logoUrl = await uploadImageIfNeeded(logoUrl, `crews/${crewId}/logo.jpg`);
     }
 
-    const nameLower = updates.name ? updates.name.toLowerCase() : undefined;
-    await updateDoc(crewRef, stripUndefined({
+    const callable = httpsCallable(functions, 'updateCrewSettings');
+    await callable(stripUndefined({
       ...updates,
       logoUrl: logoUrl ?? updates.logoUrl,
-      nameLower,
     }));
 
     void trackAnalyticsEvent({
@@ -816,6 +839,67 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     });
   }, [crewId, currentUser]);
 
+  const createAlbum = useCallback(async ({
+    title,
+    description,
+    coverImage,
+  }: {
+    title: string;
+    description?: string;
+    coverImage?: string;
+  }) => {
+    if (!crewId || !currentUser) throw new Error('No crew');
+    if (!canManageAlbums) throw new Error('NOT_AUTHORIZED');
+    const albumsRef = collection(db, 'crews', crewId, 'albums');
+    const docRef = doc(albumsRef);
+    let uploadedCover = coverImage || '';
+    if (uploadedCover) {
+      uploadedCover = await uploadImageIfNeeded(
+        uploadedCover,
+        `crews/${crewId}/albums/${docRef.id}/cover.jpg`
+      );
+    }
+
+    await setDoc(docRef, stripUndefined({
+      id: docRef.id,
+      crewId,
+      title: title.trim(),
+      description: description?.trim() || '',
+      coverImage: uploadedCover || null,
+      createdBy: currentUser.id,
+      createdByName: currentUser.name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      photos: [],
+    }));
+
+    return docRef.id;
+  }, [canManageAlbums, crewId, currentUser]);
+
+  const addAlbumPhoto = useCallback(async ({ albumId, imageUrl }: { albumId: string; imageUrl: string }) => {
+    if (!crewId || !currentUser) throw new Error('No crew member');
+
+    const photoId = `photo-${Date.now()}`;
+    const uploadedUrl = await uploadImageIfNeeded(
+      imageUrl,
+      `crews/${crewId}/albums/${albumId}/photos/${photoId}.jpg`
+    );
+
+    const newPhoto: RidePhoto = {
+      id: photoId,
+      rideId: albumId,
+      uploadedBy: currentUser.id,
+      uploadedByName: currentUser.name,
+      imageUrl: uploadedUrl,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    await updateDoc(doc(db, 'crews', crewId, 'albums', albumId), {
+      photos: arrayUnion(newPhoto),
+      updatedAt: new Date().toISOString(),
+    });
+  }, [crewId, currentUser]);
+
   const upcomingRides = useMemo(() =>
     rides
       .filter((ride) => ride.status === 'upcoming')
@@ -833,7 +917,9 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const crewStats: CrewStats = useMemo(() => {
     const totalRides = rides.length;
     const totalMiles = rides.reduce((sum, ride) => sum + (ride.estimatedDistance || 0), 0);
-    const totalPhotos = rides.reduce((sum, ride) => sum + (ride.photos?.length || 0), 0);
+    const ridePhotos = rides.reduce((sum, ride) => sum + (ride.photos?.length || 0), 0);
+    const albumPhotos = albums.reduce((sum, album) => sum + (album.photos?.length || 0), 0);
+    const totalPhotos = ridePhotos + albumPhotos;
     const totalMembers = members.length;
 
     const now = new Date();
@@ -854,7 +940,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       ridesThisMonth: ridesThisMonth.length,
       milesThisMonth,
     };
-  }, [rides, members]);
+  }, [albums, rides, members]);
 
   const memberStats: MemberStats = useMemo(() => {
     if (!currentUser) {
@@ -904,6 +990,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     [announcements]
   );
   const getMemberById = useCallback((id: string) => members.find((member) => member.id === id), [members]);
+  const getAlbumById = useCallback((id: string) => albums.find((album) => album.id === id), [albums]);
 
   return {
     currentUser,
@@ -911,6 +998,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     members,
     announcements,
     rides,
+    albums,
     statsHistory,
     joinRequests,
     upcomingRides,
@@ -924,6 +1012,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     canUseAdminTools,
     canManageRides,
     canManageAnnouncements,
+    canManageAlbums,
     canManageJoinRequests,
     canPost,
     isSubscriptionActive,
@@ -945,6 +1034,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     getInviteSettings,
     updateInviteSettings,
     addPhoto,
+    createAlbum,
+    addAlbumPhoto,
     removeMember,
     setMemberRole,
     setMemberLeadership,
@@ -954,6 +1045,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     getRideById,
     getAnnouncementById,
     getMemberById,
+    getAlbumById,
     isCreatingRide,
   };
 });

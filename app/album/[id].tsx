@@ -15,8 +15,9 @@ export default function AlbumScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const router = useRouter();
-  const { addPhoto } = useCrew();
+  const { addPhoto, addAlbumPhoto, getAlbumById } = useCrew();
   const { ride } = useRide(id || '');
+  const album = getAlbumById(id || '');
   const [selectedPhoto, setSelectedPhoto] = useState<RidePhoto | null>(null);
   const isTablet = width >= 768;
   const colors = useThemeColors();
@@ -27,7 +28,12 @@ export default function AlbumScreen() {
   const gridGap = isTablet ? 8 : 4;
   const photoSize = (gridWidth - gridPadding * 2 - gridGap * (columnCount - 1)) / columnCount;
 
-  if (!ride) {
+  const title = ride?.title || album?.title || '';
+  const date = ride?.dateTime || album?.createdAt || '';
+  const photos = ride?.photos || album?.photos || [];
+  const isRideAlbum = !!ride;
+
+  if (!ride && !album) {
     return (
       <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorText}>Album not found</Text>
@@ -51,7 +57,11 @@ export default function AlbumScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      addPhoto({ rideId: ride.id, imageUrl: result.assets[0].uri });
+      if (isRideAlbum && ride) {
+        void addPhoto({ rideId: ride.id, imageUrl: result.assets[0].uri });
+      } else if (album) {
+        void addAlbumPhoto({ albumId: album.id, imageUrl: result.assets[0].uri });
+      }
     }
   };
 
@@ -83,22 +93,22 @@ export default function AlbumScreen() {
           <ArrowLeft size={24} color={colors.text} />
         </Pressable>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle} numberOfLines={1}>{ride.title}</Text>
-          <Text style={styles.headerSubtitle}>{formatDate(ride.dateTime)} • {ride.photos.length} photos</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.headerSubtitle}>{formatDate(date)} • {photos.length} photos</Text>
         </View>
         <Pressable style={styles.addButton} onPress={handleAddPhoto}>
           <Plus size={20} color={colors.onPrimary} />
         </Pressable>
       </View>
 
-      {ride.photos.length === 0 ? (
+      {photos.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
             <Camera size={48} color={colors.textTertiary} />
           </View>
           <Text style={styles.emptyTitle}>No Photos Yet</Text>
           <Text style={styles.emptyDescription}>
-            Be the first to add photos from this ride!
+            Be the first to add photos to this album.
           </Text>
           <Pressable style={styles.emptyButton} onPress={handleAddPhoto}>
             <Plus size={18} color={colors.onPrimary} />
@@ -107,7 +117,7 @@ export default function AlbumScreen() {
         </View>
       ) : (
         <FlatList
-          data={ride.photos}
+          data={photos}
           renderItem={renderPhoto}
           keyExtractor={item => item.id}
           key={columnCount}

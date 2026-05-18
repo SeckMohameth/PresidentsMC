@@ -35,12 +35,16 @@ type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'trialing';
 type MemberPermissions = {
   manageRides?: boolean;
   manageAnnouncements?: boolean;
+  manageAlbums?: boolean;
   manageJoinRequests?: boolean;
 };
 
 type CrewDoc = {
   id: string;
   name?: string;
+  description?: string;
+  logoUrl?: string;
+  nameLower?: string;
   ownerId?: string | null;
   subscriptionOwnerId?: string | null;
   subscriptionStatus?: SubscriptionStatus;
@@ -964,6 +968,7 @@ function normalizeMemberPermissions(input: unknown): MemberPermissions {
   return {
     manageRides: data.manageRides === true,
     manageAnnouncements: data.manageAnnouncements === true,
+    manageAlbums: data.manageAlbums === true,
     manageJoinRequests: data.manageJoinRequests === true,
   };
 }
@@ -1721,6 +1726,54 @@ export const setCrewInviteCode = onCall(async (request) => {
 
   const persistedInviteCode = await persistCrewInviteCode(context.crewRef, inviteCode, expiresAt);
   return { inviteCode: persistedInviteCode, expiresAt };
+});
+
+export const updateCrewSettings = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const context = await getActingMemberContext(userId);
+  requireAdmin(context.member, context.crew);
+
+  const updates: Partial<CrewDoc> = {};
+  if (request.data?.name !== undefined) {
+    const name = String(request.data.name ?? '').trim();
+    if (!name) {
+      throw new HttpsError('invalid-argument', 'CREW_NAME_REQUIRED');
+    }
+    updates.name = name;
+    updates.nameLower = name.toLowerCase();
+  }
+  if (request.data?.description !== undefined) {
+    updates.description = String(request.data.description ?? '').trim();
+  }
+  if (request.data?.logoUrl !== undefined) {
+    updates.logoUrl = String(request.data.logoUrl ?? '').trim();
+  }
+  if (request.data?.requiresApproval !== undefined) {
+    updates.requiresApproval = request.data.requiresApproval === true;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return {
+      id: context.crewRef.id,
+      name: context.crew.name ?? '',
+      description: context.crew.description ?? '',
+      logoUrl: context.crew.logoUrl ?? '',
+      requiresApproval: context.crew.requiresApproval !== false,
+    };
+  }
+
+  await context.crewRef.set(updates, { merge: true });
+  return {
+    id: context.crewRef.id,
+    name: updates.name ?? context.crew.name ?? '',
+    description: updates.description ?? context.crew.description ?? '',
+    logoUrl: updates.logoUrl ?? context.crew.logoUrl ?? '',
+    requiresApproval: updates.requiresApproval ?? context.crew.requiresApproval ?? true,
+  };
 });
 
 export const leaveCrew = onCall(async (request) => {

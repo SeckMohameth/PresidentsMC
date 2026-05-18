@@ -380,6 +380,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       await updateFirebaseProfile(credential.user, { displayName: name });
+      const isOwner = isInitialOwnerEmail(email);
+      const isDeveloperAdmin = isDeveloperAdminEmail(email);
 
       let verificationEmailSent = false;
       try {
@@ -396,8 +398,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const userRef = doc(db, 'users', credential.user.uid);
       const existingSnap = await getDoc(userRef);
       if (!existingSnap.exists()) {
-        const isOwner = isInitialOwnerEmail(email);
-        const isDeveloperAdmin = isDeveloperAdminEmail(email);
         await setDoc(userRef, {
           id: credential.user.uid,
           email,
@@ -430,20 +430,30 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       } else {
         await updateDoc(userRef, { name, hasOnboarded: true });
-        if (isInitialOwnerEmail(email)) {
+        if (isOwner) {
           await ensureSingleClubOwner({
             id: credential.user.uid,
             email,
             name,
             avatar: DEFAULT_AVATAR,
           });
-        } else if (isDeveloperAdminEmail(email)) {
+        } else if (isDeveloperAdmin) {
           await ensureDeveloperSupportAdmin({
             id: credential.user.uid,
             email,
             name,
             avatar: DEFAULT_AVATAR,
           });
+        }
+      }
+      if (!isOwner && !isDeveloperAdmin) {
+        try {
+          const callable = httpsCallable(functions, 'requestJoinCrew');
+          await callable({ crewId: CLUB_ID, message: '' });
+        } catch (error) {
+          if (__DEV__) {
+            console.log('[AuthProvider] Auto access request failed:', error);
+          }
         }
       }
       await SafeAsyncStorage.setItem(STORAGE_KEYS.HAS_ONBOARDED, 'true');
