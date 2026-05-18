@@ -1,10 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 import { UserPreferences } from '@/types';
+import { registerForPushNotificationsAsync } from '@/utils/notifications';
 
 const DEFAULT_PREFS: UserPreferences = {
   pushEnabled: true,
@@ -20,10 +22,44 @@ export default function NotificationsScreen() {
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { user, updatePreferences } = useAuth();
   const prefs = { ...DEFAULT_PREFS, ...(user?.preferences || {}) };
+  const [hasPushPermission, setHasPushPermission] = useState(false);
 
-  const handleToggle = (key: keyof UserPreferences, value: boolean) => {
+  useEffect(() => {
+    let isActive = true;
+
+    Notifications.getPermissionsAsync()
+      .then(({ status }) => {
+        if (isActive) setHasPushPermission(status === 'granted');
+      })
+      .catch(() => {
+        if (isActive) setHasPushPermission(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const isPushEnabled = prefs.pushEnabled && hasPushPermission;
+
+  const handleToggle = async (key: keyof UserPreferences, value: boolean) => {
     if (!user?.id) return;
-    updatePreferences({ [key]: value } as Partial<UserPreferences>);
+
+    if (key === 'pushEnabled' && value) {
+      const token = await registerForPushNotificationsAsync(user.id);
+      if (!token) {
+        setHasPushPermission(false);
+        Alert.alert(
+          'Permission needed',
+          'Please allow notifications in Settings to receive ride, announcement, and join request alerts.'
+        );
+        await updatePreferences({ pushEnabled: false });
+        return;
+      }
+      setHasPushPermission(true);
+    }
+
+    await updatePreferences({ [key]: value } as Partial<UserPreferences>);
   };
 
   return (
@@ -41,7 +77,7 @@ export default function NotificationsScreen() {
           <View style={styles.row}>
             <Text style={styles.label}>Push Notifications</Text>
             <Switch
-              value={prefs.pushEnabled}
+              value={isPushEnabled}
               onValueChange={(value) => handleToggle('pushEnabled', value)}
               trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
               thumbColor={colors.text}

@@ -37,6 +37,19 @@
       "expo-router",
       "expo-font",
       "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PresidentsMC to access your photos to upload ride photos, club images, and profile pictures.",
+          "cameraPermission": "Allow PresidentsMC to use your camera for profile photos and ride photos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow PresidentsMC to access your location for ride check-ins."
+        }
+      ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       [

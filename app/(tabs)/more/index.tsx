@@ -106,7 +106,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { currentUser, crew, isAdmin, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
+  const { currentUser, crew, isAdmin, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
   const { signOut, deleteAccount, updateProfile, resendVerificationEmail, user } = useAuth();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -160,12 +160,12 @@ export default function MoreScreen() {
     if (!crew || !currentUser) {
       return {
         title: 'Delete Account',
-        message: 'This permanently deletes your account. Authored content will remain and be anonymized to "Former Member".',
+        message: 'This permanently deletes your account and personal data. This cannot be undone. Photos you added will stay in club albums, but they will be anonymized to "Former Member".',
       };
     }
 
     const base =
-      'This permanently deletes your account. Authored content will remain in the club app and be anonymized to "Former Member".';
+      'This permanently deletes your account and personal data. This cannot be undone. Photos you added will stay in club albums, but they will be anonymized to "Former Member".';
 
     if (!isOwner) {
       return {
@@ -394,8 +394,8 @@ export default function MoreScreen() {
               Alert.alert(
                 'Account Deleted',
                 result.shouldManageSubscription
-                  ? 'Your account was deleted. Any authored content was anonymized, and your store subscription remains active until you cancel it manually.'
-                  : 'Your account was deleted and any authored content was anonymized.',
+                  ? 'Your account was deleted. Photos and authored club content were kept and anonymized, and your store subscription remains active until you cancel it manually.'
+                  : 'Your account was deleted. Photos and authored club content were kept and anonymized.',
                 result.shouldManageSubscription
                   ? [
                       { text: 'Not Now', style: 'cancel' },
@@ -461,7 +461,7 @@ export default function MoreScreen() {
                 </Text>
               </View>
             )}
-            {isAdmin && (
+            {(isAdmin || canManageJoinRequests) && (
               <View style={styles.adminBadge}>
                 <Crown size={12} color={colors.text} />
               </View>
@@ -515,7 +515,7 @@ export default function MoreScreen() {
           </View>
         )}
 
-        {isAdmin && pendingJoinRequests.length > 0 && (
+        {(isAdmin || canManageJoinRequests) && pendingJoinRequests.length > 0 && (
           <Pressable style={styles.joinRequestsCard} onPress={() => router.push('/admin-settings')}>
             <View style={styles.joinRequestsIcon}>
               <UserPlus size={22} color={colors.pending} />

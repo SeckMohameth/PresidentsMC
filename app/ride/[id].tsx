@@ -137,7 +137,7 @@ export default function RideDetailScreen() {
       const isCheckedInLocal = currentUser ? ride.checkedIn.includes(currentUser.id) : false;
       if (!isUpcomingLocal || !isAttendingLocal || isCheckedInLocal) return;
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') return;
 
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });

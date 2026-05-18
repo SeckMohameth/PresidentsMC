@@ -12,6 +12,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,6 +60,7 @@ export default function MembersScreen() {
   const [filter, setFilter] = useState<'all' | 'admin' | 'officer' | 'member'>('all');
   const [editingMember, setEditingMember] = useState<CrewMember | null>(null);
   const [titleDraft, setTitleDraft] = useState('');
+  const [permissionsDraft, setPermissionsDraft] = useState<NonNullable<CrewMember['permissions']>>({});
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -147,15 +149,24 @@ export default function MembersScreen() {
   const openTitleEditor = (member: CrewMember) => {
     setEditingMember(member);
     setTitleDraft(member.leadershipTitle || '');
+    setPermissionsDraft(member.permissions || {});
   };
 
   const saveLeadershipTitle = async () => {
     if (!editingMember) return;
     setIsSavingTitle(true);
     try {
-      await setMemberLeadership(editingMember.id, { leadershipTitle: titleDraft.trim() });
+      await setMemberLeadership(editingMember.id, {
+        leadershipTitle: titleDraft.trim(),
+        permissions: {
+          manageRides: permissionsDraft.manageRides === true,
+          manageAnnouncements: permissionsDraft.manageAnnouncements === true,
+          manageJoinRequests: permissionsDraft.manageJoinRequests === true,
+        },
+      });
       setEditingMember(null);
       setTitleDraft('');
+      setPermissionsDraft({});
     } catch {
       Alert.alert('Error', 'Unable to update this title. Please try again.');
     } finally {
@@ -192,7 +203,7 @@ export default function MembersScreen() {
       { text: 'Cancel', style: 'cancel' as const },
     ];
 
-    Alert.alert('Manage Member', `Update ${member.name}'s role or club title.`, actions);
+    Alert.alert('Manage Member', `Update ${member.name}'s role, club title, or permissions.`, actions);
   };
 
   const ListHeader = () => {
@@ -345,27 +356,79 @@ export default function MembersScreen() {
               </Pressable>
             </View>
 
-            <TextInput
-              style={styles.titleInput}
-              value={titleDraft}
-              onChangeText={setTitleDraft}
-              placeholder="President, Road Captain, Treasurer..."
-              placeholderTextColor={colors.textTertiary}
-              maxLength={48}
-              autoCapitalize="words"
-            />
+            <ScrollView
+              style={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <TextInput
+                style={styles.titleInput}
+                value={titleDraft}
+                onChangeText={setTitleDraft}
+                placeholder="President, Road Captain, Treasurer..."
+                placeholderTextColor={colors.textTertiary}
+                maxLength={48}
+                autoCapitalize="words"
+              />
 
-            <View style={styles.suggestionWrap}>
-              {TITLE_SUGGESTIONS.map((title) => (
-                <Pressable
-                  key={title}
-                  style={styles.suggestionChip}
-                  onPress={() => setTitleDraft(title)}
-                >
-                  <Text style={styles.suggestionText}>{title}</Text>
-                </Pressable>
-              ))}
-            </View>
+              <View style={styles.suggestionWrap}>
+                {TITLE_SUGGESTIONS.map((title) => (
+                  <Pressable
+                    key={title}
+                    style={styles.suggestionChip}
+                    onPress={() => setTitleDraft(title)}
+                  >
+                    <Text style={styles.suggestionText}>{title}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={styles.permissionSection}>
+                <Text style={styles.permissionTitle}>Permissions</Text>
+                <View style={styles.permissionRow}>
+                  <View style={styles.permissionCopy}>
+                    <Text style={styles.permissionLabel}>Manage rides</Text>
+                    <Text style={styles.permissionHint}>Create, edit, cancel, and reopen rides.</Text>
+                  </View>
+                  <Switch
+                    value={permissionsDraft.manageRides === true}
+                    onValueChange={(value) =>
+                      setPermissionsDraft((current) => ({ ...current, manageRides: value }))
+                    }
+                    trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+                    thumbColor={colors.text}
+                  />
+                </View>
+                <View style={styles.permissionRow}>
+                  <View style={styles.permissionCopy}>
+                    <Text style={styles.permissionLabel}>Post announcements</Text>
+                    <Text style={styles.permissionHint}>Create, edit, pin, and remove announcements.</Text>
+                  </View>
+                  <Switch
+                    value={permissionsDraft.manageAnnouncements === true}
+                    onValueChange={(value) =>
+                      setPermissionsDraft((current) => ({ ...current, manageAnnouncements: value }))
+                    }
+                    trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+                    thumbColor={colors.text}
+                  />
+                </View>
+                <View style={styles.permissionRow}>
+                  <View style={styles.permissionCopy}>
+                    <Text style={styles.permissionLabel}>Review join requests</Text>
+                    <Text style={styles.permissionHint}>Approve or reject pending members.</Text>
+                  </View>
+                  <Switch
+                    value={permissionsDraft.manageJoinRequests === true}
+                    onValueChange={(value) =>
+                      setPermissionsDraft((current) => ({ ...current, manageJoinRequests: value }))
+                    }
+                    trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
+                    thumbColor={colors.text}
+                  />
+                </View>
+              </View>
+            </ScrollView>
 
             <View style={styles.modalActions}>
               <Pressable
@@ -607,6 +670,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 520,
+    maxHeight: '86%',
     alignSelf: 'center',
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -638,6 +702,9 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceElevated,
   },
+  modalScroll: {
+    flexGrow: 0,
+  },
   titleInput: {
     color: colors.text,
     fontSize: 16,
@@ -666,6 +733,38 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
+  },
+  permissionSection: {
+    marginTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 14,
+    gap: 12,
+  },
+  permissionTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  permissionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  permissionCopy: {
+    flex: 1,
+  },
+  permissionLabel: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  permissionHint: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   modalActions: {
     flexDirection: 'row',

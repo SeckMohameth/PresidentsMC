@@ -16,7 +16,6 @@ import {
 } from 'firebase/auth';
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   onSnapshot,
@@ -261,7 +260,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           hasFeatureOnboarded: false,
           crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
           role: isOwner || isDeveloperAdmin ? 'admin' : 'member',
-          pendingCrewId: isOwner || isDeveloperAdmin ? null : CLUB_ID,
+          pendingCrewId: null,
           joinedAt: new Date().toISOString(),
           preferences: DEFAULT_PREFERENCES,
           lastActiveAt: new Date().toISOString(),
@@ -409,7 +408,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           hasFeatureOnboarded: false,
           crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
           role: isOwner || isDeveloperAdmin ? 'admin' : 'member',
-          pendingCrewId: isOwner || isDeveloperAdmin ? null : CLUB_ID,
+          pendingCrewId: null,
           joinedAt: new Date().toISOString(),
           preferences: DEFAULT_PREFERENCES,
           lastActiveAt: new Date().toISOString(),
@@ -477,32 +476,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const requestJoin = useCallback(async (crewId: string, message?: string) => {
     if (!profile?.id) throw new Error('Not authenticated');
-    const requestRef = doc(db, 'crews', crewId, 'joinRequests', profile.id);
-    const existing = await getDoc(requestRef);
-    if (existing.exists()) {
-      const data = existing.data() as { status?: string };
-      if (data.status === 'pending') return;
-    }
-    await setDoc(requestRef, {
-      id: profile.id,
-      crewId,
-      userId: profile.id,
-      userName: profile.name,
-      userAvatar: profile.avatar,
-      userEmail: profile.email,
-      status: 'pending',
-      message: message || '',
-      createdAt: new Date().toISOString(),
-    });
-    await updateDoc(doc(db, 'users', profile.id), { pendingCrewId: crewId });
+    const callable = httpsCallable(functions, 'requestJoinCrew');
+    const result = await callable({ crewId, message: message || '' });
+    return result.data as {
+      status: 'pending' | 'approved';
+      crewId: string;
+      crewName: string | null;
+    };
   }, [profile]);
-
-  const cancelJoinRequest = useCallback(async (crewId: string) => {
-    if (!profile?.id) throw new Error('Not authenticated');
-    const requestRef = doc(db, 'crews', crewId, 'joinRequests', profile.id);
-    await deleteDoc(requestRef);
-    await updateDoc(doc(db, 'users', profile.id), { pendingCrewId: null });
-  }, [profile?.id]);
 
   const createCrew = useCallback(async ({
     name,
@@ -736,7 +717,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     signIn,
     joinCrew,
     requestJoin,
-    cancelJoinRequest,
     createCrew,
     signOut,
     resetPassword,

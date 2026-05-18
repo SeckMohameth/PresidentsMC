@@ -32,6 +32,11 @@ const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 type UserRole = 'admin' | 'officer' | 'member';
 type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'trialing';
+type MemberPermissions = {
+  manageRides?: boolean;
+  manageAnnouncements?: boolean;
+  manageJoinRequests?: boolean;
+};
 
 type CrewDoc = {
   id: string;
@@ -59,6 +64,7 @@ type CrewMemberDoc = {
   bike?: string;
   role?: UserRole;
   leadershipTitle?: string;
+  permissions?: MemberPermissions;
   isDeveloperSupport?: boolean;
   joinedCrewAt?: string;
   joinedAt?: string;
@@ -454,7 +460,11 @@ async function getCrewLeaders(crewId: string) {
   return members.filter(
     (member) =>
       !member.isDeveloperSupport &&
-      (member.role === 'admin' || member.role === 'officer')
+      (
+        member.role === 'admin' ||
+        member.role === 'officer' ||
+        member.permissions?.manageJoinRequests === true
+      )
   );
 }
 
@@ -554,23 +564,31 @@ async function flushBatch(batch: WriteBatch, operations: number) {
   return 0;
 }
 
-async function deleteUserPushTokens(userId: string) {
-  const tokensSnap = await adminDb.collection('users').doc(userId).collection('pushTokens').get();
-  if (tokensSnap.empty) return;
+async function deleteQueryResults(query: FirebaseFirestore.Query) {
+  while (true) {
+    const snap = await query.limit(400).get();
+    if (snap.empty) return;
 
-  let batch = adminDb.batch();
-  let operations = 0;
-  for (const tokenDoc of tokensSnap.docs) {
-    batch.delete(tokenDoc.ref);
-    operations += 1;
-    if (operations === 400) {
-      await batch.commit();
-      batch = adminDb.batch();
-      operations = 0;
+    const batch = adminDb.batch();
+    snap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+
+    if (snap.size < 400) return;
+  }
+}
+
+async function deleteDocumentTree(ref: FirebaseFirestore.DocumentReference) {
+  const subcollections = await ref.listCollections();
+  for (const collectionRef of subcollections) {
+    while (true) {
+      const snap = await collectionRef.limit(100).get();
+      if (snap.empty) break;
+
+      await Promise.all(snap.docs.map((docSnap) => deleteDocumentTree(docSnap.ref)));
     }
   }
 
-  await flushBatch(batch, operations);
+  await ref.delete();
 }
 
 async function anonymizeUserGeneratedContent(userId: string) {
@@ -630,6 +648,14 @@ async function anonymizeUserGeneratedContent(userId: string) {
       rideUpdate.createdByName = FORMER_MEMBER_NAME;
     }
 
+    if (Array.isArray(ride.attendees) && ride.attendees.includes(userId)) {
+      rideUpdate.attendees = ride.attendees.filter((attendeeId: string) => attendeeId !== userId);
+    }
+
+    if (Array.isArray(ride.checkedIn) && ride.checkedIn.includes(userId)) {
+      rideUpdate.checkedIn = ride.checkedIn.filter((checkedInId: string) => checkedInId !== userId);
+    }
+
     if (JSON.stringify(nextPhotos) !== JSON.stringify(photos)) {
       rideUpdate.photos = nextPhotos;
     }
@@ -640,14 +666,20 @@ async function anonymizeUserGeneratedContent(userId: string) {
   }
 
   for (const docSnap of joinRequestSnapshots.docs) {
-    await queueUpdate(docSnap.ref, {
-      userName: FORMER_MEMBER_NAME,
-      userAvatar: FORMER_MEMBER_AVATAR,
-      userEmail: '',
-    });
+    batch.delete(docSnap.ref);
+    operations += 1;
+    if (operations === 400) {
+      await batch.commit();
+      batch = adminDb.batch();
+      operations = 0;
+    }
   }
 
   await flushBatch(batch, operations);
+}
+
+async function deleteUserAnalyticsEvents(userId: string) {
+  await deleteQueryResults(adminDb.collection('analyticsEvents').where('actorUserId', '==', userId));
 }
 
 async function deleteUserStorage(userId: string) {
@@ -909,6 +941,33 @@ function requireActiveLeadership(member: CrewMemberDoc, crew: CrewDoc) {
   }
 }
 
+function canUseLeadershipTools(member: CrewMemberDoc, crew: CrewDoc) {
+  if (member.isDeveloperSupport) return true;
+  if (crew.ownerId === member.id) return true;
+  if (member.role !== 'admin' && member.role !== 'officer') return false;
+  return crew.billingRequired !== true || isActiveSubscription(crew.subscriptionStatus);
+}
+
+function requireJoinRequestAccess(member: CrewMemberDoc, crew: CrewDoc) {
+  if (canUseLeadershipTools(member, crew)) return;
+  if (
+    member.permissions?.manageJoinRequests === true &&
+    (crew.billingRequired !== true || isActiveSubscription(crew.subscriptionStatus))
+  ) {
+    return;
+  }
+  throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
+}
+
+function normalizeMemberPermissions(input: unknown): MemberPermissions {
+  const data = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+  return {
+    manageRides: data.manageRides === true,
+    manageAnnouncements: data.manageAnnouncements === true,
+    manageJoinRequests: data.manageJoinRequests === true,
+  };
+}
+
 function requireAdmin(member: CrewMemberDoc, crew: CrewDoc) {
   if (member.role !== 'admin') {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
@@ -1063,6 +1122,12 @@ function normalizeAnalyticsEvent(input: AnalyticsEventInput, fallbackUserId: str
     throw new HttpsError('invalid-argument', 'EVENT_NAME_REQUIRED');
   }
 
+  const properties = input.properties && typeof input.properties === 'object'
+    ? Object.fromEntries(
+        Object.entries(input.properties).filter(([, value]) => value !== undefined)
+      )
+    : {};
+
   return {
     id: String(input.id ?? `evt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`),
     eventName,
@@ -1075,7 +1140,7 @@ function normalizeAnalyticsEvent(input: AnalyticsEventInput, fallbackUserId: str
     buildNumber: input.buildNumber ?? null,
     platform: String(input.platform ?? 'unknown'),
     clientTimestamp: input.clientTimestamp ?? new Date().toISOString(),
-    properties: input.properties ?? {},
+    properties,
   };
 }
 
@@ -1507,6 +1572,119 @@ export const joinCrewByInvite = onCall(async (request) => {
   };
 });
 
+export const requestJoinCrew = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const crewId = String(request.data?.crewId ?? '').trim();
+  if (!crewId) {
+    throw new HttpsError('invalid-argument', 'CREW_ID_REQUIRED');
+  }
+
+  const userRef = adminDb.collection('users').doc(userId);
+  const crewRef = adminDb.collection('crews').doc(crewId);
+  const memberRef = crewRef.collection('members').doc(userId);
+  const joinRequestRef = crewRef.collection('joinRequests').doc(userId);
+  const now = new Date().toISOString();
+  const message = String(request.data?.message ?? '').trim().slice(0, 500);
+
+  return adminDb.runTransaction(async (transaction) => {
+    const [userSnap, crewSnap, memberSnap, joinRequestSnap] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(crewRef),
+      transaction.get(memberRef),
+      transaction.get(joinRequestRef),
+    ]);
+
+    if (!userSnap.exists) {
+      throw new HttpsError('not-found', 'USER_NOT_FOUND');
+    }
+    if (!crewSnap.exists) {
+      throw new HttpsError('not-found', 'CREW_NOT_FOUND');
+    }
+
+    const user = userSnap.data() as UserDoc;
+    const crew = crewSnap.data() as CrewDoc;
+    if (crew.status === 'archived') {
+      throw new HttpsError('failed-precondition', 'CREW_ARCHIVED');
+    }
+    if (user.crewId && user.crewId !== crewId) {
+      throw new HttpsError('failed-precondition', 'ALREADY_IN_CREW');
+    }
+    if (memberSnap.exists) {
+      transaction.set(userRef, { crewId, role: 'member', pendingCrewId: null }, { merge: true });
+      return { status: 'approved', crewId, crewName: crew.name ?? null };
+    }
+
+    if (crew.requiresApproval === false) {
+      transaction.set(
+        memberRef,
+        {
+          id: userId,
+          email: user.email ?? '',
+          name: user.name ?? 'Member',
+          avatar: user.avatar ?? '',
+          bike: user.bike ?? '',
+          role: 'member',
+          joinedCrewAt: now,
+          ridesAttended: 0,
+          milesTraveled: 0,
+        },
+        { merge: true }
+      );
+      transaction.set(
+        crewRef,
+        {
+          memberCount: FieldValue.increment(1),
+          status: 'active',
+          archivedAt: null,
+          purgeAt: null,
+        },
+        { merge: true }
+      );
+      transaction.set(userRef, { crewId, role: 'member', pendingCrewId: null }, { merge: true });
+      transaction.set(
+        joinRequestRef,
+        {
+          id: userId,
+          crewId,
+          userId,
+          userName: user.name ?? 'Member',
+          userAvatar: user.avatar ?? '',
+          userEmail: user.email ?? '',
+          status: 'approved',
+          message,
+          createdAt: joinRequestSnap.exists ? joinRequestSnap.data()?.createdAt ?? now : now,
+          decidedAt: now,
+          decidedBy: SYSTEM_ACTOR,
+        },
+        { merge: true }
+      );
+      return { status: 'approved', crewId, crewName: crew.name ?? null };
+    }
+
+    transaction.set(
+      joinRequestRef,
+      {
+        id: userId,
+        crewId,
+        userId,
+        userName: user.name ?? 'Member',
+        userAvatar: user.avatar ?? '',
+        userEmail: user.email ?? '',
+        status: 'pending',
+        message,
+        createdAt: now,
+      },
+      { merge: true }
+    );
+    transaction.set(userRef, { pendingCrewId: crewId }, { merge: true });
+    return { status: 'pending', crewId, crewName: crew.name ?? null };
+  });
+});
+
 export const getCrewInviteCode = onCall(async (request) => {
   const userId = request.auth?.uid;
   if (!userId) {
@@ -1566,7 +1744,7 @@ export const deleteAccountAndCleanup = onCall(async (request) => {
 
   await Promise.all([
     anonymizeUserGeneratedContent(userId),
-    deleteUserPushTokens(userId),
+    deleteUserAnalyticsEvents(userId),
     deleteUserStorage(userId),
   ]);
 
@@ -1580,7 +1758,7 @@ export const deleteAccountAndCleanup = onCall(async (request) => {
     }
   }
 
-  await userRef.delete().catch((error) => {
+  await deleteDocumentTree(userRef).catch((error) => {
     console.log('[Functions] delete user profile error:', error);
     throw new HttpsError('internal', 'ACCOUNT_PROFILE_DELETE_FAILED');
   });
@@ -1600,7 +1778,7 @@ export const approveJoinRequest = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireActiveLeadership(context.member, context.crew);
+  requireJoinRequestAccess(context.member, context.crew);
 
   const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
   const joinRequestSnap = await joinRequestRef.get();
@@ -1692,7 +1870,7 @@ export const denyJoinRequest = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireActiveLeadership(context.member, context.crew);
+  requireJoinRequestAccess(context.member, context.crew);
 
   const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
   const joinRequestSnap = await joinRequestRef.get();
@@ -1813,6 +1991,10 @@ export const setCrewMemberLeadership = onCall(async (request) => {
   const memberId = String(request.data?.memberId ?? '').trim();
   const nextRole = request.data?.role == null ? undefined : String(request.data.role).trim() as UserRole;
   const leadershipTitle = String(request.data?.leadershipTitle ?? '').trim().slice(0, 48);
+  const permissions =
+    request.data?.permissions == null
+      ? undefined
+      : normalizeMemberPermissions(request.data.permissions);
 
   if (!memberId) {
     throw new HttpsError('invalid-argument', 'MEMBER_ID_REQUIRED');
@@ -1845,6 +2027,10 @@ export const setCrewMemberLeadership = onCall(async (request) => {
   if (nextRole) {
     memberUpdates.role = nextRole;
     userUpdates.role = nextRole;
+  }
+  if (permissions) {
+    memberUpdates.permissions = permissions;
+    userUpdates.permissions = permissions;
   }
 
   await Promise.all([
@@ -2105,17 +2291,11 @@ export const onJoinRequestCreated = onDocumentCreated(
     const crewSnap = await adminDb.collection('crews').doc(crewId).get();
     const crewName = crewSnap.exists ? ((crewSnap.data() as CrewDoc).name ?? 'your crew') : 'your crew';
 
-    const membersSnap = await adminDb
-      .collection('crews')
-      .doc(crewId)
-      .collection('members')
-      .where('role', 'in', ['admin', 'officer'])
-      .get();
-
+    const leaders = await getCrewLeaders(crewId);
     const messages: ExpoPushMessage[] = [];
 
-    for (const memberDoc of membersSnap.docs) {
-      const memberId = memberDoc.id;
+    for (const member of leaders) {
+      const memberId = member.id;
       const prefs = await getUserPreferences(memberId);
       if (prefs.pushEnabled === false || prefs.joinRequests === false) continue;
       const tokens = await getUserPushTokens(memberId);
@@ -2140,6 +2320,19 @@ export const onJoinRequestUpdated = onDocumentUpdated(
     const after = event.data?.after.data() as JoinRequestDoc | undefined;
     if (!before || !after) return;
     if (before.status === after.status) return;
+
+    if (after.status === 'pending') {
+      const crewId = event.params.crewId as string;
+      const crewName = await getCrewName(crewId);
+      await notifyCrewLeaders({
+        crewId,
+        title: 'Join Request Resubmitted',
+        body: `${after.userName || 'Someone'} requested to join ${crewName} again.`,
+        data: { crewId, requestId: event.params.requestId, type: 'join_request_resubmitted' },
+      });
+      return;
+    }
+
     if (!['approved', 'denied'].includes(after.status ?? '')) return;
 
     const crewId = event.params.crewId as string;

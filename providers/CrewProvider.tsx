@@ -94,11 +94,19 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const isOfficer = currentUser?.role === 'officer';
   const isDeveloperSupport = !!currentUser?.isDeveloperSupport;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
+  const permissions = currentUser?.permissions || {};
   const isSubscriptionActive =
     crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing';
   const isBillingRequired = crew?.billingRequired === true;
   const canUseAdminTools = !isBillingRequired || isSubscriptionActive || isOwner || isDeveloperSupport;
-  const canPost = isDeveloperSupport || isOwner || (isAdmin && canUseAdminTools) || (isOfficer && canUseAdminTools);
+  const hasActiveDelegation = !isBillingRequired || isSubscriptionActive;
+  const canManageRides =
+    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageRides === true) && hasActiveDelegation);
+  const canManageAnnouncements =
+    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAnnouncements === true) && hasActiveDelegation);
+  const canManageJoinRequests =
+    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageJoinRequests === true) && hasActiveDelegation);
+  const canPost = canManageRides || canManageAnnouncements;
 
   const assertAdminActive = useCallback(() => {
     if (isDeveloperSupport) return;
@@ -113,6 +121,18 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       throw new Error('NOT_AUTHORIZED');
     }
   }, [isAdmin, isOfficer]);
+
+  const assertCanManageRides = useCallback(() => {
+    if (!canManageRides) throw new Error('NOT_AUTHORIZED');
+  }, [canManageRides]);
+
+  const assertCanManageAnnouncements = useCallback(() => {
+    if (!canManageAnnouncements) throw new Error('NOT_AUTHORIZED');
+  }, [canManageAnnouncements]);
+
+  const assertCanManageJoinRequests = useCallback(() => {
+    if (!canManageJoinRequests) throw new Error('NOT_AUTHORIZED');
+  }, [canManageJoinRequests]);
 
   const assertAdmin = useCallback(() => {
     if (!isAdmin) {
@@ -242,8 +262,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const createAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'createdAt'>) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageAnnouncements();
     const announcementsRef = collection(db, 'crews', crewId, 'announcements');
     const docRef = doc(announcementsRef);
 
@@ -274,7 +293,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         hasImage: Boolean(imageUrl),
       },
     });
-  }, [crewId, assertAdminActive, assertAdminOrOfficer]);
+  }, [crewId, assertCanManageAnnouncements, currentUser?.id]);
 
   const updateAnnouncement = useCallback(async (
     announcementId: string,
@@ -284,8 +303,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     }
   ) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageAnnouncements();
     const announcementRef = doc(db, 'crews', crewId, 'announcements', announcementId);
 
     let imageUrl = updates.imageUrl;
@@ -312,12 +330,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         hasImage: Boolean(imageUrl ?? updates.imageUrl),
       },
     });
-  }, [crewId, assertAdminActive, assertAdminOrOfficer]);
+  }, [crewId, assertCanManageAnnouncements, currentUser?.id]);
 
   const deleteAnnouncement = useCallback(async (announcementId: string) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageAnnouncements();
     await deleteStoragePath(`crews/${crewId}/announcements/${announcementId}.jpg`);
     await deleteDoc(doc(db, 'crews', crewId, 'announcements', announcementId));
 
@@ -328,7 +345,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       route: '/create-announcement',
       properties: { announcementId },
     });
-  }, [crewId, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+  }, [crewId, assertCanManageAnnouncements, currentUser?.id]);
 
   const toggleAnnouncementLike = useCallback(async (announcementId: string) => {
     if (!crewId || !currentUser) throw new Error('No crew member');
@@ -352,8 +369,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const createRide = useCallback(async (ride: Omit<Ride, 'id' | 'attendees' | 'checkedIn' | 'photos' | 'status'>) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageRides();
     setIsCreatingRide(true);
     try {
       const ridesRef = collection(db, 'crews', crewId, 'rides');
@@ -396,15 +412,14 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     } finally {
       setIsCreatingRide(false);
     }
-  }, [crewId, assertAdminActive, assertAdminOrOfficer]);
+  }, [crewId, assertCanManageRides, currentUser?.id]);
 
   const updateRide = useCallback(async (
     rideId: string,
     updates: Partial<Pick<Ride, 'title' | 'description' | 'startLocation' | 'endLocation' | 'dateTime' | 'estimatedDuration' | 'estimatedDistance' | 'routeCoordinates' | 'routeDistanceMeters' | 'routeDurationSeconds' | 'pace' | 'notes' | 'coverImage' | 'coverAttribution'>>
   ) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageRides();
     const rideRef = doc(db, 'crews', crewId, 'rides', rideId);
 
     let estimatedDistance = updates.estimatedDistance;
@@ -449,12 +464,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         hasCoverImage: Boolean(coverImage ?? updates.coverImage),
       },
     });
-  }, [crewId, assertAdminActive, assertAdminOrOfficer]);
+  }, [crewId, assertCanManageRides, currentUser?.id]);
 
   const deleteRide = useCallback(async (rideId: string) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageRides();
     const ride = rides.find((item) => item.id === rideId);
     await Promise.all([
       deleteStoragePath(`crews/${crewId}/rides/${rideId}/cover.jpg`),
@@ -471,12 +485,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       route: '/create-ride',
       properties: { rideId },
     });
-  }, [crewId, rides, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+  }, [crewId, rides, assertCanManageRides, currentUser?.id]);
 
   const cancelRide = useCallback(async (rideId: string) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageRides();
     await updateDoc(doc(db, 'crews', crewId, 'rides', rideId), {
       status: 'cancelled',
     });
@@ -488,12 +501,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       route: `/ride/${rideId}`,
       properties: { rideId },
     });
-  }, [crewId, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+  }, [crewId, assertCanManageRides, currentUser?.id]);
 
   const reopenRide = useCallback(async (rideId: string) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
-    assertAdminActive();
+    assertCanManageRides();
     await updateDoc(doc(db, 'crews', crewId, 'rides', rideId), {
       status: 'upcoming',
     });
@@ -505,7 +517,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       route: `/ride/${rideId}`,
       properties: { rideId },
     });
-  }, [crewId, assertAdminActive, assertAdminOrOfficer, currentUser?.id]);
+  }, [crewId, assertCanManageRides, currentUser?.id]);
 
   const joinRide = useCallback(async (rideId: string) => {
     if (!crewId || !user?.id) return;
@@ -687,7 +699,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const setMemberLeadership = useCallback(async (
     memberId: string,
-    updates: { role?: CrewMember['role']; leadershipTitle?: string }
+    updates: {
+      role?: CrewMember['role'];
+      leadershipTitle?: string;
+      permissions?: CrewMember['permissions'];
+    }
   ) => {
     if (!crewId) throw new Error('No crew');
     assertAdmin();
@@ -703,6 +719,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         memberId,
         role: updates.role ?? null,
         leadershipTitle: updates.leadershipTitle ?? null,
+        permissions: updates.permissions ? JSON.stringify(updates.permissions) : null,
         action: 'set_member_leadership',
       },
     });
@@ -710,7 +727,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const approveJoinRequest = useCallback(async (request: JoinRequest) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
+    assertCanManageJoinRequests();
     const callable = httpsCallable(functions, 'approveJoinRequest');
     await callable({ requestId: request.id });
 
@@ -724,11 +741,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         action: 'approve_join_request',
       },
     });
-  }, [crewId, assertAdminOrOfficer]);
+  }, [crewId, assertCanManageJoinRequests, currentUser?.id]);
 
   const denyJoinRequest = useCallback(async (request: JoinRequest) => {
     if (!crewId) throw new Error('No crew');
-    assertAdminOrOfficer();
+    assertCanManageJoinRequests();
     const callable = httpsCallable(functions, 'denyJoinRequest');
     await callable({ requestId: request.id });
 
@@ -742,9 +759,9 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         action: 'deny_join_request',
       },
     });
-  }, [crewId, assertAdminOrOfficer]);
+  }, [crewId, assertCanManageJoinRequests, currentUser?.id]);
 
-  const updateCrewSettings = useCallback(async (updates: Partial<Pick<Crew, 'name' | 'description' | 'logoUrl' | 'isDiscoverable' | 'requiresApproval'>>) => {
+  const updateCrewSettings = useCallback(async (updates: Partial<Pick<Crew, 'name' | 'description' | 'logoUrl' | 'requiresApproval'>>) => {
     if (!crewId) throw new Error('No crew');
     assertAdmin();
     assertAdminActive();
@@ -771,7 +788,6 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         action: 'update_crew_settings',
         crewName: updates.name ?? crew?.name ?? '',
         hasLogo: Boolean(logoUrl ?? updates.logoUrl),
-        isDiscoverable: updates.isDiscoverable ?? undefined,
         requiresApproval: updates.requiresApproval ?? undefined,
       },
     });
@@ -906,6 +922,9 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     isOwner,
     isBillingRequired,
     canUseAdminTools,
+    canManageRides,
+    canManageAnnouncements,
+    canManageJoinRequests,
     canPost,
     isSubscriptionActive,
     isLoading,

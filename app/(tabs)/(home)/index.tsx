@@ -15,7 +15,7 @@ import { getAvatarSource } from '@/utils/avatar';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { crew, currentUser, announcements, upcomingRides, canPost, isAdmin, isLoading, toggleAnnouncementLike } = useCrew();
+  const { crew, currentUser, announcements, upcomingRides, canManageAnnouncements, isAdmin, isLoading, toggleAnnouncementLike } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -140,7 +140,7 @@ export default function HomeScreen() {
               <Bell size={18} color={colors.primary} />
               <Text style={styles.sectionTitle}>Announcements</Text>
             </View>
-            {canPost && (
+            {canManageAnnouncements && (
               <Pressable 
                 style={styles.addButton}
                 onPress={() => router.push('/create-announcement')}

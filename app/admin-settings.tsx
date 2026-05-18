@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -64,18 +65,19 @@ export default function AdminSettingsScreen() {
     isOwner,
     isBillingRequired,
     isSubscriptionActive,
+    canManageJoinRequests,
   } = useCrew();
 
   const [name, setName] = useState(crew?.name || '');
   const [description, setDescription] = useState(crew?.description || '');
   const [logoUrl, setLogoUrl] = useState(crew?.logoUrl || '');
-  const [isDiscoverable, setIsDiscoverable] = useState(crew?.isDiscoverable ?? true);
   const [requiresApproval, setRequiresApproval] = useState(crew?.requiresApproval ?? true);
   const [isSaving, setIsSaving] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
   const [inviteExpiresAt, setInviteExpiresAt] = useState<string | null>(null);
   const [inviteExpirationOption, setInviteExpirationOption] =
     useState<InviteExpirationOption>('never');
+  const [isInviteExpirationDirty, setIsInviteExpirationDirty] = useState(false);
   const [isInviteLoading, setIsInviteLoading] = useState(false);
   const [isInviteSaving, setIsInviteSaving] = useState(false);
 
@@ -84,7 +86,6 @@ export default function AdminSettingsScreen() {
     setName(crew.name || '');
     setDescription(crew.description || '');
     setLogoUrl(crew.logoUrl || '');
-    setIsDiscoverable(crew.isDiscoverable ?? true);
     setRequiresApproval(crew.requiresApproval ?? true);
   }, [crew]);
 
@@ -104,6 +105,7 @@ export default function AdminSettingsScreen() {
         setInviteCode(settings.inviteCode);
         setInviteExpiresAt(settings.expiresAt);
         setInviteExpirationOption('never');
+        setIsInviteExpirationDirty(false);
       })
       .catch((error) => {
         if (__DEV__) {
@@ -121,6 +123,14 @@ export default function AdminSettingsScreen() {
   }, [getInviteSettings, isAdmin]);
 
   const pickLogo = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant photo permissions to select a club logo.');
+        return;
+      }
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -141,7 +151,6 @@ export default function AdminSettingsScreen() {
         name: name.trim() || crew.name,
         description: description.trim(),
         logoUrl,
-        isDiscoverable,
         requiresApproval,
       });
       Alert.alert('Saved', 'Club settings updated.');
@@ -211,10 +220,11 @@ export default function AdminSettingsScreen() {
       const expiresAt = expiresAtForOption(inviteExpirationOption);
       const settings = await updateInviteSettings({
         inviteCode: rotate ? undefined : inviteCode,
-        expiresAt,
+        expiresAt: isInviteExpirationDirty ? expiresAt : inviteExpiresAt,
       });
       setInviteCode(settings.inviteCode);
       setInviteExpiresAt(settings.expiresAt);
+      setIsInviteExpirationDirty(false);
       Alert.alert('Invite Updated', rotate ? 'A new invite code is ready.' : 'Invite settings saved.');
     } catch (error: any) {
       const message =
@@ -255,6 +265,7 @@ export default function AdminSettingsScreen() {
           </View>
         )}
 
+        {canManageJoinRequests && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Join Requests</Text>
           {pendingRequests.length === 0 ? (
@@ -283,6 +294,7 @@ export default function AdminSettingsScreen() {
             ))
           )}
         </View>
+        )}
 
         {isAdmin && (
           <View style={styles.card}>
@@ -316,16 +328,6 @@ export default function AdminSettingsScreen() {
               placeholderTextColor={colors.textTertiary}
               multiline
             />
-
-            <View style={styles.switchRow}>
-              <Text style={styles.label}>Discoverable</Text>
-              <Switch
-                value={isDiscoverable}
-                onValueChange={setIsDiscoverable}
-                trackColor={{ false: colors.surfaceElevated, true: colors.primary }}
-                thumbColor={colors.text}
-              />
-            </View>
 
             <View style={styles.switchRow}>
               <Text style={styles.label}>Require Approval</Text>
@@ -374,7 +376,10 @@ export default function AdminSettingsScreen() {
                   <Pressable
                     key={option.value}
                     style={[styles.expirationChip, selected && styles.expirationChipSelected]}
-                    onPress={() => setInviteExpirationOption(option.value)}
+                    onPress={() => {
+                      setInviteExpirationOption(option.value);
+                      setIsInviteExpirationDirty(true);
+                    }}
                     disabled={isInviteSaving}
                   >
                     <Text

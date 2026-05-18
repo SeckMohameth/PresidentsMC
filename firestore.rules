@@ -42,6 +42,11 @@ service cloud.firestore {
       return isCrewMember(crewId) && ['admin', 'officer'].hasAny([memberRole(crewId)]);
     }
 
+    function memberPermission(crewId, key) {
+      return isCrewMember(crewId)
+        && get(memberPath(crewId, request.auth.uid)).data.permissions[key] == true;
+    }
+
     function isDeveloperSupport(crewId) {
       return isCrewMember(crewId)
         && get(memberPath(crewId, request.auth.uid)).data.isDeveloperSupport == true;
@@ -56,6 +61,24 @@ service cloud.firestore {
         || isCrewOwner(crewId)
         || (
           isCrewLeader(crewId)
+          && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
+        );
+    }
+
+    function canManageCrewSettings(crewId) {
+      return isDeveloperSupport(crewId)
+        || isCrewOwner(crewId)
+        || (
+          isCrewMember(crewId)
+          && memberRole(crewId) == 'admin'
+          && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
+        );
+    }
+
+    function canUseDelegatedTool(crewId, key) {
+      return canUseAdminTools(crewId)
+        || (
+          memberPermission(crewId, key)
           && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
         );
     }
@@ -153,7 +176,7 @@ service cloud.firestore {
         && request.resource.data.archivedAt == null
         && request.resource.data.purgeAt == null;
       allow update: if isPresidentsClub(crewId)
-        && (isCrewOwner(crewId) || isDeveloperSupport(crewId))
+        && canManageCrewSettings(crewId)
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'name',
           'description',
@@ -162,7 +185,12 @@ service cloud.firestore {
           'requiresApproval',
           'billingRequired',
           'nameLower'
-        ]);
+        ])
+        && (
+          !request.resource.data.diff(resource.data).changedKeys().hasAny(['billingRequired'])
+          || isCrewOwner(crewId)
+          || isDeveloperSupport(crewId)
+        );
       allow delete: if false;
 
       match /members/{memberId} {
@@ -232,10 +260,10 @@ service cloud.firestore {
       match /announcements/{announcementId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
         allow create, delete: if isPresidentsClub(crewId)
-          && canUseAdminTools(crewId);
+          && canUseDelegatedTool(crewId, 'manageAnnouncements');
         allow update: if isPresidentsClub(crewId)
           && (
-            canUseAdminTools(crewId)
+            canUseDelegatedTool(crewId, 'manageAnnouncements')
             || (
               isCrewMember(crewId)
               && request.resource.data.diff(resource.data).changedKeys().hasOnly(['likedBy'])
@@ -246,10 +274,10 @@ service cloud.firestore {
       match /rides/{rideId} {
         allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
         allow create, delete: if isPresidentsClub(crewId)
-          && canUseAdminTools(crewId);
+          && canUseDelegatedTool(crewId, 'manageRides');
         allow update: if isPresidentsClub(crewId)
           && (
-            canUseAdminTools(crewId)
+            canUseDelegatedTool(crewId, 'manageRides')
             || (
               isCrewMember(crewId)
               && request.resource.data.diff(resource.data).changedKeys().hasOnly([
@@ -263,7 +291,11 @@ service cloud.firestore {
 
       match /joinRequests/{requestId} {
         allow read: if isPresidentsClub(crewId)
-          && ((signedIn() && requestId == request.auth.uid) || isCrewLeader(crewId));
+          && (
+            (signedIn() && requestId == request.auth.uid) ||
+            isCrewLeader(crewId) ||
+            memberPermission(crewId, 'manageJoinRequests')
+          );
         allow create: if isPresidentsClub(crewId)
           && signedIn()
           && request.resource.data.id == request.auth.uid
@@ -271,11 +303,16 @@ service cloud.firestore {
           && request.resource.data.crewId == crewId
           && request.resource.data.status == 'pending'
           && !isCrewMember(crewId);
-        allow update: if false;
-        allow delete: if isPresidentsClub(crewId)
+        allow update: if isPresidentsClub(crewId)
           && signedIn()
           && requestId == request.auth.uid
-          && resource.data.status == 'pending';
+          && resource.data.status == 'denied'
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.crewId == crewId
+          && request.resource.data.status == 'pending'
+          && !isCrewMember(crewId);
+        allow delete: if false;
       }
 
       match /statsHistory/{snapshotId} {

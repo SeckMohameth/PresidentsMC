@@ -17,6 +17,7 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let isFlushing = false;
 let isAnalyticsDisabled = false;
 let hasLoggedMissingFunction = false;
+let consecutiveFlushFailures = 0;
 const queuedEvents: AnalyticsPayload[] = [];
 
 function logAnalyticsDebug(message: string, error?: unknown) {
@@ -107,6 +108,7 @@ export async function flushAnalyticsEvents() {
   try {
     const callable = httpsCallable(functions, 'recordAnalyticsEvents');
     await callable({ events: batch });
+    consecutiveFlushFailures = 0;
   } catch (error: any) {
     const errorCode = String(error?.code ?? '');
     const errorMessage = String(error?.message ?? '');
@@ -127,6 +129,13 @@ export async function flushAnalyticsEvents() {
     }
 
     logAnalyticsDebug('[Analytics] Flush error:', error);
+    consecutiveFlushFailures += 1;
+    if (consecutiveFlushFailures >= 3 && errorCode === 'functions/internal') {
+      isAnalyticsDisabled = true;
+      queuedEvents.length = 0;
+      logAnalyticsDebug('[Analytics] Disabled after repeated internal flush failures.');
+      return;
+    }
     queuedEvents.unshift(...batch);
   } finally {
     isFlushing = false;

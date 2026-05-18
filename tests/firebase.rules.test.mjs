@@ -8,6 +8,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc,
+  deleteDoc,
   getDoc,
   setDoc,
   updateDoc,
@@ -184,6 +185,49 @@ test('allows signed-in non-members to request access but not read the club', asy
 
   await assertFails(getDoc(doc(db, 'crews', CLUB_ID)));
   assert.ok(true);
+});
+
+test('lets denied prospects request again but does not allow canceling pending requests', async () => {
+  await bootstrapOwner();
+  const db = dbFor('prospect');
+  const requestRef = doc(db, 'crews', CLUB_ID, 'joinRequests', 'prospect');
+
+  await assertSucceeds(setDoc(doc(db, 'users', 'prospect'), {
+    id: 'prospect',
+    name: 'Prospect',
+    email: 'prospect@example.com',
+    avatar: '',
+    crewId: null,
+    pendingCrewId: null,
+    role: 'member',
+  }));
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    await setDoc(doc(adminDb, 'crews', CLUB_ID, 'joinRequests', 'prospect'), {
+      id: 'prospect',
+      userId: 'prospect',
+      userName: 'Prospect',
+      userEmail: 'prospect@example.com',
+      crewId: CLUB_ID,
+      status: 'denied',
+      createdAt: new Date().toISOString(),
+      decidedAt: new Date().toISOString(),
+      decidedBy: 'owner',
+    });
+  });
+
+  await assertSucceeds(setDoc(requestRef, {
+    id: 'prospect',
+    userId: 'prospect',
+    userName: 'Prospect',
+    userEmail: 'prospect@example.com',
+    crewId: CLUB_ID,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  }));
+
+  await assertFails(deleteDoc(requestRef));
 });
 
 test('lets members update safe profile fields but not role or hierarchy title', async () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,32 +13,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Image } from 'expo-image';
-import { ArrowLeft, Hash, Search } from 'lucide-react-native';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAt, endAt, where } from 'firebase/firestore';
+import { ArrowLeft, Hash } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
-import { db } from '@/utils/firebase';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
-type CrewSearchResult = {
-  id: string;
-  name: string;
-  description?: string;
-  logoUrl?: string;
-  memberCount?: number;
-  requiresApproval?: boolean;
-};
-
 export default function JoinCrewScreen() {
-  const { joinCrew, isJoiningCrew, requestJoin, user } = useAuth();
+  const { joinCrew, isJoiningCrew } = useAuth();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [inviteCode, setInviteCode] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<CrewSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [requestStatus, setRequestStatus] = useState<Record<string, 'pending' | 'approved' | 'denied'>>({});
 
   const handleJoinCrew = async () => {
     if (!inviteCode.trim()) {
@@ -83,111 +67,6 @@ export default function JoinCrewScreen() {
     const cleaned = text.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     return cleaned.slice(0, 8);
   };
-
-  const handleJoinRequest = async (result: CrewSearchResult) => {
-    try {
-      await requestJoin(result.id);
-      setRequestStatus((prev) => ({ ...prev, [result.id]: 'pending' }));
-      void trackAnalyticsEvent({
-        eventName: 'crew_join_request_sent',
-        crewId: result.id,
-        route: '/join-crew',
-        properties: {
-          source: 'discoverable_search',
-          status: 'success',
-        },
-      });
-      Alert.alert('Request Sent', 'Your request has been sent to the crew admins.');
-    } catch {
-      void trackAnalyticsEvent({
-        eventName: 'crew_join_request_sent',
-        crewId: result.id,
-        route: '/join-crew',
-        properties: {
-          source: 'discoverable_search',
-          status: 'failed',
-        },
-      });
-      Alert.alert('Error', 'Unable to send request. Please try again.');
-    }
-  };
-
-  useEffect(() => {
-    const queryText = searchQuery.trim().toLowerCase();
-    if (queryText.length < 2) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const crewsRef = collection(db, 'crews');
-        const crewsQuery = query(
-          crewsRef,
-          where('isDiscoverable', '==', true),
-          where('status', '==', 'active'),
-          orderBy('nameLower'),
-          startAt(queryText),
-          endAt(`${queryText}\uf8ff`),
-          limit(10)
-        );
-        const snap = await getDocs(crewsQuery);
-        const results: CrewSearchResult[] = snap.docs.map((docSnap) => {
-          const data = docSnap.data() as any;
-          return {
-            id: docSnap.id,
-            name: data.name || '',
-            description: data.description || '',
-            logoUrl: data.logoUrl || '',
-            memberCount: data.memberCount || 0,
-            requiresApproval: data.requiresApproval ?? true,
-          };
-        });
-        setSearchResults(results);
-      } catch (error) {
-        if (__DEV__) {
-          console.log('[JoinCrew] Search error:', error);
-        }
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (!user?.id || searchResults.length === 0) return;
-    let isActive = true;
-
-    const loadStatuses = async () => {
-      const entries = await Promise.all(
-        searchResults.map(async (result) => {
-          const requestRef = doc(db, 'crews', result.id, 'joinRequests', user.id);
-          const snap = await getDoc(requestRef);
-          if (!snap.exists()) return [result.id, undefined] as const;
-          const data = snap.data() as { status?: 'pending' | 'approved' | 'denied' };
-          return [result.id, data.status] as const;
-        })
-      );
-
-      if (!isActive) return;
-
-      const next: Record<string, 'pending' | 'approved' | 'denied'> = {};
-      entries.forEach(([crewId, status]) => {
-        if (status) next[crewId] = status;
-      });
-      setRequestStatus(next);
-    };
-
-    loadStatuses();
-    return () => {
-      isActive = false;
-    };
-  }, [searchResults, user?.id]);
 
   return (
     <View style={styles.container}>
@@ -249,86 +128,9 @@ export default function JoinCrewScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or search</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Search by Name</Text>
-              <Text style={styles.sectionDescription}>
-                Find a crew by name (requires crew to be discoverable)
-              </Text>
-
-              <View style={styles.searchInputContainer}>
-                <Search size={20} color={colors.textTertiary} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search crews..."
-                  placeholderTextColor={colors.textTertiary}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  testID="search-input"
-                />
-              </View>
-
-              {searchQuery.length > 0 && (
-                <View style={styles.searchResults}>
-                  {isSearching ? (
-                    <View style={styles.emptyResults}>
-                      <ActivityIndicator color={colors.primary} />
-                    </View>
-                  ) : searchResults.length > 0 ? (
-                    searchResults.map((result) => (
-                      <TouchableOpacity
-                        key={result.id}
-                        style={styles.searchResultItem}
-                        onPress={() => handleJoinRequest(result)}
-                        activeOpacity={0.8}
-                        disabled={requestStatus[result.id] === 'pending'}
-                      >
-                        {result.logoUrl ? (
-                          <Image source={{ uri: result.logoUrl }} style={styles.resultLogo} contentFit="cover" />
-                        ) : (
-                          <View style={styles.resultLogoPlaceholder}>
-                            <Text style={styles.resultLogoText}>{result.name?.charAt(0) || '?'}</Text>
-                          </View>
-                        )}
-                        <View style={styles.resultInfo}>
-                          <Text style={styles.resultName}>{result.name}</Text>
-                          {!!result.description && (
-                            <Text style={styles.resultDescription} numberOfLines={1}>{result.description}</Text>
-                          )}
-                          <Text style={styles.resultMeta}>
-                            {result.memberCount || 0} members
-                          </Text>
-                        </View>
-                        <Text
-                          style={[
-                            styles.resultJoin,
-                            requestStatus[result.id] === 'pending' && styles.resultJoinPending,
-                          ]}
-                        >
-                          {requestStatus[result.id] === 'pending' ? 'Pending' : 'Request'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))
-                  ) : (
-                    <View style={styles.emptyResults}>
-                      <Text style={styles.emptyResultsText}>
-                        No crews found matching {`"${searchQuery}"`}
-                      </Text>
-                      <Text style={styles.emptyResultsHint}>
-                        Most crews are private. Ask your admin for an invite code.
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
+            <Text style={styles.sectionDescription}>
+              Need access? Ask an admin for the current invite code or request access from the waiting room.
+            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -424,113 +226,5 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 17,
     fontWeight: '600' as const,
     color: colors.onPrimary,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    fontSize: 14,
-    color: colors.textTertiary,
-    marginHorizontal: 16,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.text,
-    paddingVertical: 14,
-    marginLeft: 12,
-  },
-  searchResults: {
-    marginTop: 16,
-  },
-  emptyResults: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyResultsText: {
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptyResultsHint: {
-    fontSize: 13,
-    color: colors.textTertiary,
-    textAlign: 'center',
-  },
-  searchResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 10,
-  },
-  resultLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    marginRight: 12,
-  },
-  resultLogoPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  resultLogoText: {
-    color: colors.onPrimary,
-    fontSize: 18,
-    fontWeight: '700' as const,
-  },
-  resultInfo: {
-    flex: 1,
-  },
-  resultName: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700' as const,
-  },
-  resultDescription: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  resultMeta: {
-    color: colors.textTertiary,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  resultJoin: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: '700' as const,
-  },
-  resultJoinPending: {
-    color: colors.pending,
   },
 });

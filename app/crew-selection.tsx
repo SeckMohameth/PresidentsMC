@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, Hash, LogOut, ShieldCheck, UserPlus } from 'lucide-react-native';
-import { doc, getDoc } from 'firebase/firestore';
+import { Clock, Hash, LogOut, ShieldCheck, Trash2, UserPlus } from 'lucide-react-native';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_ID, CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
@@ -23,14 +23,17 @@ import { db } from '@/utils/firebase';
 const WAITING_ROOM_IMAGE = require('../assets/images/waiting-room.jpg');
 
 export default function CrewSelectionScreen() {
-  const { user, signOut, requestJoin, cancelJoinRequest, joinCrew, isJoiningCrew } = useAuth();
+  const { user, signOut, requestJoin, joinCrew, deleteAccount, isJoiningCrew } = useAuth();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [clubName, setClubName] = useState(CLUB_NAME);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
+  const [joinRequestStatus, setJoinRequestStatus] =
+    useState<'pending' | 'approved' | 'denied' | null>(null);
 
-  const hasPendingRequest = user?.pendingCrewId === CLUB_ID;
+  const hasPendingRequest = joinRequestStatus === 'pending';
+  const wasDenied = joinRequestStatus === 'denied';
 
   useEffect(() => {
     getDoc(doc(db, 'crews', CLUB_ID))
@@ -42,6 +45,46 @@ export default function CrewSelectionScreen() {
       .catch(() => setClubName(CLUB_NAME));
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) {
+      setJoinRequestStatus(null);
+      return;
+    }
+
+    const requestRef = doc(db, 'crews', CLUB_ID, 'joinRequests', user.id);
+    return onSnapshot(
+      requestRef,
+      (snap) => {
+        const status = snap.data()?.status;
+        setJoinRequestStatus(
+          status === 'pending' || status === 'approved' || status === 'denied' ? status : null
+        );
+      },
+      () => setJoinRequestStatus(null)
+    );
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || user.pendingCrewId !== CLUB_ID || joinRequestStatus !== null) return;
+
+    let isActive = true;
+    const repairMissingRequest = async () => {
+      try {
+        await requestJoin(CLUB_ID);
+        if (isActive) setJoinRequestStatus('pending');
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[CrewSelection] Pending request repair failed:', error);
+        }
+      }
+    };
+
+    void repairMissingRequest();
+    return () => {
+      isActive = false;
+    };
+  }, [joinRequestStatus, requestJoin, user?.id, user?.pendingCrewId]);
+
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -49,36 +92,44 @@ export default function CrewSelectionScreen() {
     ]);
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This permanently deletes your account and pending access request. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsSubmitting(true);
+            try {
+              await deleteAccount();
+            } catch {
+              Alert.alert('Delete Failed', 'Please sign in again and retry deleting your account.');
+            } finally {
+              setIsSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleRequestAccess = async () => {
     setIsSubmitting(true);
     try {
-      await requestJoin(CLUB_ID);
+      const result = await requestJoin(CLUB_ID);
+      if (result?.status === 'approved') {
+        Alert.alert('Access Granted', `You are now in ${result.crewName || clubName}.`);
+        return;
+      }
       Alert.alert('Request Sent', `Your request to join ${clubName} is waiting for admin approval.`);
     } catch {
       Alert.alert('Error', 'Could not send your access request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleCancelRequest = () => {
-    Alert.alert('Cancel Request', 'Cancel your pending access request?', [
-      { text: 'Keep It', style: 'cancel' },
-      {
-        text: 'Cancel Request',
-        style: 'destructive',
-        onPress: async () => {
-          setIsSubmitting(true);
-          try {
-            await cancelJoinRequest(CLUB_ID);
-          } catch {
-            Alert.alert('Error', 'Could not cancel your request. Please try again.');
-          } finally {
-            setIsSubmitting(false);
-          }
-        },
-      },
-    ]);
   };
 
   const formatInviteCode = (text: string) => text.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 16);
@@ -132,10 +183,37 @@ export default function CrewSelectionScreen() {
               <View style={styles.pendingText}>
                 <Text style={styles.pendingTitle}>Request Pending</Text>
                 <Text style={styles.pendingSubtitle}>
-                  You will get access after an admin approves your account.
+                  You will be notified when an admin approves or rejects your request.
                 </Text>
               </View>
             </View>
+          ) : wasDenied ? (
+            <>
+              <View style={styles.pendingCard}>
+                <ShieldCheck size={22} color={colors.deleted} />
+                <View style={styles.pendingText}>
+                  <Text style={styles.pendingTitle}>Request Rejected</Text>
+                  <Text style={styles.pendingSubtitle}>
+                    You can request access again if an admin asked you to retry.
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
+                onPress={handleRequestAccess}
+                disabled={isSubmitting}
+                activeOpacity={0.85}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color={colors.onPrimary} />
+                ) : (
+                  <>
+                    <UserPlus size={20} color={colors.onPrimary} />
+                    <Text style={styles.primaryButtonText}>Request Again</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
           ) : (
             <TouchableOpacity
               style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
@@ -151,18 +229,6 @@ export default function CrewSelectionScreen() {
                   <Text style={styles.primaryButtonText}>Request Access</Text>
                 </>
               )}
-            </TouchableOpacity>
-          )}
-
-          {hasPendingRequest && (
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleCancelRequest}
-              disabled={isSubmitting}
-            >
-              <Text style={styles.secondaryButtonText}>
-                {isSubmitting ? 'Updating...' : 'Cancel Request'}
-              </Text>
             </TouchableOpacity>
           )}
 
@@ -204,6 +270,14 @@ export default function CrewSelectionScreen() {
           <Text style={styles.note}>
             Members use the app free after approval. Admin tools are managed by the club owner.
           </Text>
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={handleDeleteAccount}
+            disabled={isSubmitting}
+          >
+            <Trash2 size={16} color={colors.error} />
+            <Text style={styles.deleteAccountText}>Delete Account</Text>
+          </TouchableOpacity>
           </View>
         </View>
         </KeyboardAvoidingView>
@@ -394,5 +468,21 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center',
     marginTop: 18,
+  },
+  deleteAccountButton: {
+    marginTop: 14,
+    minHeight: 42,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.36)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  deleteAccountText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

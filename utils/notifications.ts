@@ -21,7 +21,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerForPushNotificationsAsync(userId: string) {
+export async function registerForPushNotificationsAsync(
+  userId: string,
+  options: { requestPermission?: boolean } = {}
+) {
+  const shouldRequestPermission = options.requestPermission !== false;
+
   if (!Device.isDevice) {
     logNotificationDebug('[Notifications] Must use physical device for push notifications');
     return null;
@@ -29,6 +34,7 @@ export async function registerForPushNotificationsAsync(userId: string) {
 
   let { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') {
+    if (!shouldRequestPermission) return null;
     const request = await Notifications.requestPermissionsAsync();
     status = request.status;
   }

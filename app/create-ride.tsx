@@ -74,6 +74,7 @@ export default function CreateRideScreen() {
   const [routePreview, setRoutePreview] = useState<RoutePreview | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState('');
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const colors = useThemeColors();
@@ -173,6 +174,14 @@ export default function CreateRideScreen() {
       isCurrent = false;
     };
   }, [endCoords, startCoords]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    Location.getForegroundPermissionsAsync()
+      .then(({ status }) => setHasLocationPermission(status === 'granted'))
+      .catch(() => setHasLocationPermission(false));
+  }, []);
 
   const mapRegion = useMemo(() => {
     if (startCoords && endCoords) {
@@ -637,8 +646,8 @@ export default function CreateRideScreen() {
                 style={styles.map}
                 initialRegion={mapRegion}
                 mapType="standard"
-                showsUserLocation
-                showsMyLocationButton
+                showsUserLocation={hasLocationPermission}
+                showsMyLocationButton={hasLocationPermission}
                 onPress={handleMapPress}
               >
                 {startCoords && (

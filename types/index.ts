@@ -1,5 +1,11 @@
 export type UserRole = 'admin' | 'officer' | 'member';
 
+export interface MemberPermissions {
+  manageRides?: boolean;
+  manageAnnouncements?: boolean;
+  manageJoinRequests?: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -14,6 +20,7 @@ export interface User {
 export interface CrewMember extends User {
   role: UserRole;
   leadershipTitle?: string;
+  permissions?: MemberPermissions;
   isDeveloperSupport?: boolean;
   ridesAttended: number;
   milesTraveled: number;

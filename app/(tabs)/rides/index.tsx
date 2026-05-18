@@ -12,7 +12,7 @@ type TabType = 'upcoming' | 'past';
 export default function RidesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { upcomingRides, pastRides, canPost } = useCrew();
+  const { upcomingRides, pastRides, canManageRides } = useCrew();
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
@@ -33,7 +33,7 @@ export default function RidesScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Rides</Text>
-          {canPost && (
+          {canManageRides && (
             <Pressable 
               style={styles.createButton}
               onPress={() => router.push('/create-ride')}
@@ -99,7 +99,7 @@ export default function RidesScreen() {
                 ? 'When rides are scheduled, they\'ll show up here.'
                 : 'Completed rides will appear here.'}
             </Text>
-            {activeTab === 'upcoming' && canPost && (
+            {activeTab === 'upcoming' && canManageRides && (
               <Pressable 
                 style={styles.emptyButton}
                 onPress={() => router.push('/create-ride')}

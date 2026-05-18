@@ -16,14 +16,7 @@ export async function getDevicePushToken() {
   if (Platform.OS === 'web' || !Device.isDevice) return null;
 
   const existing = await Notifications.getPermissionsAsync();
-  let finalStatus = existing.status;
-
-  if (finalStatus !== 'granted') {
-    const requested = await Notifications.requestPermissionsAsync();
-    finalStatus = requested.status;
-  }
-
-  if (finalStatus !== 'granted') return null;
+  if (existing.status !== 'granted') return null;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {

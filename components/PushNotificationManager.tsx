@@ -8,7 +8,7 @@ export default function PushNotificationManager() {
   useEffect(() => {
     if (!user?.id) return;
     if (user.preferences?.pushEnabled === false) return;
-    registerForPushNotificationsAsync(user.id).catch((error) => {
+    registerForPushNotificationsAsync(user.id, { requestPermission: false }).catch((error) => {
       if (__DEV__) {
         console.log('[PushNotificationManager] Register error:', error);
       }
