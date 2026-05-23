@@ -6,9 +6,12 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
+  increment,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
@@ -47,9 +50,23 @@ function stripUndefined(obj: Record<string, any>): Record<string, any> {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 }
 
+function generateInviteCode(length = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < length; i += 1) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
 async function uploadImageIfNeeded(uri: string, path: string) {
   if (!uri) return uri;
-  if (uri.startsWith('http')) return uri;
+  const isRemotePersistedImage =
+    uri.startsWith('https://images.unsplash.com/') ||
+    uri.startsWith('https://firebasestorage.googleapis.com/') ||
+    uri.includes('.firebasestorage.app/');
+  if (isRemotePersistedImage) return uri;
+
   const response = await fetch(uri);
   const blob = await response.blob();
   const storageRef = ref(storage, path);
@@ -659,12 +676,40 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (!crewId || !currentUser) throw new Error('No crew');
     assertAdmin();
     const callable = httpsCallable(functions, 'getCrewInviteCode');
-    const result = await callable();
-    const data = result.data as { inviteCode?: string; expiresAt?: string | null };
-    return {
-      inviteCode: data.inviteCode || '',
-      expiresAt: data.expiresAt ?? null,
-    };
+    try {
+      const result = await callable();
+      const data = result.data as { inviteCode?: string; expiresAt?: string | null };
+      return {
+        inviteCode: data.inviteCode || '',
+        expiresAt: data.expiresAt ?? null,
+      };
+    } catch (callableError) {
+      try {
+        const settingsRef = doc(db, 'crews', crewId, 'private', 'settings');
+        const snap = await getDoc(settingsRef);
+        if (snap.exists()) {
+          const data = snap.data() as { inviteCode?: string; expiresAt?: string | null };
+          return {
+            inviteCode: data.inviteCode || '',
+            expiresAt: data.expiresAt ?? null,
+          };
+        }
+
+        const inviteCode = generateInviteCode();
+        const now = new Date().toISOString();
+        await setDoc(settingsRef, { inviteCode, expiresAt: null, updatedAt: now });
+        await setDoc(doc(db, 'crewInviteCodes', inviteCode), {
+          code: inviteCode,
+          crewId,
+          expiresAt: null,
+          createdBy: currentUser.id,
+          createdAt: now,
+        });
+        return { inviteCode, expiresAt: null };
+      } catch {
+        throw callableError;
+      }
+    }
   }, [crewId, currentUser, assertAdmin]);
 
   const updateInviteSettings = useCallback(async ({
@@ -677,13 +722,50 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (!crewId) throw new Error('No crew');
     assertAdmin();
     const callable = httpsCallable(functions, 'setCrewInviteCode');
-    const result = await callable({ inviteCode, expiresAt: expiresAt ?? null });
-    const data = result.data as { inviteCode?: string; expiresAt?: string | null };
-    return {
-      inviteCode: data.inviteCode || '',
-      expiresAt: data.expiresAt ?? null,
-    };
-  }, [crewId, assertAdmin]);
+    try {
+      const result = await callable({ inviteCode, expiresAt: expiresAt ?? null });
+      const data = result.data as { inviteCode?: string; expiresAt?: string | null };
+      return {
+        inviteCode: data.inviteCode || '',
+        expiresAt: data.expiresAt ?? null,
+      };
+    } catch (callableError) {
+      try {
+        if (!currentUser) throw new Error('No crew');
+
+        const nextCode = (inviteCode || generateInviteCode()).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (nextCode.length < 4 || nextCode.length > 16) throw new Error('INVITE_CODE_LENGTH');
+
+        const settingsRef = doc(db, 'crews', crewId, 'private', 'settings');
+        const lookupRef = doc(db, 'crewInviteCodes', nextCode);
+        const now = new Date().toISOString();
+        await runTransaction(db, async (transaction) => {
+          const lookupSnap = await transaction.get(lookupRef);
+          if (lookupSnap.exists()) {
+            const data = lookupSnap.data() as { crewId?: string };
+            if (data.crewId && data.crewId !== crewId) throw new Error('INVITE_CODE_TAKEN');
+          }
+
+          transaction.set(settingsRef, {
+            inviteCode: nextCode,
+            expiresAt: expiresAt ?? null,
+            updatedAt: now,
+          }, { merge: true });
+          transaction.set(lookupRef, {
+            code: nextCode,
+            crewId,
+            expiresAt: expiresAt ?? null,
+            createdBy: currentUser.id,
+            createdAt: now,
+          }, { merge: true });
+        });
+
+        return { inviteCode: nextCode, expiresAt: expiresAt ?? null };
+      } catch {
+        throw callableError;
+      }
+    }
+  }, [crewId, assertAdmin, currentUser]);
 
   const removeMember = useCallback(async (memberId: string) => {
     if (!crewId) throw new Error('No crew');
@@ -754,7 +836,58 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (!crewId) throw new Error('No crew');
     assertCanManageJoinRequests();
     const callable = httpsCallable(functions, 'approveJoinRequest');
-    await callable({ requestId: request.id });
+    try {
+      await callable({ requestId: request.id });
+    } catch (callableError) {
+      try {
+        const joinRequestRef = doc(db, 'crews', crewId, 'joinRequests', request.id);
+        const targetUserRef = doc(db, 'users', request.userId);
+        const targetMemberRef = doc(db, 'crews', crewId, 'members', request.userId);
+        const crewRef = doc(db, 'crews', crewId);
+        await runTransaction(db, async (transaction) => {
+          const [joinRequestSnap, targetUserSnap, targetMemberSnap] = await Promise.all([
+            transaction.get(joinRequestRef),
+            transaction.get(targetUserRef),
+            transaction.get(targetMemberRef),
+          ]);
+          if (!joinRequestSnap.exists()) throw new Error('JOIN_REQUEST_NOT_FOUND');
+          if (!targetUserSnap.exists()) throw new Error('USER_NOT_FOUND');
+
+          const joinRequest = joinRequestSnap.data() as JoinRequest;
+          const targetUser = targetUserSnap.data() as Partial<CrewMember> & { crewId?: string | null };
+          if (joinRequest.status === 'approved') return;
+          if (targetUser.crewId && targetUser.crewId !== crewId) throw new Error('USER_ALREADY_IN_CREW');
+
+          if (!targetMemberSnap.exists()) {
+            transaction.set(targetMemberRef, {
+              id: joinRequest.userId,
+              email: targetUser.email ?? joinRequest.userEmail ?? '',
+              name: targetUser.name ?? joinRequest.userName ?? 'Member',
+              avatar: targetUser.avatar ?? joinRequest.userAvatar ?? '',
+              bike: targetUser.bike ?? '',
+              role: 'member',
+              joinedCrewAt: new Date().toISOString(),
+              ridesAttended: 0,
+              milesTraveled: 0,
+            });
+            transaction.set(crewRef, { memberCount: increment(1) }, { merge: true });
+          }
+
+          transaction.set(targetUserRef, {
+            crewId,
+            role: 'member',
+            pendingCrewId: null,
+          }, { merge: true });
+          transaction.set(joinRequestRef, {
+            status: 'approved',
+            decidedAt: new Date().toISOString(),
+            decidedBy: currentUser?.id ?? null,
+          }, { merge: true });
+        });
+      } catch {
+        throw callableError;
+      }
+    }
 
     void trackAnalyticsEvent({
       eventName: 'crew_join_request_resolved',
@@ -772,7 +905,24 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (!crewId) throw new Error('No crew');
     assertCanManageJoinRequests();
     const callable = httpsCallable(functions, 'denyJoinRequest');
-    await callable({ requestId: request.id });
+    try {
+      await callable({ requestId: request.id });
+    } catch (callableError) {
+      try {
+        await runTransaction(db, async (transaction) => {
+          transaction.set(doc(db, 'users', request.userId), {
+            pendingCrewId: null,
+          }, { merge: true });
+          transaction.set(doc(db, 'crews', crewId, 'joinRequests', request.id), {
+            status: 'denied',
+            decidedAt: new Date().toISOString(),
+            decidedBy: currentUser?.id ?? null,
+          }, { merge: true });
+        });
+      } catch {
+        throw callableError;
+      }
+    }
 
     void trackAnalyticsEvent({
       eventName: 'crew_join_request_resolved',
@@ -791,16 +941,32 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     assertAdmin();
     assertAdminActive();
 
+    const callable = httpsCallable(functions, 'updateCrewSettings');
+    try {
+      await callable({});
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[CrewProvider] Crew settings preflight callable failed:', error);
+      }
+    }
+
     let logoUrl = updates.logoUrl;
     if (logoUrl) {
       logoUrl = await uploadImageIfNeeded(logoUrl, `crews/${crewId}/logo.jpg`);
     }
 
-    const callable = httpsCallable(functions, 'updateCrewSettings');
-    await callable(stripUndefined({
+    const payload = stripUndefined({
       ...updates,
       logoUrl: logoUrl ?? updates.logoUrl,
-    }));
+      nameLower: updates.name ? updates.name.trim().toLowerCase() : undefined,
+    });
+    try {
+      await callable(payload);
+    } catch (callableError) {
+      await updateDoc(doc(db, 'crews', crewId), payload).catch(() => {
+        throw callableError;
+      });
+    }
 
     void trackAnalyticsEvent({
       eventName: 'crew_settings_updated',

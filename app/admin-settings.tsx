@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,12 +12,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
-import { Camera, Copy, RefreshCcw, Shield, Star, UserMinus, UserPlus } from 'lucide-react-native';
+import { Camera, Copy, Database, FileJson, FileText, RefreshCcw, Shield, Star, UserMinus, UserPlus } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { CrewMember, JoinRequest } from '@/types';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
+import { ClubStatsExportFormat, exportClubStats } from '@/utils/clubStatsExport';
 
 const INVITE_EXPIRATION_OPTIONS = [
   { label: 'Never', value: 'never' },
@@ -45,6 +45,13 @@ function getInviteExpirationLabel(expiresAt: string | null) {
   })}`;
 }
 
+function getDevErrorMessage(error: any) {
+  if (!__DEV__) return '';
+  const code = error?.code ? ` (${String(error.code)})` : '';
+  const message = error?.message ? String(error.message) : 'Unknown Firebase error';
+  return `\n\nDev details${code}: ${message}`;
+}
+
 export default function AdminSettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -53,6 +60,10 @@ export default function AdminSettingsScreen() {
   const {
     crew,
     members,
+    rides,
+    albums,
+    crewStats,
+    statsHistory,
     joinRequests,
     approveJoinRequest,
     denyJoinRequest,
@@ -80,6 +91,7 @@ export default function AdminSettingsScreen() {
   const [isInviteExpirationDirty, setIsInviteExpirationDirty] = useState(false);
   const [isInviteLoading, setIsInviteLoading] = useState(false);
   const [isInviteSaving, setIsInviteSaving] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ClubStatsExportFormat | null>(null);
 
   useEffect(() => {
     if (!crew) return;
@@ -123,23 +135,22 @@ export default function AdminSettingsScreen() {
   }, [getInviteSettings, isAdmin]);
 
   const pickLogo = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant photo permissions to select a club logo.');
-        return;
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to select a club logo.'
+    );
+    if (!hasAccess) return;
+
+    try {
+      const result = await pickSingleImage({ quality: 0.8 });
+
+      if (!result.canceled && result.assets[0]) {
+        setLogoUrl(result.assets[0].uri);
       }
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setLogoUrl(result.assets[0].uri);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
     }
   };
 
@@ -155,10 +166,13 @@ export default function AdminSettingsScreen() {
       });
       Alert.alert('Saved', 'Club settings updated.');
     } catch (error: any) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Save settings error:', error);
+      }
       const message =
         error?.message === 'SUBSCRIPTION_INACTIVE'
           ? 'Subscription inactive. Renew to manage crew settings.'
-          : 'Unable to save settings right now.';
+          : `Unable to save settings right now.${getDevErrorMessage(error)}`;
       Alert.alert('Error', message);
     } finally {
       setIsSaving(false);
@@ -168,16 +182,22 @@ export default function AdminSettingsScreen() {
   const handleApprove = async (request: JoinRequest) => {
     try {
       await approveJoinRequest(request);
-    } catch {
-      Alert.alert('Error', 'Unable to approve this request right now.');
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Approve request error:', error);
+      }
+      Alert.alert('Error', `Unable to approve this request right now.${getDevErrorMessage(error)}`);
     }
   };
 
   const handleDeny = async (request: JoinRequest) => {
     try {
       await denyJoinRequest(request);
-    } catch {
-      Alert.alert('Error', 'Unable to deny this request right now.');
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Deny request error:', error);
+      }
+      Alert.alert('Error', `Unable to deny this request right now.${getDevErrorMessage(error)}`);
     }
   };
 
@@ -191,10 +211,13 @@ export default function AdminSettingsScreen() {
           try {
             await removeMember(member.id);
           } catch (error: any) {
+            if (__DEV__) {
+              console.log('[AdminSettings] Remove member error:', error);
+            }
             const message =
               error?.message === 'OWNER_REMOVE_NOT_ALLOWED'
                 ? 'You cannot remove the current owner.'
-                : 'Unable to remove this member right now.';
+                : `Unable to remove this member right now.${getDevErrorMessage(error)}`;
             Alert.alert('Error', message);
           }
         },
@@ -206,10 +229,13 @@ export default function AdminSettingsScreen() {
     try {
       await setMemberRole(member.id, member.role === 'officer' ? 'member' : 'officer');
     } catch (error: any) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Toggle officer error:', error);
+      }
       const message =
         error?.message === 'OWNER_ROLE_LOCKED'
           ? 'The owner role cannot be changed.'
-          : 'Unable to update this member role.';
+          : `Unable to update this member role.${getDevErrorMessage(error)}`;
       Alert.alert('Error', message);
     }
   };
@@ -227,12 +253,15 @@ export default function AdminSettingsScreen() {
       setIsInviteExpirationDirty(false);
       Alert.alert('Invite Updated', rotate ? 'A new invite code is ready.' : 'Invite settings saved.');
     } catch (error: any) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Invite settings save error:', error);
+      }
       const message =
         error?.message === 'INVITE_CODE_TAKEN'
           ? 'That invite code is already taken.'
           : error?.message === 'INVITE_CODE_LENGTH'
             ? 'Invite codes must be 4 to 16 letters or numbers.'
-            : 'Unable to update invite settings right now.';
+            : `Unable to update invite settings right now.${getDevErrorMessage(error)}`;
       Alert.alert('Error', message);
     } finally {
       setIsInviteSaving(false);
@@ -243,6 +272,28 @@ export default function AdminSettingsScreen() {
     if (!inviteCode) return;
     await Clipboard.setStringAsync(inviteCode);
     Alert.alert('Copied', 'Invite code copied.');
+  };
+
+  const handleExportStats = async (format: ClubStatsExportFormat) => {
+    if (!crew) return;
+    setExportingFormat(format);
+    try {
+      await exportClubStats(format, {
+        crew,
+        members,
+        rides,
+        albums,
+        crewStats,
+        statsHistory,
+      });
+    } catch (error: any) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Export stats error:', error);
+      }
+      Alert.alert('Export Error', `Unable to export club stats right now.${getDevErrorMessage(error)}`);
+    } finally {
+      setExportingFormat(null);
+    }
   };
 
   return (
@@ -411,6 +462,47 @@ export default function AdminSettingsScreen() {
               >
                 <Text style={styles.saveButtonText}>
                   {isInviteSaving ? 'Saving...' : 'Save Invite'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {isAdmin && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Export Club Stats</Text>
+            <Text style={styles.helperText}>
+              Download the current club summary, member stats, ride stats, and archived stat history.
+            </Text>
+            <View style={styles.exportGrid}>
+              <Pressable
+                style={[styles.exportButton, exportingFormat === 'pdf' && styles.disabledAction]}
+                onPress={() => handleExportStats('pdf')}
+                disabled={!!exportingFormat}
+              >
+                <FileText size={18} color={colors.text} />
+                <Text style={styles.exportButtonText}>
+                  {exportingFormat === 'pdf' ? 'Exporting...' : 'PDF'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.exportButton, exportingFormat === 'csv' && styles.disabledAction]}
+                onPress={() => handleExportStats('csv')}
+                disabled={!!exportingFormat}
+              >
+                <Database size={18} color={colors.text} />
+                <Text style={styles.exportButtonText}>
+                  {exportingFormat === 'csv' ? 'Exporting...' : 'CSV'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.exportButton, exportingFormat === 'json' && styles.disabledAction]}
+                onPress={() => handleExportStats('json')}
+                disabled={!!exportingFormat}
+              >
+                <FileJson size={18} color={colors.text} />
+                <Text style={styles.exportButtonText}>
+                  {exportingFormat === 'json' ? 'Exporting...' : 'JSON'}
                 </Text>
               </Pressable>
             </View>
@@ -669,6 +761,26 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   inviteActions: {
     flexDirection: 'row',
     gap: 10,
+  },
+  exportGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  exportButton: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  exportButtonText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
   },
   secondaryActionButton: {
     flex: 1,

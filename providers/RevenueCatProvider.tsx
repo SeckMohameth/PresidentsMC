@@ -16,6 +16,7 @@ type RevenueCatBootstrap = {
 };
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
+const isRevenueCatEnabled = process.env.EXPO_PUBLIC_ENABLE_REVENUECAT === 'true';
 
 function getRCToken() {
   if (Platform.OS === 'web' || isExpoGo) {
@@ -38,6 +39,13 @@ export function getCrewAdminStatus(customerInfo: CustomerInfo | null | undefined
 
 const apiKey = getRCToken();
 const revenueCatBootstrap: RevenueCatBootstrap = (() => {
+  if (!isRevenueCatEnabled) {
+    if (__DEV__) {
+      console.log('[RevenueCat] Disabled. Set EXPO_PUBLIC_ENABLE_REVENUECAT=true to enable purchases.');
+    }
+    return { apiKey: null, isConfigured: false };
+  }
+
   if (!apiKey) {
     if (__DEV__) {
       console.log('[RevenueCat] Missing API key. RevenueCat disabled.');
@@ -154,6 +162,7 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
   }, [logoutMutation]);
 
   return {
+    isEnabled: isRevenueCatEnabled,
     isConfigured,
     customerInfo,
     offerings,

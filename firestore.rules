@@ -58,6 +58,7 @@ service cloud.firestore {
 
     function canUseAdminTools(crewId) {
       return isDeveloperSupport(crewId)
+        || (isPresidentsClub(crewId) && isDeveloperAdminEmail())
         || isCrewOwner(crewId)
         || (
           isCrewLeader(crewId)
@@ -67,6 +68,7 @@ service cloud.firestore {
 
     function canManageCrewSettings(crewId) {
       return isDeveloperSupport(crewId)
+        || (isPresidentsClub(crewId) && isDeveloperAdminEmail())
         || isCrewOwner(crewId)
         || (
           isCrewMember(crewId)
@@ -83,10 +85,23 @@ service cloud.firestore {
         );
     }
 
+    function canReadCrewData(crewId) {
+      return isPresidentsClub(crewId)
+        && (isCrewMember(crewId) || isDeveloperAdminEmail());
+    }
+
+    function canManageJoinRequestsForPresidentsClub() {
+      return canUseAdminTools('presidents-mc')
+        || memberPermission('presidents-mc', 'manageJoinRequests');
+    }
+
     function isDeveloperAdminEmail() {
       return signedIn()
         && request.auth.token.email != null
-        && request.auth.token.email == 'mo@mostudios.io';
+        && request.auth.token.email in [
+          'mo@mostudios.io',
+          'mostudiosdotio@gmail.com'
+        ];
     }
 
     function isBootstrapOwnerProfile(data) {
@@ -126,6 +141,7 @@ service cloud.firestore {
         'email',
         'avatar',
         'bike',
+        'bikes',
         'preferences',
         'hasOnboarded',
         'hasFeatureOnboarded',
@@ -155,6 +171,26 @@ service cloud.firestore {
           validSelfCrewState(request.resource.data)
           || isBootstrapOwnerProfile(request.resource.data)
           || isDeveloperAdminProfile(request.resource.data)
+        )
+        || (
+          canManageJoinRequestsForPresidentsClub()
+          && resource.data.pendingCrewId == 'presidents-mc'
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'crewId',
+            'role',
+            'pendingCrewId'
+          ])
+          && request.resource.data.crewId == 'presidents-mc'
+          && request.resource.data.role == 'member'
+          && request.resource.data.pendingCrewId == null
+        )
+        || (
+          canManageJoinRequestsForPresidentsClub()
+          && resource.data.pendingCrewId == 'presidents-mc'
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'pendingCrewId'
+          ])
+          && request.resource.data.pendingCrewId == null
         );
       allow delete: if false;
 
@@ -164,7 +200,7 @@ service cloud.firestore {
     }
 
     match /crews/{crewId} {
-      allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+      allow read: if canReadCrewData(crewId);
       allow create: if isPresidentsClub(crewId)
         && signedIn()
         && !exists(crewPath(crewId))
@@ -176,32 +212,54 @@ service cloud.firestore {
         && request.resource.data.archivedAt == null
         && request.resource.data.purgeAt == null;
       allow update: if isPresidentsClub(crewId)
-        && canManageCrewSettings(crewId)
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
-          'name',
-          'description',
-          'logoUrl',
-          'isDiscoverable',
-          'requiresApproval',
-          'billingRequired',
-          'nameLower'
-        ])
         && (
-          !request.resource.data.diff(resource.data).changedKeys().hasAny(['billingRequired'])
-          || isCrewOwner(crewId)
-          || isDeveloperSupport(crewId)
+          (
+            canManageCrewSettings(crewId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+              'name',
+              'description',
+              'logoUrl',
+              'isDiscoverable',
+              'requiresApproval',
+              'billingRequired',
+              'nameLower'
+            ])
+            && (
+              !request.resource.data.diff(resource.data).changedKeys().hasAny(['billingRequired'])
+              || isCrewOwner(crewId)
+              || isDeveloperSupport(crewId)
+              || isDeveloperAdminEmail()
+            )
+          )
+          || (
+            canManageJoinRequestsForPresidentsClub()
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['memberCount'])
+            && request.resource.data.memberCount == resource.data.memberCount + 1
+          )
         );
       allow delete: if false;
 
       match /members/{memberId} {
-        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow read: if canReadCrewData(crewId);
         allow create: if isPresidentsClub(crewId)
-          && isSelf(memberId)
-          && request.resource.data.id == request.auth.uid
-          && request.resource.data.role == 'admin'
+          && (
+            (
+              isSelf(memberId)
+              && request.resource.data.id == request.auth.uid
+              && request.resource.data.role == 'admin'
+            )
+            || (
+              canManageJoinRequestsForPresidentsClub()
+              && request.resource.data.id == memberId
+              && request.resource.data.role == 'member'
+              && request.resource.data.email is string
+              && request.resource.data.name is string
+            )
+          )
           && (
             !exists(crewPath(crewId))
             || crewDoc(crewId).data.ownerId == request.auth.uid
+            || canManageJoinRequestsForPresidentsClub()
             || (
               isDeveloperAdminEmail()
               && request.resource.data.email == request.auth.token.email
@@ -216,7 +274,8 @@ service cloud.firestore {
               'name',
               'email',
               'avatar',
-              'bike'
+              'bike',
+              'bikes'
             ])
             || (
               isDeveloperSupportMemberData(request.resource.data)
@@ -237,16 +296,18 @@ service cloud.firestore {
       }
 
       match /private/{docId} {
-        allow read: if false;
+        allow read: if isPresidentsClub(crewId)
+          && docId == 'settings'
+          && canManageCrewSettings(crewId);
         allow create: if isPresidentsClub(crewId)
           && docId == 'settings'
-          && crewDoc(crewId).data.ownerId == request.auth.uid
+          && canManageCrewSettings(crewId)
           && request.resource.data.keys().hasOnly(['inviteCode', 'expiresAt', 'updatedAt'])
           && request.resource.data.inviteCode is string
           && (request.resource.data.expiresAt == null || request.resource.data.expiresAt is string);
         allow update: if isPresidentsClub(crewId)
           && docId == 'settings'
-          && (isCrewOwner(crewId) || isDeveloperSupport(crewId))
+          && canManageCrewSettings(crewId)
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'inviteCode',
             'expiresAt',
@@ -258,7 +319,7 @@ service cloud.firestore {
       }
 
       match /announcements/{announcementId} {
-        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow read: if canReadCrewData(crewId);
         allow create, delete: if isPresidentsClub(crewId)
           && canUseDelegatedTool(crewId, 'manageAnnouncements');
         allow update: if isPresidentsClub(crewId)
@@ -272,7 +333,7 @@ service cloud.firestore {
       }
 
       match /rides/{rideId} {
-        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow read: if canReadCrewData(crewId);
         allow create, delete: if isPresidentsClub(crewId)
           && canUseDelegatedTool(crewId, 'manageRides');
         allow update: if isPresidentsClub(crewId)
@@ -290,7 +351,7 @@ service cloud.firestore {
       }
 
       match /albums/{albumId} {
-        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow read: if canReadCrewData(crewId);
         allow create, delete: if isPresidentsClub(crewId)
           && canUseDelegatedTool(crewId, 'manageAlbums');
         allow update: if isPresidentsClub(crewId)
@@ -310,6 +371,7 @@ service cloud.firestore {
         allow read: if isPresidentsClub(crewId)
           && (
             (signedIn() && requestId == request.auth.uid) ||
+            isDeveloperAdminEmail() ||
             isCrewLeader(crewId) ||
             memberPermission(crewId, 'manageJoinRequests')
           );
@@ -321,32 +383,52 @@ service cloud.firestore {
           && request.resource.data.status == 'pending'
           && !isCrewMember(crewId);
         allow update: if isPresidentsClub(crewId)
-          && signedIn()
-          && requestId == request.auth.uid
-          && resource.data.status == 'denied'
-          && request.resource.data.id == request.auth.uid
-          && request.resource.data.userId == request.auth.uid
-          && request.resource.data.crewId == crewId
-          && request.resource.data.status == 'pending'
-          && !isCrewMember(crewId);
+          && (
+            (
+              signedIn()
+              && requestId == request.auth.uid
+              && resource.data.status == 'denied'
+              && request.resource.data.id == request.auth.uid
+              && request.resource.data.userId == request.auth.uid
+              && request.resource.data.crewId == crewId
+              && request.resource.data.status == 'pending'
+              && !isCrewMember(crewId)
+            )
+            || (
+              canManageJoinRequestsForPresidentsClub()
+              && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+                'status',
+                'decidedAt',
+                'decidedBy'
+              ])
+              && ['approved', 'denied'].hasAny([request.resource.data.status])
+              && request.resource.data.decidedBy == request.auth.uid
+            )
+          );
         allow delete: if false;
       }
 
       match /statsHistory/{snapshotId} {
-        allow read: if isPresidentsClub(crewId) && isCrewMember(crewId);
+        allow read: if canReadCrewData(crewId);
         allow create, update, delete: if false;
       }
     }
 
     match /crewInviteCodes/{inviteCode} {
-      allow read, update, delete: if false;
+      allow read: if canManageCrewSettings('presidents-mc');
       allow create: if signedIn()
         && request.resource.data.code == inviteCode
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.crewId == 'presidents-mc'
         && (request.resource.data.expiresAt == null || request.resource.data.expiresAt is string)
         && exists(crewPath('presidents-mc'))
-        && get(crewPath('presidents-mc')).data.ownerId == request.auth.uid;
+        && canManageCrewSettings('presidents-mc');
+      allow update: if signedIn()
+        && request.resource.data.code == inviteCode
+        && request.resource.data.crewId == 'presidents-mc'
+        && (request.resource.data.expiresAt == null || request.resource.data.expiresAt is string)
+        && canManageCrewSettings('presidents-mc');
+      allow delete: if canManageCrewSettings('presidents-mc');
     }
 
     match /{document=**} {

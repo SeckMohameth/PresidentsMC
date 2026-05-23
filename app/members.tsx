@@ -142,7 +142,7 @@ export default function MembersScreen() {
       member={item}
       showRemove={isAdmin && item.id !== currentUser?.id && item.id !== crew?.ownerId}
       onRemove={() => handleRemoveMember(item)}
-      onPress={isAdmin ? () => handleRoleChange(item) : undefined}
+      onPress={() => router.push(`/member/${item.id}`)}
     />
   );
 

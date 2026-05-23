@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Platform, Animated, ActivityIndicator, useWindowDimensions } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT, PROVIDER_GOOGLE } from '@/components/NativeMap';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -73,7 +73,7 @@ export default function RideDetailScreen() {
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const mapOpacity = useRef(new Animated.Value(0)).current;
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [hasPromptedCheckIn, setHasPromptedCheckIn] = useState(false);
@@ -231,6 +231,12 @@ export default function RideDetailScreen() {
   const lngDelta = hasRouteCoordinates
     ? Math.abs(ride.startLocation.longitude - ride.endLocation.longitude) * 1.5 + 0.02
     : 0.05;
+  const routeMiles = ride.routeDistanceMeters
+    ? ride.routeDistanceMeters / 1609.344
+    : ride.estimatedDistance || 0;
+  const routeMinutes = ride.routeDurationSeconds
+    ? Math.round(ride.routeDurationSeconds / 60)
+    : null;
 
   const handleToggleAttendance = () => {
     if (Platform.OS !== 'web') {
@@ -517,6 +523,21 @@ export default function RideDetailScreen() {
                 </Text>
               </View>
             )}
+
+            <View style={styles.routeStatsRow}>
+              <View style={styles.routeStatPill}>
+                <Gauge size={15} color={colors.primary} />
+                <Text style={styles.routeStatText}>{formatMiles(routeMiles)} mi</Text>
+              </View>
+              <View style={styles.routeStatPill}>
+                <Clock size={15} color={colors.warning} />
+                <Text style={styles.routeStatText}>{routeMinutes ? `${routeMinutes} min` : ride.estimatedDuration}</Text>
+              </View>
+              <View style={styles.routeStatPill}>
+                <MapPin size={15} color={colors.success} />
+                <Text style={styles.routeStatText}>{routeCoordinates.length || 2} route points</Text>
+              </View>
+            </View>
             
             <View style={styles.routeCard}>
               <View style={styles.routePoint}>
@@ -925,6 +946,28 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   mapPlaceholderText: {
     color: colors.textTertiary,
     fontSize: 14,
+  },
+  routeStatsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  routeStatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  routeStatText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
   },
   weatherCard: {
     flexDirection: 'row',

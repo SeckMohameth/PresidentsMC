@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X, Camera, Plus } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
 import { RidePhoto } from '@/types';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 
 export default function AlbumScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,6 +19,7 @@ export default function AlbumScreen() {
   const { ride } = useRide(id || '');
   const album = getAlbumById(id || '');
   const [selectedPhoto, setSelectedPhoto] = useState<RidePhoto | null>(null);
+  const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const isTablet = width >= 768;
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -42,25 +43,36 @@ export default function AlbumScreen() {
   }
 
   const handleAddPhoto = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant photo permissions to add ride photos.');
-        return;
+    if (isAddingPhoto) return;
+
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to add ride photos.'
+    );
+    if (!hasAccess) return;
+
+    let result;
+    try {
+      result = await pickSingleImage({ quality: 0.8 });
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[Album] Photo picker error:', error);
       }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
+      return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: false,
-      quality: 0.8,
-    });
-
     if (!result.canceled && result.assets[0]) {
-      if (isRideAlbum && ride) {
-        void addPhoto({ rideId: ride.id, imageUrl: result.assets[0].uri });
-      } else if (album) {
-        void addAlbumPhoto({ albumId: album.id, imageUrl: result.assets[0].uri });
+      setIsAddingPhoto(true);
+      try {
+        if (isRideAlbum && ride) {
+          await addPhoto({ rideId: ride.id, imageUrl: result.assets[0].uri });
+        } else if (album) {
+          await addAlbumPhoto({ albumId: album.id, imageUrl: result.assets[0].uri });
+        }
+      } catch {
+        Alert.alert('Upload Failed', 'Unable to add this photo right now. Please try again.');
+      } finally {
+        setIsAddingPhoto(false);
       }
     }
   };
@@ -96,7 +108,11 @@ export default function AlbumScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
           <Text style={styles.headerSubtitle}>{formatDate(date)} • {photos.length} photos</Text>
         </View>
-        <Pressable style={styles.addButton} onPress={handleAddPhoto}>
+        <Pressable
+          style={[styles.addButton, isAddingPhoto && styles.disabledButton]}
+          onPress={handleAddPhoto}
+          disabled={isAddingPhoto}
+        >
           <Plus size={20} color={colors.onPrimary} />
         </Pressable>
       </View>
@@ -110,9 +126,13 @@ export default function AlbumScreen() {
           <Text style={styles.emptyDescription}>
             Be the first to add photos to this album.
           </Text>
-          <Pressable style={styles.emptyButton} onPress={handleAddPhoto}>
+          <Pressable
+            style={[styles.emptyButton, isAddingPhoto && styles.disabledButton]}
+            onPress={handleAddPhoto}
+            disabled={isAddingPhoto}
+          >
             <Plus size={18} color={colors.onPrimary} />
-            <Text style={styles.emptyButtonText}>Add Photos</Text>
+            <Text style={styles.emptyButtonText}>{isAddingPhoto ? 'Adding...' : 'Add Photos'}</Text>
           </Pressable>
         </View>
       ) : (
@@ -214,6 +234,9 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   gridContent: {
     alignSelf: 'center',

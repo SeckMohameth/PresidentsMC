@@ -27,11 +27,17 @@ export async function getDevicePushToken() {
 
   const projectId =
     Constants.easConfig?.projectId ??
-    Constants.expoConfig?.extra?.eas?.projectId;
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
 
-  const token = projectId
-    ? await Notifications.getExpoPushTokenAsync({ projectId })
-    : await Notifications.getExpoPushTokenAsync();
+  if (!projectId) {
+    if (__DEV__) {
+      console.log('[PushNotifications] Missing EAS projectId');
+    }
+    return null;
+  }
+
+  const token = await Notifications.getExpoPushTokenAsync({ projectId });
 
   return token.data;
 }

@@ -13,9 +13,19 @@ export interface User {
   avatar: string;
   email: string;
   bike?: string;
+  bikes?: BikeProfile[];
   joinedAt: string;
   preferences?: UserPreferences;
   lastActiveAt?: string;
+}
+
+export interface BikeProfile {
+  id: string;
+  name: string;
+  photoUrl?: string;
+  details?: string;
+  isPrimary?: boolean;
+  createdAt: string;
 }
 
 export interface CrewMember extends User {

@@ -18,7 +18,8 @@ import { defineSecret } from 'firebase-functions/params';
 
 initializeApp();
 
-const adminDb = getFirestore();
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || 'default';
+const adminDb = getFirestore(FIRESTORE_DATABASE_ID);
 const adminAuth = getAuth();
 const storage = getStorage();
 
@@ -29,6 +30,10 @@ const FORMER_MEMBER_AVATAR = '';
 const SYSTEM_ACTOR = 'system';
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DEFAULT_CLUB_ID = 'presidents-mc';
+const DEFAULT_CLUB_NAME = 'PresidentsMC';
+const DEFAULT_CLUB_DESCRIPTION = 'Private biker club rides, announcements, members, photos, and stats.';
+const DEVELOPER_ADMIN_EMAILS = new Set(['mo@mostudios.io', 'mostudiosdotio@gmail.com']);
 
 type UserRole = 'admin' | 'officer' | 'member';
 type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'trialing';
@@ -37,6 +42,17 @@ type MemberPermissions = {
   manageAnnouncements?: boolean;
   manageAlbums?: boolean;
   manageJoinRequests?: boolean;
+};
+
+type BikeProfile = {
+  id?: string;
+  name?: string;
+  make?: string;
+  model?: string;
+  year?: string;
+  color?: string;
+  photoUrl?: string;
+  isPrimary?: boolean;
 };
 
 type CrewDoc = {
@@ -66,6 +82,7 @@ type CrewMemberDoc = {
   name?: string;
   avatar?: string;
   bike?: string;
+  bikes?: BikeProfile[];
   role?: UserRole;
   leadershipTitle?: string;
   permissions?: MemberPermissions;
@@ -82,7 +99,9 @@ type UserDoc = {
   name?: string;
   avatar?: string;
   bike?: string;
+  bikes?: BikeProfile[];
   crewId?: string | null;
+  pendingCrewId?: string | null;
   role?: UserRole;
   preferences?: Record<string, unknown>;
 };
@@ -904,24 +923,142 @@ async function refreshCrewAggregates(crewId: string) {
   }
 }
 
-async function getActingMemberContext(userId: string) {
+type AuthContextLike = {
+  auth?: {
+    uid?: string;
+    token?: {
+      email?: string;
+      name?: string;
+      picture?: string;
+    };
+  };
+};
+
+function getAuthEmail(request?: AuthContextLike) {
+  return String(request?.auth?.token?.email ?? '').trim().toLowerCase();
+}
+
+function isDeveloperAdminRequest(request?: AuthContextLike) {
+  const email = getAuthEmail(request);
+  return Boolean(email && DEVELOPER_ADMIN_EMAILS.has(email));
+}
+
+function userProfileFromAuth(userId: string, request?: AuthContextLike): UserDoc {
+  const email = getAuthEmail(request);
+  const name = String(request?.auth?.token?.name ?? '').trim() || (email ? email.split('@')[0] : 'Member');
+  const avatar = String(request?.auth?.token?.picture ?? '').trim();
+  return {
+    id: userId,
+    email,
+    name,
+    avatar,
+    bike: '',
+    bikes: [],
+    crewId: null,
+    pendingCrewId: null,
+    role: 'member',
+    preferences: {
+      pushEnabled: true,
+      announcements: true,
+      rides: true,
+      joinRequests: true,
+    },
+  };
+}
+
+function defaultCrewDoc(ownerId: string | null = null): CrewDoc {
+  return {
+    id: DEFAULT_CLUB_ID,
+    name: DEFAULT_CLUB_NAME,
+    description: DEFAULT_CLUB_DESCRIPTION,
+    logoUrl: '',
+    nameLower: DEFAULT_CLUB_NAME.toLowerCase(),
+    ownerId,
+    subscriptionOwnerId: ownerId,
+    subscriptionStatus: 'active',
+    billingRequired: false,
+    status: 'active',
+    archivedAt: null,
+    purgeAt: null,
+    requiresApproval: true,
+    memberCount: 0,
+    totalRides: 0,
+    totalMiles: 0,
+    totalPhotos: 0,
+  };
+}
+
+function developerMemberDoc(userId: string, user: UserDoc): CrewMemberDoc {
+  return {
+    id: userId,
+    email: user.email ?? '',
+    name: user.name ?? 'Developer Admin',
+    avatar: user.avatar ?? '',
+    bike: user.bike ?? '',
+    bikes: Array.isArray(user.bikes) ? user.bikes : [],
+    role: 'admin',
+    isDeveloperSupport: true,
+    joinedCrewAt: new Date().toISOString(),
+    joinedAt: new Date().toISOString(),
+    ridesAttended: 0,
+    milesTraveled: 0,
+  };
+}
+
+async function getActingMemberContext(userId: string, request?: AuthContextLike) {
   const userRef = adminDb.collection('users').doc(userId);
   const userSnap = await userRef.get();
-  if (!userSnap.exists) {
+  const isDeveloperAdmin = isDeveloperAdminRequest(request);
+
+  if (!userSnap.exists && !isDeveloperAdmin) {
     throw new HttpsError('not-found', 'USER_NOT_FOUND');
   }
 
-  const user = userSnap.data() as UserDoc;
-  if (!user.crewId) {
+  const user = userSnap.exists
+    ? userSnap.data() as UserDoc
+    : { ...userProfileFromAuth(userId, request), crewId: DEFAULT_CLUB_ID, role: 'admin' as UserRole };
+
+  if (!user.crewId && !isDeveloperAdmin) {
     throw new HttpsError('failed-precondition', 'NO_CREW');
   }
 
-  const crewRef = adminDb.collection('crews').doc(user.crewId);
+  const crewId = user.crewId || DEFAULT_CLUB_ID;
+  const crewRef = adminDb.collection('crews').doc(crewId);
   const memberRef = crewRef.collection('members').doc(userId);
   const [crewSnap, memberSnap] = await Promise.all([crewRef.get(), memberRef.get()]);
 
-  if (!crewSnap.exists || !memberSnap.exists) {
+  if ((!crewSnap.exists || !memberSnap.exists) && !isDeveloperAdmin) {
     throw new HttpsError('failed-precondition', 'NO_CREW');
+  }
+
+  if (
+    isDeveloperAdmin &&
+    (!userSnap.exists || !user.crewId || user.role !== 'admin' || !crewSnap.exists || !memberSnap.exists)
+  ) {
+    const batch = adminDb.batch();
+    const nextUser: UserDoc = {
+      ...userProfileFromAuth(userId, request),
+      ...user,
+      crewId,
+      pendingCrewId: null,
+      role: 'admin',
+    };
+    batch.set(userRef, nextUser, { merge: true });
+    if (!crewSnap.exists) {
+      batch.set(crewRef, defaultCrewDoc(userId), { merge: true });
+    }
+    batch.set(memberRef, developerMemberDoc(userId, nextUser), { merge: true });
+    await batch.commit();
+
+    const [freshCrewSnap, freshMemberSnap] = await Promise.all([crewRef.get(), memberRef.get()]);
+    return {
+      user: nextUser,
+      userRef,
+      crewRef,
+      crew: freshCrewSnap.data() as CrewDoc,
+      memberRef,
+      member: freshMemberSnap.data() as CrewMemberDoc,
+    };
   }
 
   return {
@@ -1603,15 +1740,31 @@ export const requestJoinCrew = onCall(async (request) => {
       transaction.get(joinRequestRef),
     ]);
 
+    const user = userSnap.exists
+      ? userSnap.data() as UserDoc
+      : userProfileFromAuth(userId, request);
+    const crew = crewSnap.exists
+      ? crewSnap.data() as CrewDoc
+      : crewId === DEFAULT_CLUB_ID
+        ? defaultCrewDoc(null)
+        : null;
+
     if (!userSnap.exists) {
-      throw new HttpsError('not-found', 'USER_NOT_FOUND');
+      console.log('[requestJoinCrew] Missing user profile; creating from auth token.', {
+        userId,
+        email: getAuthEmail(request),
+      });
+      transaction.set(userRef, user, { merge: true });
     }
-    if (!crewSnap.exists) {
+    if (!crew) {
+      console.log('[requestJoinCrew] Missing crew.', { crewId, userId });
       throw new HttpsError('not-found', 'CREW_NOT_FOUND');
     }
+    if (!crewSnap.exists && crewId === DEFAULT_CLUB_ID) {
+      console.log('[requestJoinCrew] Missing default crew; creating bootstrap crew.', { crewId });
+      transaction.set(crewRef, crew, { merge: true });
+    }
 
-    const user = userSnap.data() as UserDoc;
-    const crew = crewSnap.data() as CrewDoc;
     if (crew.status === 'archived') {
       throw new HttpsError('failed-precondition', 'CREW_ARCHIVED');
     }
@@ -1632,6 +1785,7 @@ export const requestJoinCrew = onCall(async (request) => {
           name: user.name ?? 'Member',
           avatar: user.avatar ?? '',
           bike: user.bike ?? '',
+          bikes: Array.isArray(user.bikes) ? user.bikes : [],
           role: 'member',
           joinedCrewAt: now,
           ridesAttended: 0,
@@ -1696,7 +1850,7 @@ export const getCrewInviteCode = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireAdmin(context.member, context.crew);
   return getOrCreateCrewInviteCode(context.crewRef, context.crew);
 });
@@ -1707,7 +1861,7 @@ export const setCrewInviteCode = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireAdmin(context.member, context.crew);
 
   const requestedCode = request.data?.inviteCode;
@@ -1734,7 +1888,7 @@ export const updateCrewSettings = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireAdmin(context.member, context.crew);
 
   const updates: Partial<CrewDoc> = {};
@@ -1830,7 +1984,7 @@ export const approveJoinRequest = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'REQUEST_ID_REQUIRED');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireJoinRequestAccess(context.member, context.crew);
 
   const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
@@ -1922,7 +2076,7 @@ export const denyJoinRequest = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'REQUEST_ID_REQUIRED');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireJoinRequestAccess(context.member, context.crew);
 
   const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
@@ -1963,7 +2117,7 @@ export const removeCrewMember = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'MEMBER_ID_REQUIRED');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireAdmin(context.member, context.crew);
 
   if (context.crew.ownerId === memberId) {
@@ -2013,7 +2167,7 @@ export const setCrewMemberRole = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'INVALID_MEMBER_ROLE');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireAdmin(context.member, context.crew);
 
   if (context.crew.ownerId === memberId && role !== 'admin') {
@@ -2056,7 +2210,7 @@ export const setCrewMemberLeadership = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'INVALID_MEMBER_ROLE');
   }
 
-  const context = await getActingMemberContext(userId);
+  const context = await getActingMemberContext(userId, request);
   requireAdmin(context.member, context.crew);
 
   if (context.crew.ownerId === memberId && nextRole && nextRole !== 'admin') {

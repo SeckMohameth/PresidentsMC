@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Keyboa
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { X, Pin, ImagePlus, Trash2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { ImageAttribution } from '@/types';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
+import { COVER_IMAGE_PRESETS, getCoverPresetUri } from '@/constants/coverImages';
 
 export default function CreateAnnouncementScreen() {
   const insets = useSafeAreaInsets();
@@ -50,32 +51,39 @@ export default function CreateAnnouncementScreen() {
   }
 
   const pickImage = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions to upload images.');
-        return;
-      }
-    }
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant camera roll permissions to upload images.'
+    );
+    if (!hasAccess) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
+    try {
+      const result = await pickSingleImage({ quality: 0.8 });
 
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setImageAttribution(undefined);
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+        setImageAttribution(undefined);
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
       }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[CreateAnnouncement] Photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
     }
   };
 
   const removeImage = () => {
     setImageUri(null);
+    setImageAttribution(undefined);
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const selectPresetImage = (presetUri: string) => {
+    setImageUri(presetUri);
     setImageAttribution(undefined);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -273,6 +281,28 @@ export default function CreateAnnouncementScreen() {
                 <Text style={styles.imagePickerText}>Add from Photos</Text>
               </Pressable>
             )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.imagePresetList}
+            >
+              {COVER_IMAGE_PRESETS.map((preset) => {
+                const presetUri = getCoverPresetUri(preset);
+                const selected = imageUri === presetUri;
+                return (
+                  <Pressable
+                    key={preset.id}
+                    style={[styles.imagePreset, selected && styles.imagePresetSelected]}
+                    onPress={() => selectPresetImage(presetUri)}
+                  >
+                    <Image source={preset.source} style={styles.imagePresetThumb} contentFit="cover" />
+                    <Text style={styles.imagePresetLabel} numberOfLines={1}>
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <View style={styles.optionRow}>
@@ -469,6 +499,34 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     width: '100%',
     height: 180,
     borderRadius: 12,
+  },
+  imagePresetList: {
+    gap: 10,
+    paddingTop: 12,
+    paddingRight: 4,
+  },
+  imagePreset: {
+    width: 104,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  imagePresetSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  imagePresetThumb: {
+    width: '100%',
+    height: 68,
+  },
+  imagePresetLabel: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 7,
   },
   removeImageButton: {
     position: 'absolute',

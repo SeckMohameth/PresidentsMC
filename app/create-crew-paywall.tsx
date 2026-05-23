@@ -9,14 +9,12 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Platform,
   Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { 
   ArrowLeft, 
   Crown, 
@@ -33,6 +31,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import type { CrewAdminStatus } from '@/providers/RevenueCatProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 
 
 
@@ -60,13 +59,16 @@ export default function CreateCrewPaywallScreen() {
     purchasePackage, 
     restorePurchases,
     crewAdminStatus,
+    isEnabled: isRevenueCatEnabled,
   } = useRevenueCat();
   
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [crewName, setCrewName] = useState('');
   const [crewDescription, setCrewDescription] = useState('');
   const [crewLogo, setCrewLogo] = useState('');
-  const [step, setStep] = useState<'paywall' | 'details'>('paywall');
+  const [step, setStep] = useState<'paywall' | 'details'>(() =>
+    isRevenueCatEnabled ? 'paywall' : 'details'
+  );
   const [subscriptionStatus, setSubscriptionStatus] = useState<CrewAdminStatus>('inactive');
   const [isUsingBetaAccess, setIsUsingBetaAccess] = useState(false);
 
@@ -122,6 +124,13 @@ export default function CreateCrewPaywallScreen() {
   }, [selectedPlan]);
 
   useEffect(() => {
+    if (!isRevenueCatEnabled) {
+      setSubscriptionStatus('inactive');
+      setIsUsingBetaAccess(false);
+      setStep('details');
+      return;
+    }
+
     setSubscriptionStatus(crewAdminStatus);
     if (crewAdminStatus !== 'inactive') {
       setIsUsingBetaAccess(false);
@@ -129,7 +138,7 @@ export default function CreateCrewPaywallScreen() {
     if (crewAdminStatus !== 'inactive' && step === 'paywall') {
       setStep('details');
     }
-  }, [crewAdminStatus, step]);
+  }, [crewAdminStatus, isRevenueCatEnabled, step]);
 
   const crownRotateInterpolate = crownRotate.interpolate({
     inputRange: [0, 1],
@@ -262,6 +271,7 @@ export default function CreateCrewPaywallScreen() {
   };
 
   const handleSkipPaywall = () => {
+    if (!__DEV__) return;
     setIsUsingBetaAccess(true);
     setSubscriptionStatus('trialing');
     void trackAnalyticsEvent({
@@ -294,7 +304,8 @@ export default function CreateCrewPaywallScreen() {
         name: crewName,
         description: crewDescription,
         logoUri: crewLogo,
-        subscriptionStatus,
+        subscriptionStatus: isRevenueCatEnabled ? subscriptionStatus : 'inactive',
+        billingRequired: false,
       });
       void trackAnalyticsEvent({
         eventName: 'crew_create_success',
@@ -326,23 +337,22 @@ export default function CreateCrewPaywallScreen() {
   };
 
   const handlePickLogo = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant photo permissions to select a crew logo.');
-        return;
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to select a crew logo.'
+    );
+    if (!hasAccess) return;
+
+    try {
+      const result = await pickSingleImage({ quality: 0.8 });
+
+      if (!result.canceled && result.assets[0]) {
+        setCrewLogo(result.assets[0].uri);
       }
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setCrewLogo(result.assets[0].uri);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[CreateCrewPaywall] Photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
     }
   };
 
@@ -353,7 +363,13 @@ export default function CreateCrewPaywallScreen() {
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => setStep('paywall')}
+              onPress={() => {
+                if (isRevenueCatEnabled) {
+                  setStep('paywall');
+                } else {
+                  router.back();
+                }
+              }}
               testID="back-button"
             >
               <ArrowLeft size={24} color={colors.text} />
@@ -370,11 +386,13 @@ export default function CreateCrewPaywallScreen() {
             <View style={styles.successBadge}>
               <Check size={20} color={colors.success} />
               <Text style={styles.successText}>
-                {isUsingBetaAccess
-                  ? 'Beta Access Enabled'
-                  : subscriptionStatus === 'trialing'
-                    ? 'Free Trial Active'
-                    : 'Subscription Active'}
+                {isRevenueCatEnabled
+                  ? isUsingBetaAccess
+                    ? 'Beta Access Enabled'
+                    : subscriptionStatus === 'trialing'
+                      ? 'Free Trial Active'
+                      : 'Subscription Active'
+                  : 'Club Setup'}
               </Text>
             </View>
 
@@ -626,17 +644,21 @@ export default function CreateCrewPaywallScreen() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.betaAccessButton}
-            onPress={handleSkipPaywall}
-            activeOpacity={0.8}
-            testID="skip-paywall-button"
-          >
-            <Text style={styles.betaAccessButtonText}>Skip For Testing</Text>
-          </TouchableOpacity>
-          <Text style={styles.betaAccessText}>
-            This bypasses billing and unlocks crew admin access so you can create a crew and explore the app.
-          </Text>
+          {__DEV__ && (
+            <>
+              <TouchableOpacity
+                style={styles.betaAccessButton}
+                onPress={handleSkipPaywall}
+                activeOpacity={0.8}
+                testID="skip-paywall-button"
+              >
+                <Text style={styles.betaAccessButtonText}>Skip For Testing</Text>
+              </TouchableOpacity>
+              <Text style={styles.betaAccessText}>
+                This bypasses billing and unlocks crew admin access so you can create a crew and explore the app.
+              </Text>
+            </>
+          )}
 
           <Text style={styles.termsText}>
             Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. After the free introductory period, you will be charged {selectedPlan === 'yearly' ? `${getYearlyPrice()}/year` : `${getMonthlyPrice()}/month`} to your Apple or Google account. Manage or cancel anytime in account settings. By continuing, you agree to our{' '}

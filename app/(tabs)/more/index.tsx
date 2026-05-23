@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Share, Platform, TextInput, Modal, Linking, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { storage } from '@/utils/firebase';
 import {
@@ -13,7 +13,6 @@ import {
   Copy,
   Shield,
   Bell,
-  CreditCard,
   HelpCircle,
   LogOut,
   ChevronRight,
@@ -25,7 +24,11 @@ import {
   AtSign,
   KeyRound,
   Bike,
-  UserPlus
+  ImagePlus,
+  UserPlus,
+  UserMinus,
+  Trash2,
+  X
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { AppColors, useThemeColors } from '@/constants/colors';
@@ -36,7 +39,8 @@ import { getAvatarSource, isDefaultAvatar } from '@/utils/avatar';
 import { getInitials } from '@/utils/helpers';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 import * as Clipboard from 'expo-clipboard';
-import { CrewMember } from '@/types';
+import { BikeProfile, CrewMember } from '@/types';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -45,9 +49,10 @@ interface MenuItemProps {
   showBadge?: boolean;
   badgeText?: string;
   destructive?: boolean;
+  warning?: boolean;
 }
 
-function MenuItem({ icon, label, onPress, showBadge, badgeText, destructive }: MenuItemProps) {
+function MenuItem({ icon, label, onPress, showBadge, badgeText, destructive, warning }: MenuItemProps) {
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -58,7 +63,13 @@ function MenuItem({ icon, label, onPress, showBadge, badgeText, destructive }: M
     >
       <View style={styles.menuItemLeft}>
         {icon}
-        <Text style={[styles.menuItemLabel, destructive && styles.destructiveText]}>{label}</Text>
+        <Text style={[
+          styles.menuItemLabel,
+          destructive && styles.destructiveText,
+          warning && styles.warningText,
+        ]}>
+          {label}
+        </Text>
       </View>
       <View style={styles.menuItemRight}>
         {showBadge && (
@@ -80,9 +91,6 @@ type ExitPreview = {
 const WEBSITE_URL = 'https://www.mostudios.io/';
 const PRIVACY_URL = 'https://www.mostudios.io/privacy';
 const TERMS_URL = 'https://www.mostudios.io/terms';
-const IOS_SUBSCRIPTIONS_URL = 'itms-apps://apps.apple.com/account/subscriptions';
-const ANDROID_SUBSCRIPTIONS_URL =
-  'https://play.google.com/store/account/subscriptions?package=app.mostudios.presidentsmc';
 
 function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
   if (!currentUserId) return null;
@@ -111,15 +119,13 @@ export default function MoreScreen() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
-  const isSubscriptionOwner =
-    !!currentUser?.id &&
-    (crew?.subscriptionOwnerId === currentUser.id || crew?.ownerId === currentUser.id);
   const pendingJoinRequests = joinRequests.filter((request) => request.status === 'pending');
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editBike, setEditBike] = useState('');
+  const [editBikes, setEditBikes] = useState<BikeProfile[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [isSendingVerification, setIsSendingVerification] = useState(false);
@@ -146,13 +152,13 @@ export default function MoreScreen() {
     if (members.length <= 1) {
       return {
         title: 'Archive Club',
-        message: `You are the last member of ${crew.name}. Leaving will archive the crew immediately and permanently purge it after 30 days. Your store subscription is not auto-cancelled and must be cancelled manually from Apple or Google subscriptions.`,
+        message: `You are the last member of ${crew.name}. Leaving will archive the crew immediately and permanently purge it after 30 days.`,
       };
     }
 
     return {
       title: 'Transfer Ownership and Leave',
-      message: `Ownership will transfer to ${nextOwner?.name || 'the longest-serving member'}. Admin tools will lock until the new owner starts a subscription. Your store subscription is not auto-cancelled and must be cancelled manually from Apple or Google subscriptions.`,
+      message: `Ownership will transfer to ${nextOwner?.name || 'the longest-serving member'}.`,
     };
   })();
 
@@ -177,13 +183,13 @@ export default function MoreScreen() {
     if (members.length <= 1) {
       return {
         title: 'Delete Account and Archive Crew',
-        message: `${base} Because you are the last member, ${crew.name} will be archived immediately and permanently purged after 30 days. Your store subscription is not auto-cancelled and must be cancelled manually from Apple or Google subscriptions.`,
+      message: `${base} Because you are the last member, ${crew.name} will be archived immediately and permanently purged after 30 days.`,
       };
     }
 
     return {
       title: 'Delete Account and Transfer Ownership',
-      message: `${base} Ownership will transfer to ${nextOwner?.name || 'the longest-serving member'}, and admin tools will lock until the new owner subscribes. Your store subscription is not auto-cancelled and must be cancelled manually from Apple or Google subscriptions.`,
+      message: `${base} Ownership will transfer to ${nextOwner?.name || 'the longest-serving member'}.`,
     };
   })();
 
@@ -222,25 +228,91 @@ export default function MoreScreen() {
     setEditName(currentUser?.name || '');
     setEditAvatar(currentUser?.avatar || '');
     setEditBike(currentUser?.bike || '');
+    setEditBikes(
+      currentUser?.bikes?.length
+        ? currentUser.bikes
+        : currentUser?.bike
+          ? [{
+              id: `bike-${Date.now()}`,
+              name: currentUser.bike,
+              createdAt: new Date().toISOString(),
+              isPrimary: true,
+            }]
+          : []
+    );
     setEditModalVisible(true);
   };
 
-  const pickAvatar = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant photo permissions to change your avatar.');
-        return;
+  const addBikeDraft = () => {
+    setEditBikes((current) => [
+      ...current,
+      {
+        id: `bike-${Date.now()}`,
+        name: '',
+        details: '',
+        createdAt: new Date().toISOString(),
+        isPrimary: current.length === 0,
+      },
+    ]);
+  };
+
+  const updateBikeDraft = (bikeId: string, updates: Partial<BikeProfile>) => {
+    setEditBikes((current) =>
+      current.map((bike) => bike.id === bikeId ? { ...bike, ...updates } : bike)
+    );
+  };
+
+  const removeBikeDraft = (bikeId: string) => {
+    setEditBikes((current) => {
+      const next = current.filter((bike) => bike.id !== bikeId);
+      if (next.length > 0 && !next.some((bike) => bike.isPrimary)) {
+        return next.map((bike, index) => ({ ...bike, isPrimary: index === 0 }));
       }
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      return next;
     });
-    if (!result.canceled && result.assets[0]) {
-      setEditAvatar(result.assets[0].uri);
+  };
+
+  const setPrimaryBikeDraft = (bikeId: string) => {
+    setEditBikes((current) =>
+      current.map((bike) => ({ ...bike, isPrimary: bike.id === bikeId }))
+    );
+  };
+
+  const pickAvatar = async () => {
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to change your avatar.'
+    );
+    if (!hasAccess) return;
+
+    try {
+      const result = await pickSingleImage({ quality: 0.8 });
+      if (!result.canceled && result.assets[0]) {
+        setEditAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[More] Photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
+    }
+  };
+
+  const pickBikePhoto = async (bikeId: string) => {
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to add a bike photo.'
+    );
+    if (!hasAccess) return;
+
+    try {
+      const result = await pickSingleImage({ quality: 0.85 });
+      if (!result.canceled && result.assets[0]) {
+        updateBikeDraft(bikeId, { photoUrl: result.assets[0].uri });
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[More] Bike photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
     }
   };
 
@@ -259,10 +331,31 @@ export default function MoreScreen() {
         await uploadBytes(storageRef, blob);
         avatarUrl = await getDownloadURL(storageRef);
       }
+      const normalizedBikes = editBikes
+        .map((bike, index) => ({
+          ...bike,
+          name: bike.name.trim(),
+          details: bike.details?.trim() || '',
+          isPrimary: bike.isPrimary === true || (index === 0 && !editBikes.some((item) => item.isPrimary)),
+        }))
+        .filter((bike) => bike.name);
+      const uploadedBikes = await Promise.all(normalizedBikes.map(async (bike) => {
+        let photoUrl = bike.photoUrl || '';
+        if (photoUrl && !photoUrl.startsWith('http') && user?.id) {
+          const response = await fetch(photoUrl);
+          const blob = await response.blob();
+          const storageRef = ref(storage, `users/${user.id}/bikes/${bike.id}.jpg`);
+          await uploadBytes(storageRef, blob, { contentType: blob.type || 'image/jpeg' });
+          photoUrl = await getDownloadURL(storageRef);
+        }
+        return { ...bike, photoUrl };
+      }));
+      const primaryBike = uploadedBikes.find((bike) => bike.isPrimary) || uploadedBikes[0];
       await updateProfile({
         name: editName.trim(),
         avatar: avatarUrl,
-        bike: editBike.trim(),
+        bike: primaryBike?.name || editBike.trim(),
+        bikes: uploadedBikes,
       });
       setEditModalVisible(false);
       Alert.alert('Saved', 'Your profile has been updated.');
@@ -318,20 +411,9 @@ export default function MoreScreen() {
             const successMessage = result.crewArchived
               ? `The crew was archived and will be purged after 30 days.`
               : result.ownershipTransferred
-                ? `Ownership transferred to ${result.nextOwnerName || 'the next owner'}. Admin tools are now locked until a subscription is active.`
+                ? `Ownership transferred to ${result.nextOwnerName || 'the next owner'}.`
                 : `You left ${result.crewName || 'the crew'}.`;
-            Alert.alert(
-              'Club Updated',
-              result.shouldManageSubscription
-                ? `${successMessage} Your store subscription stays active until you cancel it manually.`
-                : successMessage,
-              result.shouldManageSubscription
-                ? [
-                    { text: 'Not Now', style: 'cancel' },
-                    { text: 'Manage Subscription', onPress: () => void handleManageSubscription() },
-                  ]
-                : [{ text: 'OK' }]
-            );
+            Alert.alert('Club Updated', successMessage);
           } catch {
             void trackAnalyticsEvent({
               eventName: 'crew_leave_failed',
@@ -393,15 +475,7 @@ export default function MoreScreen() {
               });
               Alert.alert(
                 'Account Deleted',
-                result.shouldManageSubscription
-                  ? 'Your account was deleted. Photos and authored club content were kept and anonymized, and your store subscription remains active until you cancel it manually.'
-                  : 'Your account was deleted. Photos and authored club content were kept and anonymized.',
-                result.shouldManageSubscription
-                  ? [
-                      { text: 'Not Now', style: 'cancel' },
-                      { text: 'Manage Subscription', onPress: () => void handleManageSubscription() },
-                    ]
-                  : [{ text: 'OK' }]
+                'Your account was deleted. Photos and authored club content were kept and anonymized.'
               );
             } catch {
               void trackAnalyticsEvent({
@@ -415,14 +489,6 @@ export default function MoreScreen() {
         },
       ]
     );
-  };
-
-  const handleManageSubscription = async () => {
-    const url =
-      Platform.OS === 'ios'
-        ? IOS_SUBSCRIPTIONS_URL
-        : ANDROID_SUBSCRIPTIONS_URL;
-    await openSupportLink(url);
   };
 
   const openSupportLink = async (url: string) => {
@@ -446,7 +512,10 @@ export default function MoreScreen() {
       >
         <Text style={styles.title}>More</Text>
 
-        <Pressable style={styles.profileCard} onPress={openEditProfile}>
+        <Pressable
+          style={styles.profileCard}
+          onPress={() => currentUser?.id && router.push(`/member/${currentUser.id}`)}
+        >
           <View style={styles.profileAvatarContainer}>
             {currentUser?.avatar ? (
               <Image
@@ -482,7 +551,15 @@ export default function MoreScreen() {
               </Text>
             </View>
           </View>
-          <Pencil size={18} color={colors.textTertiary} />
+          <Pressable
+            style={styles.editProfileButton}
+            onPress={(event) => {
+              event.stopPropagation();
+              openEditProfile();
+            }}
+          >
+            <Pencil size={18} color={colors.textTertiary} />
+          </Pressable>
         </Pressable>
 
         {user && !user.emailVerified && (
@@ -589,19 +666,6 @@ export default function MoreScreen() {
           </View>
         </View>
 
-        {isSubscriptionOwner && (
-          <View style={styles.menuSection}>
-            <Text style={styles.menuSectionTitle}>Subscription</Text>
-            <View style={styles.menuCard}>
-            <MenuItem 
-              icon={<CreditCard size={20} color={colors.success} />}
-              label="Manage Subscription"
-              onPress={handleManageSubscription}
-            />
-          </View>
-        </View>
-        )}
-
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Support</Text>
           <View style={styles.menuCard}>
@@ -614,23 +678,6 @@ export default function MoreScreen() {
         </View>
 
         <View style={styles.menuSection}>
-          <View style={styles.menuCard}>
-            <MenuItem 
-              icon={<LogOut size={20} color={colors.error} />}
-              label="Leave Club"
-              onPress={handleLeaveCrew}
-              destructive
-            />
-            <MenuItem 
-              icon={<LogOut size={20} color={colors.error} />}
-              label="Delete Account"
-              onPress={handleDeleteAccount}
-              destructive
-            />
-          </View>
-        </View>
-
-        <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Account</Text>
           <View style={styles.menuCard}>
             <MenuItem
@@ -638,12 +685,37 @@ export default function MoreScreen() {
               label="Email & Password"
               onPress={() => router.push('/account-security' as any)}
             />
+          </View>
+        </View>
+
+        <View style={[styles.menuSection, styles.dangerZoneSection]}>
+          <Text style={[styles.menuSectionTitle, styles.dangerZoneTitle]}>Danger Zone</Text>
+          <Text style={styles.dangerZoneHint}>
+            These actions remove access or permanently delete your account data.
+          </Text>
+          <View style={styles.dangerMenuCard}>
             <MenuItem
-              icon={<LogOut size={20} color={colors.textSecondary} />}
-              label="Sign Out"
-              onPress={handleSignOut}
+              icon={<UserMinus size={20} color={colors.error} />}
+              label="Leave Club"
+              onPress={handleLeaveCrew}
+              destructive
+            />
+            <MenuItem
+              icon={<Trash2 size={20} color={colors.error} />}
+              label="Delete Account"
+              onPress={handleDeleteAccount}
+              destructive
             />
           </View>
+        </View>
+
+        <View style={styles.bottomAccountActions}>
+          <MenuItem
+            icon={<LogOut size={20} color={colors.warning} />}
+            label="Sign Out"
+            onPress={handleSignOut}
+            warning
+          />
         </View>
 
         <Text style={styles.version}>{CLUB_NAME} v1.0.0</Text>
@@ -664,37 +736,112 @@ export default function MoreScreen() {
               </Pressable>
             </View>
 
-            <Pressable style={styles.editAvatarContainer} onPress={pickAvatar}>
-              {editAvatar ? (
-                <Image source={getAvatarSource(editAvatar)} style={styles.editAvatar} contentFit="cover" />
-              ) : (
-                <View style={styles.editAvatarPlaceholder}>
-                  <Text style={styles.editAvatarInitials}>{getInitials(editName || 'U')}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Pressable style={styles.editAvatarContainer} onPress={pickAvatar}>
+                {editAvatar ? (
+                  <Image source={getAvatarSource(editAvatar)} style={styles.editAvatar} contentFit="cover" />
+                ) : (
+                  <View style={styles.editAvatarPlaceholder}>
+                    <Text style={styles.editAvatarInitials}>{getInitials(editName || 'U')}</Text>
+                  </View>
+                )}
+                <View style={styles.editAvatarBadge}>
+                  <Camera size={14} color={colors.text} />
                 </View>
-              )}
-              <View style={styles.editAvatarBadge}>
-                <Camera size={14} color={colors.text} />
+              </Pressable>
+
+              <Text style={styles.editLabel}>Display Name</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Your name"
+                placeholderTextColor={colors.textTertiary}
+              />
+
+              <View style={styles.editSectionHeader}>
+                <Text style={[styles.editLabel, styles.editLabelSpaced]}>Bikes</Text>
+                <Pressable style={styles.addBikeButton} onPress={addBikeDraft}>
+                  <ImagePlus size={15} color={colors.text} />
+                  <Text style={styles.addBikeText}>Add Bike</Text>
+                </Pressable>
               </View>
-            </Pressable>
 
-            <Text style={styles.editLabel}>Display Name</Text>
-            <TextInput
-              style={styles.editInput}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Your name"
-              placeholderTextColor={colors.textTertiary}
-            />
-
-            <Text style={[styles.editLabel, styles.editLabelSpaced]}>Bike</Text>
-            <TextInput
-              style={styles.editInput}
-              value={editBike}
-              onChangeText={setEditBike}
-              placeholder="Harley-Davidson Street Glide"
-              placeholderTextColor={colors.textTertiary}
-              maxLength={80}
-            />
+              {editBikes.length === 0 ? (
+                <View style={styles.emptyBikeCard}>
+                  <Bike size={18} color={colors.textTertiary} />
+                  <Text style={styles.emptyBikeText}>Add your bike so members can see what you ride.</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.bikeEditorList}
+                >
+                  {editBikes.map((bike, index) => (
+                    <View key={bike.id} style={styles.bikeEditorCard}>
+                      <Pressable style={styles.bikePhotoButton} onPress={() => pickBikePhoto(bike.id)}>
+                        {bike.photoUrl ? (
+                          <Image source={{ uri: bike.photoUrl }} style={styles.bikePhoto} contentFit="cover" />
+                        ) : (
+                          <View style={styles.bikePhotoPlaceholder}>
+                            <Camera size={18} color={colors.textTertiary} />
+                            <Text style={styles.bikePhotoPlaceholderText}>Add Photo</Text>
+                          </View>
+                        )}
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.72)', 'rgba(0,0,0,0.95)']}
+                          locations={[0.22, 0.68, 1]}
+                          style={StyleSheet.absoluteFill}
+                        />
+                        <View style={styles.bikePhotoCopy}>
+                          <Text style={styles.bikeCardTitle} numberOfLines={1}>
+                            {bike.name.trim() || `Bike ${index + 1}`}
+                          </Text>
+                          <Text style={styles.bikeCardSubtitle} numberOfLines={2}>
+                            {bike.details?.trim() || 'Bike photo'}
+                          </Text>
+                        </View>
+                      </Pressable>
+                      <View style={styles.bikeEditorBody}>
+                        <TextInput
+                          style={styles.bikeInput}
+                          value={bike.name}
+                          onChangeText={(value) => {
+                            updateBikeDraft(bike.id, { name: value });
+                            if (index === 0) setEditBike(value);
+                          }}
+                          placeholder="Harley-Davidson Street Glide"
+                          placeholderTextColor={colors.textTertiary}
+                          maxLength={80}
+                        />
+                        <TextInput
+                          style={[styles.bikeInput, styles.bikeDetailsInput]}
+                          value={bike.details || ''}
+                          onChangeText={(value) => updateBikeDraft(bike.id, { details: value })}
+                          placeholder="Color, year, custom notes"
+                          placeholderTextColor={colors.textTertiary}
+                          maxLength={120}
+                        />
+                        <View style={styles.bikeEditorActions}>
+                          <Pressable
+                            style={[styles.primaryBikeChip, bike.isPrimary && styles.primaryBikeChipActive]}
+                            onPress={() => setPrimaryBikeDraft(bike.id)}
+                          >
+                            <Text style={[styles.primaryBikeText, bike.isPrimary && styles.primaryBikeTextActive]}>
+                              {bike.isPrimary ? 'Primary' : 'Set Primary'}
+                            </Text>
+                          </Pressable>
+                          <Pressable style={styles.removeBikeButton} onPress={() => removeBikeDraft(bike.id)}>
+                            <X size={15} color={colors.error} />
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -756,7 +903,7 @@ export default function MoreScreen() {
               </View>
               <View style={styles.supportText}>
                 <Text style={styles.supportTitle}>Terms of Use</Text>
-                <Text style={styles.supportSubtitle}>Auto-renewable subscription terms</Text>
+                <Text style={styles.supportSubtitle}>App terms and acceptable use</Text>
               </View>
             </Pressable>
 
@@ -881,6 +1028,14 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
+  },
+  editProfileButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
   },
   profileName: {
     color: colors.text,
@@ -1019,6 +1174,34 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  dangerZoneSection: {
+    marginTop: 12,
+  },
+  dangerZoneTitle: {
+    color: colors.error,
+  },
+  dangerZoneHint: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  dangerMenuCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  bottomAccountActions: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.warning,
+    marginBottom: 18,
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1043,6 +1226,9 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   destructiveText: {
     color: colors.error,
+  },
+  warningText: {
+    color: colors.warning,
   },
   menuItemRight: {
     flexDirection: 'row',
@@ -1076,6 +1262,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '92%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1177,5 +1364,149 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  editSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addBikeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  addBikeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptyBikeCard: {
+    minHeight: 86,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+  },
+  emptyBikeText: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  bikeEditorList: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  bikeEditorCard: {
+    width: 278,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  bikePhotoButton: {
+    height: 330,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceElevated,
+  },
+  bikePhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  bikePhotoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  bikePhotoPlaceholderText: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  bikePhotoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderBottomWidth: 180,
+    borderBottomColor: 'rgba(0,0,0,0.72)',
+  },
+  bikePhotoCopy: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+  },
+  bikeCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  bikeCardSubtitle: {
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 5,
+  },
+  bikeEditorBody: {
+    gap: 8,
+    padding: 12,
+  },
+  bikeInput: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    color: colors.text,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  bikeDetailsInput: {
+    fontSize: 13,
+  },
+  bikeEditorActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  primaryBikeChip: {
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  primaryBikeChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  primaryBikeText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  primaryBikeTextActive: {
+    color: colors.text,
+  },
+  removeBikeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.12)',
   },
 });

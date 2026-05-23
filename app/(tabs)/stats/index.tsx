@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike } from 'lucide-react-native';
+import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike, CheckCircle2, Clock, Gauge } from 'lucide-react-native';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
-import MilestoneBurst from '@/components/MilestoneBurst';
 import StatCard from '@/components/StatCard';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatMiles, formatNumber } from '@/utils/helpers';
@@ -23,26 +22,6 @@ export default function StatsScreen() {
   const isTablet = width >= 768;
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const crewMilestones = [
-    crewStats.totalRides >= 1
-      ? { id: 'first-club-ride', label: 'First club ride completed', value: `${crewStats.totalRides} rides`, tone: colors.primary, icon: 'rides' as const }
-      : null,
-    crewStats.totalMiles >= 100
-      ? { id: 'hundred-club-miles', label: 'Club crossed 100 miles', value: formatMiles(crewStats.totalMiles), tone: colors.success, icon: 'miles' as const }
-      : null,
-    crewStats.totalPhotos >= 10
-      ? { id: 'ten-club-photos', label: 'Ride memories are building', value: `${formatNumber(crewStats.totalPhotos)} photos`, tone: colors.accent, icon: 'photos' as const }
-      : null,
-  ].filter(Boolean) as React.ComponentProps<typeof MilestoneBurst>['milestones'];
-  const personalMilestones = [
-    memberStats.ridesAttended >= 1
-      ? { id: 'first-personal-ride', label: 'First ride attended', value: `${memberStats.ridesAttended} rides`, tone: colors.primary, icon: 'award' as const }
-      : null,
-    memberStats.milesTraveled >= 50
-      ? { id: 'fifty-personal-miles', label: 'Personal mileage milestone', value: formatMiles(memberStats.milesTraveled), tone: colors.success, icon: 'miles' as const }
-      : null,
-  ].filter(Boolean) as React.ComponentProps<typeof MilestoneBurst>['milestones'];
-
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -53,6 +32,83 @@ export default function StatsScreen() {
     crewCreatedAt && !Number.isNaN(crewCreatedAt.getTime())
       ? crewCreatedAt.getFullYear()
       : null;
+  const personalRideHistory = currentUser
+    ? pastRides.filter((ride) => ride.attendees?.includes(currentUser.id))
+    : [];
+
+  const renderRideHistoryCard = (ride: (typeof pastRides)[number], showPersonalStatus = false) => {
+    const checkedInCount = ride.checkedIn?.length || 0;
+    const attendeeCount = ride.attendees?.length || 0;
+    const photoCount = ride.photos?.length || 0;
+    const didAttend = !!currentUser?.id && ride.attendees?.includes(currentUser.id);
+    const didCheckIn = !!currentUser?.id && ride.checkedIn?.includes(currentUser.id);
+
+    return (
+      <Animated.View key={ride.id} entering={FadeInDown.duration(260)} layout={Layout.springify().damping(18)} style={styles.rideHistoryCard}>
+        <View style={styles.rideHistoryHeader}>
+          <View style={styles.rideHistoryTitleWrap}>
+            <Text style={styles.rideHistoryTitle}>{ride.title}</Text>
+            <Text style={styles.rideHistoryDate}>
+              {new Date(ride.dateTime).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </Text>
+          </View>
+          <View style={styles.rideMilesPill}>
+            <MapPin size={13} color={colors.success} />
+            <Text style={styles.rideMilesText}>{formatMiles(ride.estimatedDistance)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.routeSummary}>
+          <View style={styles.routePointRow}>
+            <View style={[styles.routeDot, { backgroundColor: colors.success }]} />
+            <Text style={styles.routePointText} numberOfLines={1}>
+              {ride.startLocation?.name || ride.startLocation?.address || 'Start not set'}
+            </Text>
+          </View>
+          <View style={styles.routePointRow}>
+            <View style={[styles.routeDot, { backgroundColor: colors.error }]} />
+            <Text style={styles.routePointText} numberOfLines={1}>
+              {ride.endLocation?.name || ride.endLocation?.address || 'End not set'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.rideMetaGrid}>
+          <View style={styles.rideMetaItem}>
+            <Clock size={14} color={colors.textTertiary} />
+            <Text style={styles.rideMetaText}>{ride.estimatedDuration || 'Duration not set'}</Text>
+          </View>
+          <View style={styles.rideMetaItem}>
+            <Gauge size={14} color={colors.textTertiary} />
+            <Text style={styles.rideMetaText}>{ride.pace || 'pace'} pace</Text>
+          </View>
+          <View style={styles.rideMetaItem}>
+            <Users size={14} color={colors.textTertiary} />
+            <Text style={styles.rideMetaText}>{attendeeCount} going</Text>
+          </View>
+          <View style={styles.rideMetaItem}>
+            <CheckCircle2 size={14} color={colors.textTertiary} />
+            <Text style={styles.rideMetaText}>{checkedInCount} checked in</Text>
+          </View>
+          <View style={styles.rideMetaItem}>
+            <Camera size={14} color={colors.textTertiary} />
+            <Text style={styles.rideMetaText}>{photoCount} photos</Text>
+          </View>
+        </View>
+
+        {showPersonalStatus && (
+          <Text style={styles.personalRideStatus}>
+            {didCheckIn ? 'You checked in for this ride.' : didAttend ? 'You were marked as going.' : 'You did not attend this ride.'}
+          </Text>
+        )}
+      </Animated.View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -115,8 +171,6 @@ export default function StatsScreen() {
                 ) : null}
               </View>
             </Animated.View>
-
-            <MilestoneBurst milestones={crewMilestones} />
 
             <Text style={styles.sectionTitle}>All Time</Text>
             <View style={styles.statsGrid}>
@@ -214,14 +268,7 @@ export default function StatsScreen() {
               {pastRides.length === 0 ? (
                 <Text style={styles.historyEmptyText}>No completed rides yet</Text>
               ) : (
-                pastRides.slice(0, 10).map((ride) => (
-                  <Animated.View key={ride.id} entering={FadeInDown.duration(260)} layout={Layout.springify().damping(18)} style={styles.rideHistoryCard}>
-                    <Text style={styles.rideHistoryTitle}>{ride.title}</Text>
-                    <Text style={styles.rideHistoryMeta}>
-                      {new Date(ride.dateTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} • {formatMiles(ride.estimatedDistance)} mi
-                    </Text>
-                  </Animated.View>
-                ))
+                pastRides.slice(0, 10).map((ride) => renderRideHistoryCard(ride))
               )}
             </View>
           </>
@@ -247,8 +294,6 @@ export default function StatsScreen() {
                 Member since {new Date(memberStats.memberSince).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </Text>
             </Animated.View>
-
-            <MilestoneBurst milestones={personalMilestones} />
 
             <Text style={styles.sectionTitle}>My Biker Stats</Text>
             <View style={styles.statsGrid}>
@@ -282,6 +327,15 @@ export default function StatsScreen() {
                 subtitle="personal best"
                 color={colors.warning}
               />
+            </View>
+
+            <Text style={styles.sectionTitle}>My Ride History</Text>
+            <View style={styles.rideHistoryList}>
+              {personalRideHistory.length === 0 ? (
+                <Text style={styles.historyEmptyText}>No attended rides yet</Text>
+              ) : (
+                personalRideHistory.slice(0, 10).map((ride) => renderRideHistoryCard(ride, true))
+              )}
             </View>
           </>
         )}
@@ -527,14 +581,87 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 10,
   },
+  rideHistoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+  },
+  rideHistoryTitleWrap: {
+    flex: 1,
+  },
   rideHistoryTitle: {
     color: colors.text,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 4,
   },
-  rideHistoryMeta: {
+  rideHistoryDate: {
     color: colors.textTertiary,
     fontSize: 12,
+  },
+  rideMilesPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  rideMilesText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  routeSummary: {
+    gap: 8,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 10,
+  },
+  routePointRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  routeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  routePointText: {
+    flex: 1,
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  rideMetaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  rideMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minWidth: '30%',
+  },
+  rideMetaText: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  personalRideStatus: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 10,
   },
 });

@@ -16,6 +16,8 @@ const firebaseConfig = {
   measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 const firestoreDatabaseId = process.env.EXPO_PUBLIC_FIRESTORE_DATABASE_ID || '(default)';
+const usesDefaultFirestoreDatabase =
+  firestoreDatabaseId === 'default' || firestoreDatabaseId === '(default)';
 
 const isConfigComplete = Object.values(firebaseConfig).every(Boolean);
 if (!isConfigComplete) {
@@ -43,7 +45,9 @@ const auth =
           return FirebaseAuth.getAuth(app);
         }
       })();
-const db = getFirestore(app, firestoreDatabaseId);
+const db = usesDefaultFirestoreDatabase
+  ? getFirestore(app)
+  : getFirestore(app, firestoreDatabaseId);
 const storage = getStorage(app);
 const functions = getFunctions(app);
 

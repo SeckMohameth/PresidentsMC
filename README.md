@@ -10,8 +10,8 @@ The original idea was a multi-club SaaS product where any bike or motorcycle clu
 
 - Build one polished app for one biker club.
 - Keep members free.
-- Let the club owner/admin pay a small subscription for admin tools.
-- Use the project as a real portfolio piece with production-style auth, database rules, file storage, functions, subscriptions, and mobile UI.
+- Keep billing out of the first store release, with optional admin billing left behind a feature flag for a later pass.
+- Use the project as a real portfolio piece with production-style auth, database rules, file storage, functions, notifications, and mobile UI.
 
 ## Features
 
@@ -47,10 +47,10 @@ That owner/admin can approve members and manage club content. Admin tools are us
 This was built as a favor-style project, not a big SaaS launch. The monetization idea is intentionally lightweight:
 
 - Members: free
-- Club owner/admin: low subscription
-- Example pricing: `$1.99/month` or `$19.99/year`
+- Club owner/admin: free for the first release
+- Future optional pricing: `$1.99/month` or `$19.99/year`
 
-The subscription is meant to help cover hosting, app upkeep, Firebase usage, App Store/Play Store maintenance, and ongoing support. Billing is disabled by default for this beta build, so RevenueCat is future work rather than a requirement to run the app.
+Future billing may help cover hosting, app upkeep, Firebase usage, App Store/Play Store maintenance, and ongoing support. Billing is disabled for this release, so RevenueCat is future work rather than a requirement to run the app.
 
 ## Tech Stack
 
@@ -125,6 +125,7 @@ EXPO_PUBLIC_DEVELOPER_ADMIN_EMAILS=developer@example.com
 8. RevenueCat is optional for this beta build. Leave these blank unless you are ready to configure paid admin subscriptions:
 
 ```bash
+EXPO_PUBLIC_ENABLE_REVENUECAT=false
 EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=
 EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=
 EXPO_PUBLIC_REVENUECAT_TEST_API_KEY=

@@ -3,10 +3,9 @@ import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert, Keyboa
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import MapView, { MapPressEvent, Marker, Polyline } from 'react-native-maps';
+import MapView, { MapPressEvent, Marker, Polyline } from '@/components/NativeMap';
 import { httpsCallable } from 'firebase/functions';
 import { X, MapPin, Calendar, Clock, Gauge, FileText, ImagePlus, Image as ImageIcon, Trash2, MapPinned, LocateFixed } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +15,8 @@ import AddressAutocomplete, { AddressSelection } from '@/components/AddressAutoc
 import { ImageAttribution, RouteCoordinate } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 import { functions } from '@/utils/firebase';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
+import { COVER_IMAGE_PRESETS, getCoverPresetUri, getDefaultRideCoverUri } from '@/constants/coverImages';
 
 type PaceType = 'casual' | 'moderate' | 'spirited';
 type MapTarget = 'start' | 'end';
@@ -24,7 +25,7 @@ type RoutePreview = {
   distanceMeters: number;
   durationSeconds: number;
 };
-const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=400&fit=crop';
+const DEFAULT_COVER_IMAGE = getDefaultRideCoverUri();
 const DEFAULT_REGION = {
   latitude: 41.7658,
   longitude: -72.6734,
@@ -42,7 +43,7 @@ function formatReverseAddress(item?: Location.LocationGeocodedAddress) {
 export default function CreateRideScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const { rideId } = useLocalSearchParams<{ rideId?: string }>();
   const { crew, currentUser, createRide, updateRide, deleteRide, isCreatingRide } = useCrew();
   const { ride } = useRide(rideId || '');
@@ -238,23 +239,28 @@ export default function CreateRideScreen() {
   }
 
   const pickCoverImage = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant photo permissions to select a cover image.');
-        return;
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to select a cover image.'
+    );
+    if (!hasAccess) return;
+
+    try {
+      const result = await pickSingleImage({ quality: 0.8 });
+      if (!result.canceled && result.assets[0]) {
+        setCoverImage(result.assets[0].uri);
+        setCoverAttribution(undefined);
       }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[CreateRide] Photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setCoverImage(result.assets[0].uri);
-      setCoverAttribution(undefined);
-    }
+  };
+
+  const selectPresetCover = (presetUri: string) => {
+    setCoverImage(presetUri);
+    setCoverAttribution(undefined);
   };
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -553,6 +559,28 @@ export default function CreateRideScreen() {
                 <Text style={styles.coverButtonText}>Photos</Text>
               </Pressable>
             </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.coverPresetList}
+            >
+              {COVER_IMAGE_PRESETS.map((preset) => {
+                const presetUri = getCoverPresetUri(preset);
+                const selected = coverImage === presetUri || (!coverImage && preset.id === 'jan-kopriva-aby36io-q48');
+                return (
+                  <Pressable
+                    key={preset.id}
+                    style={[styles.coverPreset, selected && styles.coverPresetSelected]}
+                    onPress={() => selectPresetCover(presetUri)}
+                  >
+                    <Image source={preset.source} style={styles.coverPresetImage} contentFit="cover" />
+                    <Text style={styles.coverPresetLabel} numberOfLines={1}>
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <View style={[styles.section, { zIndex: 3 }]}>
@@ -979,6 +1007,34 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: '600',
+  },
+  coverPresetList: {
+    gap: 10,
+    paddingTop: 12,
+    paddingRight: 4,
+  },
+  coverPreset: {
+    width: 104,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  coverPresetSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+  },
+  coverPresetImage: {
+    width: '100%',
+    height: 68,
+  },
+  coverPresetLabel: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 7,
   },
   label: {
     color: colors.textSecondary,

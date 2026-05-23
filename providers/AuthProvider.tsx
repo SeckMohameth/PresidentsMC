@@ -28,7 +28,7 @@ import { useRevenueCat } from '@/providers/RevenueCatProvider';
 import { auth, db, functions, storage } from '@/utils/firebase';
 import { getDevicePushToken } from '@/utils/pushNotifications';
 import SafeAsyncStorage from '@/utils/safeAsyncStorage';
-import { UserPreferences } from '@/types';
+import { BikeProfile, UserPreferences } from '@/types';
 import { DEFAULT_AVATAR } from '@/utils/avatar';
 import {
   CLUB_DESCRIPTION,
@@ -58,6 +58,7 @@ interface AuthUser {
 interface UserProfile extends AuthUser {
   crewId?: string | null;
   role?: 'admin' | 'officer' | 'member';
+  bikes?: BikeProfile[];
   preferences?: UserPreferences;
   lastActiveAt?: string;
   pendingCrewId?: string | null;
@@ -318,6 +319,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           name: data.name,
           avatar: data.avatar,
           bike: data.bike || '',
+          bikes: Array.isArray(data.bikes) ? data.bikes : [],
           emailVerified: fbUser.emailVerified,
           crewId: data.crewId || null,
           role: data.role || 'member',
@@ -592,7 +594,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     }
   }, [profile]);
 
-  const updateUserProfile = useCallback(async (updates: { name?: string; avatar?: string; bike?: string }) => {
+  const updateUserProfile = useCallback(async (updates: { name?: string; avatar?: string; bike?: string; bikes?: BikeProfile[] }) => {
     if (!profile?.id) throw new Error('Not authenticated');
     const uid = profile.id;
     await updateDoc(doc(db, 'users', uid), updates);

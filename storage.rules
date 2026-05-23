@@ -15,17 +15,17 @@ service firebase.storage {
     }
 
     function crewDoc(crewId) {
-      return firestore.get(/databases/default/documents/crews/$(crewId));
+      return firestore.get(/databases/(default)/documents/crews/$(crewId));
     }
 
     function crewMemberDoc(crewId, userId) {
-      return firestore.get(/databases/default/documents/crews/$(crewId)/members/$(userId));
+      return firestore.get(/databases/(default)/documents/crews/$(crewId)/members/$(userId));
     }
 
     function isCrewMember(crewId) {
       return signedIn()
         && isPresidentsClub(crewId)
-        && firestore.exists(/databases/default/documents/crews/$(crewId)/members/$(request.auth.uid));
+        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(request.auth.uid));
     }
 
     function isCrewOwner(crewId) {
@@ -46,8 +46,18 @@ service firebase.storage {
       return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
     }
 
+    function isDeveloperAdminEmail() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email in [
+          'mo@mostudios.io',
+          'mostudiosdotio@gmail.com'
+        ];
+    }
+
     function canUseAdminTools(crewId) {
       return isDeveloperSupport(crewId)
+        || (isPresidentsClub(crewId) && isDeveloperAdminEmail())
         || isCrewOwner(crewId)
         || (
           isCrewLeader(crewId)
@@ -57,6 +67,7 @@ service firebase.storage {
 
     function canManageCrewSettings(crewId) {
       return isDeveloperSupport(crewId)
+        || (isPresidentsClub(crewId) && isDeveloperAdminEmail())
         || isCrewOwner(crewId)
         || (
           isCrewMember(crewId)
@@ -78,6 +89,11 @@ service firebase.storage {
         && crewMemberDoc(crewId, request.auth.uid).data.isDeveloperSupport == true;
     }
 
+    function canReadCrewStorage(crewId) {
+      return isCrewMember(crewId)
+        || (isPresidentsClub(crewId) && isDeveloperAdminEmail());
+    }
+
     function isImage() {
       return request.resource != null
         && request.resource.size < 10 * 1024 * 1024
@@ -89,43 +105,48 @@ service firebase.storage {
       allow write: if isSelf(userId) && isImage();
     }
 
+    match /users/{userId}/bikes/{fileName} {
+      allow read: if signedIn();
+      allow write, delete: if isSelf(userId) && isImage();
+    }
+
     match /crews/{crewId}/logo.jpg {
-      allow read: if isCrewMember(crewId);
+      allow read: if canReadCrewStorage(crewId);
       allow write: if canManageCrewSettings(crewId)
         && crewDoc(crewId).data.status == 'active'
         && isImage();
     }
 
     match /crews/{crewId}/announcements/{fileName} {
-      allow read: if isCrewMember(crewId);
+      allow read: if canReadCrewStorage(crewId);
       allow write: if canUseDelegatedTool(crewId, 'manageAnnouncements')
         && isImage();
       allow delete: if canUseDelegatedTool(crewId, 'manageAnnouncements');
     }
 
     match /crews/{crewId}/rides/{rideId}/cover.jpg {
-      allow read: if isCrewMember(crewId);
+      allow read: if canReadCrewStorage(crewId);
       allow write: if canUseDelegatedTool(crewId, 'manageRides')
         && isImage();
       allow delete: if canUseDelegatedTool(crewId, 'manageRides');
     }
 
     match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
-      allow read: if isCrewMember(crewId);
-      allow write: if isCrewMember(crewId) && isImage();
+      allow read: if canReadCrewStorage(crewId);
+      allow write: if canReadCrewStorage(crewId) && isImage();
       allow delete: if canUseAdminTools(crewId);
     }
 
     match /crews/{crewId}/albums/{albumId}/cover.jpg {
-      allow read: if isCrewMember(crewId);
+      allow read: if canReadCrewStorage(crewId);
       allow write: if canUseDelegatedTool(crewId, 'manageAlbums')
         && isImage();
       allow delete: if canUseDelegatedTool(crewId, 'manageAlbums');
     }
 
     match /crews/{crewId}/albums/{albumId}/photos/{fileName} {
-      allow read: if isCrewMember(crewId);
-      allow write: if isCrewMember(crewId) && isImage();
+      allow read: if canReadCrewStorage(crewId);
+      allow write: if canReadCrewStorage(crewId) && isImage();
       allow delete: if canUseAdminTools(crewId);
     }
 

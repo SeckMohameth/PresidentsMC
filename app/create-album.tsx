@@ -11,12 +11,12 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, ImagePlus, X } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
+import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 
 export default function CreateAlbumScreen() {
   const insets = useSafeAreaInsets();
@@ -30,23 +30,22 @@ export default function CreateAlbumScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const pickCoverImage = async () => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant photo permissions to select an album cover.');
-        return;
+    const hasAccess = await requestPhotoLibraryAccess(
+      'Please grant photo permissions to select an album cover.'
+    );
+    if (!hasAccess) return;
+
+    try {
+      const result = await pickSingleImage({ quality: 0.8 });
+
+      if (!result.canceled && result.assets[0]) {
+        setCoverImage(result.assets[0].uri);
       }
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setCoverImage(result.assets[0].uri);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[CreateAlbum] Photo picker error:', error);
+      }
+      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
     }
   };
 
