@@ -1,13 +1,20 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import Purchases, { 
   PurchasesPackage,
   LOG_LEVEL,
 } from 'react-native-purchases';
-import type { CustomerInfo } from 'react-native-purchases';
+import type { CustomerInfo, CustomerInfoUpdateListener } from 'react-native-purchases';
+import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import createContextHook from '@nkzw/create-context-hook';
+import {
+  REVENUECAT_ENTITLEMENT_ID,
+  REVENUECAT_FALLBACK_API_KEY,
+  REVENUECAT_MONTHLY_PRODUCT_ID,
+  REVENUECAT_YEARLY_PRODUCT_ID,
+} from '@/constants/revenueCat';
 
 export type CrewAdminStatus = 'active' | 'inactive' | 'trialing';
 type RevenueCatBootstrap = {
@@ -16,11 +23,11 @@ type RevenueCatBootstrap = {
 };
 
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
-const isRevenueCatEnabled = process.env.EXPO_PUBLIC_ENABLE_REVENUECAT === 'true';
+const isRevenueCatExplicitlyDisabled = process.env.EXPO_PUBLIC_ENABLE_REVENUECAT === 'false';
 
 function getRCToken() {
   if (Platform.OS === 'web' || isExpoGo) {
-    return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
+    return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY || REVENUECAT_FALLBACK_API_KEY;
   }
 
   const nativeKey = Platform.select({
@@ -28,20 +35,24 @@ function getRCToken() {
     android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
   });
 
-  return nativeKey ?? process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
+  return nativeKey ?? process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ?? REVENUECAT_FALLBACK_API_KEY;
 }
 
 export function getCrewAdminStatus(customerInfo: CustomerInfo | null | undefined): CrewAdminStatus {
-  const crewAdminEntitlement = customerInfo?.entitlements.active['crew_admin'];
-  if (!crewAdminEntitlement?.isActive) return 'inactive';
-  return crewAdminEntitlement.periodType === 'trial' ? 'trialing' : 'active';
+  const presidentsMCProEntitlement = customerInfo?.entitlements.active[REVENUECAT_ENTITLEMENT_ID];
+  if (!presidentsMCProEntitlement?.isActive) return 'inactive';
+  return presidentsMCProEntitlement.periodType === 'trial' ? 'trialing' : 'active';
+}
+
+function isProCustomer(customerInfo: CustomerInfo | null | undefined) {
+  return typeof customerInfo?.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !== 'undefined';
 }
 
 const apiKey = getRCToken();
 const revenueCatBootstrap: RevenueCatBootstrap = (() => {
-  if (!isRevenueCatEnabled) {
+  if (isRevenueCatExplicitlyDisabled) {
     if (__DEV__) {
-      console.log('[RevenueCat] Disabled. Set EXPO_PUBLIC_ENABLE_REVENUECAT=true to enable purchases.');
+      console.log('[RevenueCat] Disabled by EXPO_PUBLIC_ENABLE_REVENUECAT=false.');
     }
     return { apiKey: null, isConfigured: false };
   }
@@ -69,7 +80,10 @@ const revenueCatBootstrap: RevenueCatBootstrap = (() => {
 export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [isConfigured] = useState(revenueCatBootstrap.isConfigured);
-  const customerInfoQueryKey = ['revenuecat', 'customerInfo', isConfigured] as const;
+  const customerInfoQueryKey = useMemo(
+    () => ['revenuecat', 'customerInfo', isConfigured] as const,
+    [isConfigured]
+  );
 
   const customerInfoQuery = useQuery({
     queryKey: customerInfoQueryKey,
@@ -136,14 +150,33 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
   const currentOffering = offerings?.current;
 
   const crewAdminStatus = getCrewAdminStatus(customerInfo);
-  const isCrewAdmin = crewAdminStatus !== 'inactive';
+  const isCrewAdmin = isProCustomer(customerInfo);
 
   const monthlyPackage = currentOffering?.availablePackages.find(
-    (pkg) => pkg.identifier === '$rc_monthly'
+    (pkg) =>
+      pkg.identifier === '$rc_monthly' ||
+      pkg.identifier === REVENUECAT_MONTHLY_PRODUCT_ID ||
+      pkg.product.identifier === REVENUECAT_MONTHLY_PRODUCT_ID
   );
   const yearlyPackage = currentOffering?.availablePackages.find(
-    (pkg) => pkg.identifier === '$rc_annual'
+    (pkg) =>
+      pkg.identifier === '$rc_annual' ||
+      pkg.identifier === REVENUECAT_YEARLY_PRODUCT_ID ||
+      pkg.product.identifier === REVENUECAT_YEARLY_PRODUCT_ID
   );
+
+  useEffect(() => {
+    if (!isConfigured) return;
+
+    const listener: CustomerInfoUpdateListener = (nextCustomerInfo) => {
+      queryClient.setQueryData(customerInfoQueryKey, nextCustomerInfo);
+    };
+
+    Purchases.addCustomerInfoUpdateListener(listener);
+    return () => {
+      Purchases.removeCustomerInfoUpdateListener(listener);
+    };
+  }, [customerInfoQueryKey, isConfigured, queryClient]);
 
   const purchasePackage = useCallback(async (pkg: PurchasesPackage) => {
     return purchaseMutation.mutateAsync(pkg);
@@ -152,6 +185,62 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
   const restorePurchases = useCallback(async () => {
     return restoreMutation.mutateAsync();
   }, [restoreMutation]);
+
+  const refreshCustomerInfo = useCallback(async () => {
+    if (!isConfigured) return null;
+    const nextCustomerInfo = await Purchases.getCustomerInfo();
+    queryClient.setQueryData(customerInfoQueryKey, nextCustomerInfo);
+    return nextCustomerInfo;
+  }, [customerInfoQueryKey, isConfigured, queryClient]);
+
+  const presentPaywall = useCallback(async () => {
+    if (!isConfigured) return false;
+
+    const result = await RevenueCatUI.presentPaywall({
+      offering: currentOffering ?? undefined,
+      displayCloseButton: true,
+    });
+    if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) {
+      await refreshCustomerInfo();
+      return true;
+    }
+    return false;
+  }, [currentOffering, isConfigured, refreshCustomerInfo]);
+
+  const presentPaywallIfNeeded = useCallback(async () => {
+    if (!isConfigured) return false;
+
+    const result = await RevenueCatUI.presentPaywallIfNeeded({
+      requiredEntitlementIdentifier: REVENUECAT_ENTITLEMENT_ID,
+      offering: currentOffering ?? undefined,
+      displayCloseButton: true,
+    });
+    if (
+      result === PAYWALL_RESULT.NOT_PRESENTED ||
+      result === PAYWALL_RESULT.PURCHASED ||
+      result === PAYWALL_RESULT.RESTORED
+    ) {
+      const nextCustomerInfo = await refreshCustomerInfo();
+      return isProCustomer(nextCustomerInfo) || result === PAYWALL_RESULT.NOT_PRESENTED;
+    }
+    return false;
+  }, [currentOffering, isConfigured, refreshCustomerInfo]);
+
+  const presentCustomerCenter = useCallback(async () => {
+    if (!isConfigured) return;
+
+    await RevenueCatUI.presentCustomerCenter({
+      callbacks: {
+        onRestoreCompleted: ({ customerInfo: restoredCustomerInfo }) => {
+          queryClient.setQueryData(customerInfoQueryKey, restoredCustomerInfo);
+        },
+        onPromotionalOfferSucceeded: ({ customerInfo: nextCustomerInfo }) => {
+          queryClient.setQueryData(customerInfoQueryKey, nextCustomerInfo);
+        },
+      },
+    });
+    await refreshCustomerInfo();
+  }, [customerInfoQueryKey, isConfigured, queryClient, refreshCustomerInfo]);
 
   const loginUser = useCallback(async (userId: string) => {
     return loginMutation.mutateAsync(userId);
@@ -162,7 +251,7 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
   }, [logoutMutation]);
 
   return {
-    isEnabled: isRevenueCatEnabled,
+    isEnabled: !isRevenueCatExplicitlyDisabled && Boolean(apiKey),
     isConfigured,
     customerInfo,
     offerings,
@@ -171,11 +260,16 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
     yearlyPackage,
     crewAdminStatus,
     isCrewAdmin,
+    entitlementId: REVENUECAT_ENTITLEMENT_ID,
     isLoading: customerInfoQuery.isLoading || offeringsQuery.isLoading,
     isPurchasing: purchaseMutation.isPending,
     isRestoring: restoreMutation.isPending,
     purchasePackage,
     restorePurchases,
+    refreshCustomerInfo,
+    presentPaywall,
+    presentPaywallIfNeeded,
+    presentCustomerCenter,
     loginUser,
     logoutUser,
     purchaseError: purchaseMutation.error,

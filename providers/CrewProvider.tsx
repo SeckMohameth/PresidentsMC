@@ -108,25 +108,24 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const isSubscriptionActive =
     crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing';
   const isBillingRequired = crew?.billingRequired === true;
-  const canUseAdminTools = !isBillingRequired || isSubscriptionActive || isOwner || isDeveloperSupport;
-  const hasActiveDelegation = !isBillingRequired || isSubscriptionActive;
+  const canUseAdminTools = !isBillingRequired || isSubscriptionActive || isDeveloperSupport;
+  const hasActiveDelegation = !isBillingRequired || isSubscriptionActive || isDeveloperSupport;
   const canManageRides =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageRides === true) && hasActiveDelegation);
+    (isAdmin || isOfficer || permissions.manageRides === true) && hasActiveDelegation;
   const canManageAnnouncements =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAnnouncements === true) && hasActiveDelegation);
+    (isAdmin || isOfficer || permissions.manageAnnouncements === true) && hasActiveDelegation;
   const canManageAlbums =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAlbums === true) && hasActiveDelegation);
+    (isAdmin || isOfficer || permissions.manageAlbums === true) && hasActiveDelegation;
   const canManageJoinRequests =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageJoinRequests === true) && hasActiveDelegation);
+    (isAdmin || isOfficer || permissions.manageJoinRequests === true) && hasActiveDelegation;
   const canPost = canManageRides || canManageAnnouncements;
 
   const assertAdminActive = useCallback(() => {
     if (isDeveloperSupport) return;
-    if (isOwner) return;
     if (isBillingRequired && !isSubscriptionActive) {
       throw new Error('SUBSCRIPTION_INACTIVE');
     }
-  }, [isBillingRequired, isDeveloperSupport, isOwner, isSubscriptionActive]);
+  }, [isBillingRequired, isDeveloperSupport, isSubscriptionActive]);
 
   const assertAdminOrOfficer = useCallback(() => {
     if (!isAdmin && !isOfficer) {
@@ -292,6 +291,21 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       unsubStatsHistory();
     };
   }, [crewId, user?.id]);
+
+  useEffect(() => {
+    if (!crewId || !crew || !currentUser) return;
+    if (currentUser.role !== 'admin') return;
+    if (crew.billingRequired === true) return;
+
+    updateDoc(doc(db, 'crews', crewId), {
+      billingRequired: true,
+      subscriptionStatus: crew.subscriptionStatus ?? 'inactive',
+    }).catch((error) => {
+      if (__DEV__) {
+        console.log('[CrewProvider] Billing migration skipped:', error);
+      }
+    });
+  }, [crew, crewId, currentUser]);
 
   const createAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'createdAt'>) => {
     if (!crewId) throw new Error('No crew');
@@ -993,6 +1007,35 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     });
   }, [crewId, assertAdminActive, assertAdmin]);
 
+  const syncClubSubscription = useCallback(async (
+    subscriptionStatus: NonNullable<Crew['subscriptionStatus']>
+  ) => {
+    if (!crewId || !currentUser) throw new Error('No crew');
+    assertAdmin();
+
+    const isActiveSubscription =
+      subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
+
+    await updateDoc(doc(db, 'crews', crewId), {
+      billingRequired: true,
+      subscriptionStatus,
+      subscriptionOwnerId: isActiveSubscription
+        ? currentUser.id
+        : crew?.subscriptionOwnerId ?? null,
+    });
+
+    void trackAnalyticsEvent({
+      eventName: 'crew_subscription_synced',
+      actorUserId: currentUser.id,
+      crewId,
+      route: '/(tabs)/more',
+      properties: {
+        subscriptionStatus,
+        subscriptionOwnerId: isActiveSubscription ? currentUser.id : crew?.subscriptionOwnerId ?? null,
+      },
+    });
+  }, [assertAdmin, crew?.subscriptionOwnerId, crewId, currentUser]);
+
   const addPhoto = useCallback(async ({ rideId, imageUrl }: { rideId: string; imageUrl: string }) => {
     if (!crewId || !currentUser) return;
 
@@ -1224,6 +1267,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     approveJoinRequest,
     denyJoinRequest,
     updateCrewSettings,
+    syncClubSubscription,
     getRideById,
     getAnnouncementById,
     getMemberById,

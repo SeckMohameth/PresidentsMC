@@ -27,6 +27,7 @@ export type AnalyticsEventName =
   | 'crew_delete_requested'
   | 'crew_delete_success'
   | 'crew_delete_failed'
+  | 'crew_subscription_synced'
   | 'ride_create_success'
   | 'ride_update_success'
   | 'ride_delete_success'

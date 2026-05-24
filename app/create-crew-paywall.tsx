@@ -17,14 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { 
   ArrowLeft, 
-  Crown, 
   Shield, 
   Users, 
   Map, 
   Camera,
   Zap,
   Check,
-  Sparkles,
 } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
@@ -43,8 +41,9 @@ const features = [
   { icon: Zap, text: 'Real-time check-ins' },
 ];
 
-const TERMS_URL = 'https://www.mostudios.io/terms';
-const PRIVACY_URL = 'https://www.mostudios.io/privacy';
+const TERMS_URL = 'https://sites.google.com/view/presidentsmc-terms/home';
+const PRIVACY_URL = 'https://sites.google.com/view/presidentsmc-privacy/home';
+const paywallHeroImage = require('../assets/images/custom-images/harley-davidson-aiBYhrzsQw4-unsplash.jpg');
 
 export default function CreateCrewPaywallScreen() {
   const { createCrew, isCreatingCrew } = useAuth();
@@ -56,8 +55,10 @@ export default function CreateCrewPaywallScreen() {
     isLoading, 
     isPurchasing,
     isRestoring,
-    purchasePackage, 
     restorePurchases,
+    presentPaywallIfNeeded,
+    presentCustomerCenter,
+    refreshCustomerInfo,
     crewAdminStatus,
     isEnabled: isRevenueCatEnabled,
   } = useRevenueCat();
@@ -71,11 +72,11 @@ export default function CreateCrewPaywallScreen() {
   );
   const [subscriptionStatus, setSubscriptionStatus] = useState<CrewAdminStatus>('inactive');
   const [isUsingBetaAccess, setIsUsingBetaAccess] = useState(false);
+  const [isPresentingPaywall, setIsPresentingPaywall] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  const crownRotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -96,22 +97,7 @@ export default function CreateCrewPaywallScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(crownRotate, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(crownRotate, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [fadeAnim, slideAnim, scaleAnim, crownRotate]);
+  }, [fadeAnim, slideAnim, scaleAnim]);
 
   useEffect(() => {
     void trackAnalyticsEvent({
@@ -140,23 +126,18 @@ export default function CreateCrewPaywallScreen() {
     }
   }, [crewAdminStatus, isRevenueCatEnabled, step]);
 
-  const crownRotateInterpolate = crownRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['-5deg', '5deg'],
-  });
-
   const getMonthlyPrice = () => {
     if (monthlyPackage?.product?.priceString) {
       return monthlyPackage.product.priceString;
     }
-    return '$2.49';
+    return '$3.99';
   };
 
   const getYearlyPrice = () => {
     if (yearlyPackage?.product?.priceString) {
       return yearlyPackage.product.priceString;
     }
-    return '$24.99';
+    return '$39.99';
   };
 
   const getYearlyMonthlyPrice = () => {
@@ -164,7 +145,7 @@ export default function CreateCrewPaywallScreen() {
       const monthly = (yearlyPackage.product.price / 12).toFixed(2);
       return `$${monthly}`;
     }
-    return '$2.08';
+    return '$3.33';
   };
 
   const openExternalLink = async (url: string) => {
@@ -176,50 +157,50 @@ export default function CreateCrewPaywallScreen() {
   };
 
   const handleSubscribe = async () => {
-    const selectedPackage = selectedPlan === 'monthly' ? monthlyPackage : yearlyPackage;
-    
-    if (!selectedPackage) {
-      Alert.alert('Error', 'Selected plan is not available. Please try again.');
+    if (!isRevenueCatEnabled) {
+      setStep('details');
       return;
     }
+
+    const selectedPackage = selectedPlan === 'monthly' ? monthlyPackage : yearlyPackage;
 
     void trackAnalyticsEvent({
       eventName: 'purchase_intent',
       route: '/create-crew-paywall',
       properties: {
         selectedPlan,
-        packageId: selectedPackage.identifier,
+        packageId: selectedPackage?.identifier || null,
+        productId: selectedPackage?.product?.identifier || null,
+        mode: 'revenuecat_paywall',
       },
     });
 
+    setIsPresentingPaywall(true);
     try {
-      const customerInfo = await purchasePackage(selectedPackage);
-      const nextSubscriptionStatus = getCrewAdminStatus(customerInfo);
+      const didUnlock = await presentPaywallIfNeeded();
 
-      if (nextSubscriptionStatus === 'inactive') {
+      if (!didUnlock && crewAdminStatus === 'inactive') {
         void trackAnalyticsEvent({
           eventName: 'purchase_failed',
           route: '/create-crew-paywall',
           properties: {
             selectedPlan,
-            packageId: selectedPackage.identifier,
-            reason: 'missing_entitlement',
+            packageId: selectedPackage?.identifier || null,
+            reason: 'paywall_cancelled_or_missing_entitlement',
           },
         });
-        Alert.alert(
-          'Subscription Not Ready',
-          'Your purchase completed, but Crew Admin access is not active yet. Tap Restore Purchases or try again in a moment.'
-        );
         return;
       }
 
-      setSubscriptionStatus(nextSubscriptionStatus);
+      const customerInfo = await refreshCustomerInfo();
+      const nextSubscriptionStatus = getCrewAdminStatus(customerInfo);
+      setSubscriptionStatus(nextSubscriptionStatus === 'inactive' ? 'active' : nextSubscriptionStatus);
       void trackAnalyticsEvent({
         eventName: 'purchase_success',
         route: '/create-crew-paywall',
         properties: {
           selectedPlan,
-          packageId: selectedPackage.identifier,
+          packageId: selectedPackage?.identifier || null,
         },
       });
       setStep('details');
@@ -232,10 +213,12 @@ export default function CreateCrewPaywallScreen() {
         route: '/create-crew-paywall',
         properties: {
           selectedPlan,
-          packageId: selectedPackage.identifier,
+          packageId: selectedPackage?.identifier || null,
         },
       });
       Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
+    } finally {
+      setIsPresentingPaywall(false);
     }
   };
 
@@ -305,7 +288,7 @@ export default function CreateCrewPaywallScreen() {
         description: crewDescription,
         logoUri: crewLogo,
         subscriptionStatus: isRevenueCatEnabled ? subscriptionStatus : 'inactive',
-        billingRequired: false,
+        billingRequired: isRevenueCatEnabled,
       });
       void trackAnalyticsEvent({
         eventName: 'crew_create_success',
@@ -492,28 +475,25 @@ export default function CreateCrewPaywallScreen() {
               },
             ]}
           >
-            <Animated.View 
-              style={[
-                styles.crownContainer,
-                { transform: [{ rotate: crownRotateInterpolate }] },
-              ]}
-            >
+            <View style={styles.heroImageFrame}>
+              <Image
+                source={paywallHeroImage}
+                style={styles.heroImage}
+                contentFit="cover"
+                contentPosition="center"
+              />
               <LinearGradient
-                colors={[colors.primary, '#B8860B']}
-                style={styles.crownGradient}
-              >
-                <Crown size={48} color="#fff" strokeWidth={1.5} />
-              </LinearGradient>
-            </Animated.View>
-            <View style={styles.heroTextContainer}>
-              <View style={styles.heroTitleRow}>
-                <Sparkles size={18} color={colors.primary} />
+                colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.48)', 'rgba(0,0,0,0.86)']}
+                locations={[0, 0.45, 1]}
+                style={styles.heroImageOverlay}
+              />
+              <View style={styles.heroTextContainer}>
+                <Text style={styles.heroEyebrow}>PresidentsMC Pro</Text>
                 <Text style={styles.heroTitle}>Become a Crew Admin</Text>
-                <Sparkles size={18} color={colors.primary} />
+                <Text style={styles.heroSubtitle}>
+                  Create and manage your own private crew. Members always join free.
+                </Text>
               </View>
-              <Text style={styles.heroSubtitle}>
-                Create and manage your own private crew. Members always join free.
-              </Text>
             </View>
           </Animated.View>
 
@@ -523,7 +503,7 @@ export default function CreateCrewPaywallScreen() {
               { opacity: fadeAnim },
             ]}
           >
-            <Text style={styles.trialText}>First month free on monthly · First year free on yearly</Text>
+            <Text style={styles.trialText}>Monthly {getMonthlyPrice()} · Yearly {getYearlyPrice()} · Save 16%</Text>
           </Animated.View>
 
           <Animated.View 
@@ -565,7 +545,7 @@ export default function CreateCrewPaywallScreen() {
                 <View style={styles.planHeader}>
                   <View>
                     <Text style={styles.planName}>Yearly</Text>
-                    <Text style={styles.planSavings}>First year free · Lower monthly cost</Text>
+                    <Text style={styles.planSavings}>Save 16% · Best value</Text>
                   </View>
                   <View style={[
                     styles.radioOuter,
@@ -580,7 +560,7 @@ export default function CreateCrewPaywallScreen() {
                   <Text style={styles.planPrice}>{getYearlyPrice()}</Text>
                   <Text style={styles.planPeriod}>/year</Text>
                 </View>
-                <Text style={styles.planBilling}>Free for 1 year, then {getYearlyMonthlyPrice()}/month billed annually</Text>
+                <Text style={styles.planBilling}>Billed annually · about {getYearlyMonthlyPrice()}/month</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -607,7 +587,7 @@ export default function CreateCrewPaywallScreen() {
                   <Text style={styles.planPrice}>{getMonthlyPrice()}</Text>
                   <Text style={styles.planPeriod}>/month</Text>
                 </View>
-                <Text style={styles.planBilling}>Free for 1 month, then {getMonthlyPrice()}/month</Text>
+                <Text style={styles.planBilling}>Billed monthly · cancel anytime</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -615,18 +595,18 @@ export default function CreateCrewPaywallScreen() {
           <TouchableOpacity
             style={[
               styles.subscribeButton, 
-              (isPurchasing || isLoading) && styles.buttonDisabled
+              (isPurchasing || isPresentingPaywall || isLoading) && styles.buttonDisabled
             ]}
             onPress={handleSubscribe}
             activeOpacity={0.8}
-            disabled={isPurchasing || isLoading}
+            disabled={isPurchasing || isPresentingPaywall || isLoading}
             testID="subscribe-button"
           >
-            {isPurchasing ? (
+            {isPurchasing || isPresentingPaywall ? (
               <ActivityIndicator color={colors.background} />
             ) : (
               <Text style={styles.subscribeButtonText}>
-                {selectedPlan === 'monthly' ? 'Get First Month Free' : 'Get First Year Free'}
+                View Plans
               </Text>
             )}
           </TouchableOpacity>
@@ -642,6 +622,15 @@ export default function CreateCrewPaywallScreen() {
             ) : (
               <Text style={styles.restoreText}>Restore Purchases</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={() => void presentCustomerCenter()}
+            disabled={!isRevenueCatEnabled}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.restoreText}>Manage Subscription</Text>
           </TouchableOpacity>
 
           {__DEV__ && (
@@ -661,7 +650,7 @@ export default function CreateCrewPaywallScreen() {
           )}
 
           <Text style={styles.termsText}>
-            Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. After the free introductory period, you will be charged {selectedPlan === 'yearly' ? `${getYearlyPrice()}/year` : `${getMonthlyPrice()}/month`} to your Apple or Google account. Manage or cancel anytime in account settings. By continuing, you agree to our{' '}
+            Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. You will be charged {selectedPlan === 'yearly' ? `${getYearlyPrice()}/year` : `${getMonthlyPrice()}/month`} to your Apple or Google account. Manage or cancel anytime in account settings. By continuing, you agree to our{' '}
             <Text style={styles.termsLink} onPress={() => void openExternalLink(TERMS_URL)}>
               Terms of Use
             </Text>{' '}
@@ -714,46 +703,50 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     width: 40,
   },
   scrollContent: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     paddingTop: 8,
   },
   heroSection: {
-    alignItems: 'center',
+    width: '100%',
     marginBottom: 20,
   },
-  crownContainer: {
-    marginBottom: 20,
+  heroImageFrame: {
+    height: 340,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  crownGradient: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   heroTextContainer: {
-    alignItems: 'center',
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 20,
   },
-  heroTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  heroEyebrow: {
+    fontSize: 12,
+    fontWeight: '800' as const,
+    color: colors.primary,
+    textTransform: 'uppercase',
     marginBottom: 8,
   },
   heroTitle: {
-    fontSize: 26,
-    fontWeight: '700' as const,
-    color: colors.text,
+    fontSize: 30,
+    fontWeight: '800' as const,
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   heroSubtitle: {
     fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
+    color: 'rgba(255,255,255,0.88)',
     lineHeight: 22,
   },
   trialBanner: {

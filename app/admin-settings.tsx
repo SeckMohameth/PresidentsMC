@@ -16,6 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Camera, Copy, Database, FileJson, FileText, RefreshCcw, Shield, UserMinus, UserPlus } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
+import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import { CrewMember, JoinRequest } from '@/types';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 import { ClubStatsExportFormat, exportClubStats } from '@/utils/clubStatsExport';
@@ -73,12 +74,17 @@ export default function AdminSettingsScreen() {
     updateCrewSettings,
     getInviteSettings,
     updateInviteSettings,
+    syncClubSubscription,
     isAdmin,
-    isOwner,
     isBillingRequired,
     isSubscriptionActive,
     canManageJoinRequests,
   } = useCrew();
+  const {
+    isConfigured: isRevenueCatConfigured,
+    presentPaywallIfNeeded,
+    refreshCustomerInfo,
+  } = useRevenueCat();
 
   const [name, setName] = useState(crew?.name || '');
   const [description, setDescription] = useState(crew?.description || '');
@@ -242,6 +248,28 @@ export default function AdminSettingsScreen() {
     }
   };
 
+  const handleRenewSubscription = async () => {
+    if (!isRevenueCatConfigured) {
+      Alert.alert('Subscriptions Unavailable', 'Subscription management is not available in this build.');
+      return;
+    }
+
+    try {
+      const didUnlock = await presentPaywallIfNeeded();
+      if (!didUnlock) return;
+
+      const customerInfo = await refreshCustomerInfo();
+      const nextStatus = getCrewAdminStatus(customerInfo);
+      await syncClubSubscription(nextStatus);
+      Alert.alert('Subscription Active', 'PresidentsMC Pro is active for this club.');
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[AdminSettings] Subscription renewal error:', error);
+      }
+      Alert.alert('Subscription Error', 'Unable to renew the club subscription right now.');
+    }
+  };
+
   const saveInviteSettings = async ({ rotate }: { rotate: boolean }) => {
     setIsInviteSaving(true);
     try {
@@ -309,12 +337,17 @@ export default function AdminSettingsScreen() {
           <View style={styles.backButton} />
         </View>
 
-        {isBillingRequired && !isOwner && !isSubscriptionActive && (
+        {isBillingRequired && !isSubscriptionActive && (
           <View style={styles.banner}>
             <Shield size={16} color={colors.warning} />
-            <Text style={styles.bannerText}>
-              Subscription inactive. Admin actions are locked until the club subscription is active.
-            </Text>
+            <View style={styles.bannerContent}>
+              <Text style={styles.bannerText}>
+                Subscription inactive. Admin actions are locked until one admin has PresidentsMC Pro active.
+              </Text>
+              <Pressable style={styles.bannerButton} onPress={() => void handleRenewSubscription()}>
+                <Text style={styles.bannerButtonText}>Renew Pro</Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -590,11 +623,26 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderColor: colors.border,
     marginBottom: 16,
   },
-  bannerText: {
+  bannerContent: {
     flex: 1,
+    gap: 10,
+  },
+  bannerText: {
     color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
+  },
+  bannerButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.warning,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  bannerButtonText: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: '800',
   },
   card: {
     backgroundColor: colors.surface,

@@ -35,6 +35,7 @@ import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useCrew } from '@/providers/CrewProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import { getAvatarSource, isDefaultAvatar } from '@/utils/avatar';
 import { getInitials } from '@/utils/helpers';
 import { trackAnalyticsEvent } from '@/utils/analytics';
@@ -90,8 +91,8 @@ type ExitPreview = {
 };
 
 const WEBSITE_URL = 'https://www.mostudios.io/';
-const PRIVACY_URL = 'https://www.mostudios.io/privacy';
-const TERMS_URL = 'https://www.mostudios.io/terms';
+const PRIVACY_URL = 'https://sites.google.com/view/presidentsmc-privacy/home';
+const TERMS_URL = 'https://sites.google.com/view/presidentsmc-terms/home';
 const FEEDBACK_URL = 'https://www.momadeit.online/apps/pjs8MBE7YCvnzUzLCIFd';
 
 function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
@@ -117,8 +118,27 @@ export default function MoreScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { currentUser, crew, isAdmin, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
+  const {
+    currentUser,
+    crew,
+    isAdmin,
+    isSubscriptionActive,
+    canManageJoinRequests,
+    members,
+    joinRequests,
+    leaveCrew,
+    getInviteCode,
+    syncClubSubscription,
+  } = useCrew();
   const { signOut, deleteAccount, updateProfile, user } = useAuth();
+  const {
+    isConfigured: isRevenueCatConfigured,
+    isCrewAdmin,
+    crewAdminStatus,
+    presentPaywallIfNeeded,
+    presentCustomerCenter,
+    refreshCustomerInfo,
+  } = useRevenueCat();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
@@ -248,6 +268,29 @@ export default function MoreScreen() {
       isActive = false;
     };
   }, [crew?.id, getInviteCode, isAdmin]);
+
+  useEffect(() => {
+    if (!crew?.id || !currentUser?.id || !isAdmin) return;
+    if (crew.subscriptionOwnerId && crew.subscriptionOwnerId !== currentUser.id) return;
+    if (!isCrewAdmin && crew.subscriptionOwnerId !== currentUser.id) return;
+    if (crew.subscriptionStatus === crewAdminStatus && crew.billingRequired === true) return;
+
+    syncClubSubscription(crewAdminStatus).catch((error) => {
+      if (__DEV__) {
+        console.log('[MoreScreen] Subscription auto-sync error:', error);
+      }
+    });
+  }, [
+    crew?.billingRequired,
+    crew?.id,
+    crew?.subscriptionOwnerId,
+    crew?.subscriptionStatus,
+    crewAdminStatus,
+    currentUser?.id,
+    isAdmin,
+    isCrewAdmin,
+    syncClubSubscription,
+  ]);
 
   const openEditProfile = () => {
     setEditName(currentUser?.name || '');
@@ -538,6 +581,46 @@ export default function MoreScreen() {
     }
   };
 
+  const handleSubscriptionPress = async () => {
+    if (!isAdmin) {
+      Alert.alert('Admins Only', 'Only a club admin needs PresidentsMC Pro. Members can keep using the app for free.');
+      return;
+    }
+
+    if (!isRevenueCatConfigured) {
+      Alert.alert('Subscriptions Unavailable', 'Subscription management is not available in this build.');
+      return;
+    }
+
+    if (isSubscriptionActive && !isCrewAdmin) {
+      Alert.alert('Club Subscription Active', 'Another admin is covering PresidentsMC Pro for this club.');
+      return;
+    }
+
+    try {
+      if (isCrewAdmin) {
+        await presentCustomerCenter();
+        const customerInfo = await refreshCustomerInfo();
+        const nextStatus = getCrewAdminStatus(customerInfo);
+        await syncClubSubscription(nextStatus);
+        return;
+      }
+
+      const didUnlock = await presentPaywallIfNeeded();
+      if (didUnlock) {
+        const customerInfo = await refreshCustomerInfo();
+        const nextStatus = getCrewAdminStatus(customerInfo);
+        await syncClubSubscription(nextStatus);
+        Alert.alert('Subscription Active', 'PresidentsMC Pro is active for your account.');
+      }
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[MoreScreen] Subscription sync error:', error);
+      }
+      Alert.alert('Subscription Error', 'Unable to update the club subscription right now.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -688,6 +771,16 @@ export default function MoreScreen() {
               label="Help & Support"
               onPress={() => setSupportModalVisible(true)}
             />
+            <MenuItem
+              icon={<Shield size={20} color={colors.textSecondary} />}
+              label="Terms of Use"
+              onPress={() => openSupportLink(TERMS_URL)}
+            />
+            <MenuItem
+              icon={<Shield size={20} color={colors.textSecondary} />}
+              label="Privacy Policy"
+              onPress={() => openSupportLink(PRIVACY_URL)}
+            />
           </View>
         </View>
 
@@ -699,6 +792,19 @@ export default function MoreScreen() {
               label="Email & Password"
               onPress={() => router.push('/account-security' as any)}
             />
+            {isAdmin && (
+              <MenuItem
+                icon={<Crown size={20} color={colors.warning} />}
+                label={
+                  isCrewAdmin
+                    ? 'Manage Subscription'
+                    : isSubscriptionActive
+                      ? 'Club Subscription Active'
+                      : 'Renew PresidentsMC Pro'
+                }
+                onPress={() => void handleSubscriptionPress()}
+              />
+            )}
           </View>
         </View>
 
