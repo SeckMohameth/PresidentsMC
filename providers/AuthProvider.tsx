@@ -527,7 +527,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         const response = await fetch(logoUri);
         const blob = await response.blob();
         const storageRef = ref(storage, `crews/${crewId}/logo.jpg`);
-        await uploadBytes(storageRef, blob);
+        const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
+        await uploadBytes(storageRef, blob, { contentType });
         logoUrl = await getDownloadURL(storageRef);
       } else if (logoUri) {
         logoUrl = logoUri;

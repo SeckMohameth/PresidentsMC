@@ -14,38 +14,6 @@ service firebase.storage {
       return crewId == 'presidents-mc';
     }
 
-    function crewDoc(crewId) {
-      return firestore.get(/databases/(default)/documents/crews/$(crewId));
-    }
-
-    function crewMemberDoc(crewId, userId) {
-      return firestore.get(/databases/(default)/documents/crews/$(crewId)/members/$(userId));
-    }
-
-    function isCrewMember(crewId) {
-      return signedIn()
-        && isPresidentsClub(crewId)
-        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(request.auth.uid));
-    }
-
-    function isCrewOwner(crewId) {
-      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
-    }
-
-    function isCrewLeader(crewId) {
-      return isCrewMember(crewId)
-        && ['admin', 'officer'].hasAny([crewMemberDoc(crewId, request.auth.uid).data.role]);
-    }
-
-    function memberPermission(crewId, key) {
-      return isCrewMember(crewId)
-        && crewMemberDoc(crewId, request.auth.uid).data.permissions[key] == true;
-    }
-
-    function hasActiveSubscription(crewId) {
-      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
-    }
-
     function isDeveloperAdminEmail() {
       return signedIn()
         && request.auth.token.email != null
@@ -55,99 +23,70 @@ service firebase.storage {
         ];
     }
 
-    function canUseAdminTools(crewId) {
-      return isDeveloperSupport(crewId)
-        || (isPresidentsClub(crewId) && isDeveloperAdminEmail())
-        || isCrewOwner(crewId)
-        || (
-          isCrewLeader(crewId)
-          && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
-        );
-    }
-
-    function canManageCrewSettings(crewId) {
-      return isDeveloperSupport(crewId)
-        || (isPresidentsClub(crewId) && isDeveloperAdminEmail())
-        || isCrewOwner(crewId)
-        || (
-          isCrewMember(crewId)
-          && crewMemberDoc(crewId, request.auth.uid).data.role == 'admin'
-          && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
-        );
-    }
-
-    function canUseDelegatedTool(crewId, key) {
-      return canUseAdminTools(crewId)
-        || (
-          memberPermission(crewId, key)
-          && (crewDoc(crewId).data.billingRequired != true || hasActiveSubscription(crewId))
-        );
-    }
-
-    function isDeveloperSupport(crewId) {
-      return isCrewMember(crewId)
-        && crewMemberDoc(crewId, request.auth.uid).data.isDeveloperSupport == true;
-    }
-
-    function canReadCrewStorage(crewId) {
-      return isCrewMember(crewId)
-        || (isPresidentsClub(crewId) && isDeveloperAdminEmail());
-    }
-
     function isImage() {
       return request.resource != null
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
+    function canReadCrewStorage(crewId) {
+      return signedIn() && isPresidentsClub(crewId);
+    }
+
+    function canWriteCrewImage(crewId) {
+      return signedIn() && isPresidentsClub(crewId) && isImage();
+    }
+
+    function canDeleteCrewImage(crewId) {
+      return signedIn() && isPresidentsClub(crewId);
+    }
+
     match /users/{userId}/avatar.jpg {
-      allow read: if isSelf(userId);
+      allow read: if signedIn();
       allow write: if isSelf(userId) && isImage();
+      allow delete: if isSelf(userId);
     }
 
     match /users/{userId}/bikes/{fileName} {
       allow read: if signedIn();
-      allow write, delete: if isSelf(userId) && isImage();
+      allow write: if isSelf(userId) && isImage();
+      allow delete: if isSelf(userId);
     }
 
     match /crews/{crewId}/logo.jpg {
       allow read: if canReadCrewStorage(crewId);
-      allow write: if canManageCrewSettings(crewId)
-        && crewDoc(crewId).data.status == 'active'
-        && isImage();
+      allow write: if canWriteCrewImage(crewId);
+      allow delete: if isDeveloperAdminEmail();
     }
 
     match /crews/{crewId}/announcements/{fileName} {
       allow read: if canReadCrewStorage(crewId);
-      allow write: if canUseDelegatedTool(crewId, 'manageAnnouncements')
-        && isImage();
-      allow delete: if canUseDelegatedTool(crewId, 'manageAnnouncements');
+      allow write: if canWriteCrewImage(crewId);
+      allow delete: if canDeleteCrewImage(crewId);
     }
 
     match /crews/{crewId}/rides/{rideId}/cover.jpg {
       allow read: if canReadCrewStorage(crewId);
-      allow write: if canUseDelegatedTool(crewId, 'manageRides')
-        && isImage();
-      allow delete: if canUseDelegatedTool(crewId, 'manageRides');
+      allow write: if canWriteCrewImage(crewId);
+      allow delete: if canDeleteCrewImage(crewId);
     }
 
     match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
       allow read: if canReadCrewStorage(crewId);
-      allow write: if canReadCrewStorage(crewId) && isImage();
-      allow delete: if canUseAdminTools(crewId);
+      allow write: if canWriteCrewImage(crewId);
+      allow delete: if canDeleteCrewImage(crewId);
     }
 
     match /crews/{crewId}/albums/{albumId}/cover.jpg {
       allow read: if canReadCrewStorage(crewId);
-      allow write: if canUseDelegatedTool(crewId, 'manageAlbums')
-        && isImage();
-      allow delete: if canUseDelegatedTool(crewId, 'manageAlbums');
+      allow write: if canWriteCrewImage(crewId);
+      allow delete: if canDeleteCrewImage(crewId);
     }
 
     match /crews/{crewId}/albums/{albumId}/photos/{fileName} {
       allow read: if canReadCrewStorage(crewId);
-      allow write: if canReadCrewStorage(crewId) && isImage();
-      allow delete: if canUseAdminTools(crewId);
+      allow write: if canWriteCrewImage(crewId);
+      allow delete: if canDeleteCrewImage(crewId);
     }
 
     match /{allPaths=**} {

@@ -1,6 +1,18 @@
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+
+type PickedImageResult = {
+  canceled: boolean;
+  assets: Array<{
+    uri: string;
+    fileName?: string | null;
+    mimeType?: string | null;
+    width?: number;
+    height?: number;
+  }>;
+};
 
 export async function requestPhotoLibraryAccess(permissionMessage: string) {
   if (Platform.OS === 'web') return true;
@@ -14,16 +26,82 @@ export async function requestPhotoLibraryAccess(permissionMessage: string) {
   return true;
 }
 
-export async function pickSingleImage(options?: Pick<ImagePicker.ImagePickerOptions, 'quality'>) {
+export async function pickSingleImage(options?: Pick<ImagePicker.ImagePickerOptions, 'quality'>): Promise<PickedImageResult> {
   await ensureImagePickerDirectories();
 
-  return ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    allowsMultipleSelection: false,
-    quality: Platform.OS === 'ios' ? 1 : options?.quality ?? 0.8,
-    preferredAssetRepresentationMode:
-      ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
+  try {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: false,
+      quality: Platform.OS === 'ios' ? 1 : options?.quality ?? 0.8,
+      preferredAssetRepresentationMode:
+        ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
+    });
+    return normalizeImagePickerResult(result);
+  } catch (error) {
+    if (Platform.OS !== 'ios' || !isLocalPickerWriteError(error)) {
+      throw error;
+    }
+
+    if (__DEV__) {
+      console.log('[ImagePicker] Native photo picker failed; falling back to document picker.', error);
+    }
+    return pickImageFile();
+  }
+}
+
+function normalizeImagePickerResult(result: ImagePicker.ImagePickerResult): PickedImageResult {
+  if (result.canceled) {
+    return { canceled: true, assets: [] };
+  }
+
+  return {
+    canceled: false,
+    assets: result.assets.map((asset) => ({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+    })),
+  };
+}
+
+async function pickImageFile(): Promise<PickedImageResult> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: 'image/*',
+    multiple: false,
+    copyToCacheDirectory: true,
   });
+
+  if (result.canceled) {
+    return { canceled: true, assets: [] };
+  }
+
+  const asset = result.assets[0];
+  return {
+    canceled: false,
+    assets: [{
+      uri: asset.uri,
+      fileName: asset.name,
+      mimeType: asset.mimeType,
+      width: undefined,
+      height: undefined,
+    }],
+  };
+}
+
+function isLocalPickerWriteError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error && 'message' in error
+        ? String((error as { message?: unknown }).message)
+        : String(error);
+
+  return message.includes('Failed to write data to a file')
+    || message.includes("doesn't exist")
+    || message.includes('does not exist');
 }
 
 async function ensureImagePickerDirectories() {

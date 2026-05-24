@@ -26,6 +26,10 @@ async function repairExpoStorageDirectory() {
           const basePath = `${root}ExponentExperienceData`;
           const anonymousPath = `${basePath}/@anonymous`;
 
+          const baseInfo = await FileSystem.getInfoAsync(basePath).catch(() => null);
+          if (baseInfo?.exists && !baseInfo.isDirectory) {
+            await FileSystem.deleteAsync(basePath, { idempotent: true }).catch(() => {});
+          }
           await FileSystem.makeDirectoryAsync(basePath, { intermediates: true }).catch(() => {});
 
           const info = await FileSystem.getInfoAsync(anonymousPath).catch(() => null);

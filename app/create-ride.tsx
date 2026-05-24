@@ -384,37 +384,43 @@ export default function CreateRideScreen() {
       return;
     }
 
-    await createRide({
-      crewId: crew?.id || '',
-      title: title.trim(),
-      description: description.trim(),
-      startLocation: {
-        name: startName.trim(),
-        address: startAddress.trim(),
-        latitude: startCoords?.latitude ?? 0,
-        longitude: startCoords?.longitude ?? 0,
-      },
-      endLocation: {
-        name: endName.trim(),
-        address: endAddress.trim(),
-        latitude: endCoords?.latitude ?? 0,
-        longitude: endCoords?.longitude ?? 0,
-      },
-      dateTime: rideDate.toISOString(),
-      estimatedDuration: duration || '2 hours',
-      estimatedDistance: parseFloat(distance) || 0,
-      routeCoordinates: routePreview?.coordinates || [],
-      routeDistanceMeters: routePreview?.distanceMeters || 0,
-      routeDurationSeconds: routePreview?.durationSeconds || 0,
-      pace,
-      notes: notes.trim(),
-      coverImage: coverValue,
-      coverAttribution: coverAttribution,
-      createdBy: currentUser?.id || '',
-      createdByName: currentUser?.name || '',
-    });
-
-    router.back();
+    try {
+      await createRide({
+        crewId: crew?.id || '',
+        title: title.trim(),
+        description: description.trim(),
+        startLocation: {
+          name: startName.trim(),
+          address: startAddress.trim(),
+          latitude: startCoords?.latitude ?? 0,
+          longitude: startCoords?.longitude ?? 0,
+        },
+        endLocation: {
+          name: endName.trim(),
+          address: endAddress.trim(),
+          latitude: endCoords?.latitude ?? 0,
+          longitude: endCoords?.longitude ?? 0,
+        },
+        dateTime: rideDate.toISOString(),
+        estimatedDuration: duration || '2 hours',
+        estimatedDistance: parseFloat(distance) || 0,
+        routeCoordinates: routePreview?.coordinates || [],
+        routeDistanceMeters: routePreview?.distanceMeters || 0,
+        routeDurationSeconds: routePreview?.durationSeconds || 0,
+        pace,
+        notes: notes.trim(),
+        coverImage: coverValue,
+        coverAttribution: coverAttribution,
+        createdBy: currentUser?.id || '',
+        createdByName: currentUser?.name || '',
+      });
+      router.back();
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[CreateRide] Create ride error:', error);
+      }
+      Alert.alert('Ride Error', 'Unable to save this ride right now.');
+    }
   };
 
   const handleCreate = () => {

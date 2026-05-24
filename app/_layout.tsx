@@ -23,26 +23,35 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
+  const currentSegment = segments[0];
+
+  const inAuthGroup = currentSegment === 'onboarding' ||
+                      currentSegment === 'feature-onboarding' ||
+                      currentSegment === 'sign-in' ||
+                      currentSegment === 'sign-up' ||
+                      currentSegment === 'crew-selection' ||
+                      currentSegment === 'join-crew' ||
+                      currentSegment === 'create-crew-paywall';
+  const inAuthFlow =
+    currentSegment === 'onboarding' ||
+    currentSegment === 'sign-in' ||
+    currentSegment === 'sign-up';
+  const inFeatureOnboardingFlow = currentSegment === 'feature-onboarding';
+  const inNeedsCrewFlow =
+    currentSegment === 'crew-selection' ||
+    currentSegment === 'join-crew' ||
+    currentSegment === 'create-crew-paywall';
+  const shouldHoldForRedirect =
+    !rootNavigationState?.key ||
+    authStatus === 'loading' ||
+    (authStatus === 'onboarding' && currentSegment !== 'onboarding') ||
+    (authStatus === 'unauthenticated' && !inAuthFlow) ||
+    (authStatus === 'feature_onboarding' && !inFeatureOnboardingFlow) ||
+    (authStatus === 'needs_crew' && !inNeedsCrewFlow) ||
+    (authStatus === 'authenticated' && inAuthGroup);
 
   useEffect(() => {
     if (authStatus === 'loading' || !rootNavigationState?.key) return;
-
-    const inAuthGroup = segments[0] === 'onboarding' || 
-                        segments[0] === 'feature-onboarding' ||
-                        segments[0] === 'sign-in' || 
-                        segments[0] === 'sign-up' ||
-                        segments[0] === 'crew-selection' ||
-                        segments[0] === 'join-crew' ||
-                        segments[0] === 'create-crew-paywall';
-    const inAuthFlow =
-      segments[0] === 'onboarding' ||
-      segments[0] === 'sign-in' ||
-      segments[0] === 'sign-up';
-    const inFeatureOnboardingFlow = segments[0] === 'feature-onboarding';
-    const inNeedsCrewFlow =
-      segments[0] === 'crew-selection' ||
-      segments[0] === 'join-crew' ||
-      segments[0] === 'create-crew-paywall';
 
     if (authStatus === 'onboarding') {
       router.replace('/onboarding');
@@ -55,9 +64,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (authStatus === 'authenticated' && inAuthGroup) {
       router.replace('/');
     }
-  }, [authStatus, rootNavigationState?.key, segments, router]);
+  }, [
+    authStatus,
+    inAuthFlow,
+    inAuthGroup,
+    inFeatureOnboardingFlow,
+    inNeedsCrewFlow,
+    rootNavigationState?.key,
+    router,
+  ]);
 
-  if (authStatus === 'loading') {
+  if (shouldHoldForRedirect) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />

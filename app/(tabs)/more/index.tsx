@@ -328,7 +328,8 @@ export default function MoreScreen() {
         const response = await fetch(avatarUrl);
         const blob = await response.blob();
         const storageRef = ref(storage, `users/${user.id}/avatar.jpg`);
-        await uploadBytes(storageRef, blob);
+        const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
+        await uploadBytes(storageRef, blob, { contentType });
         avatarUrl = await getDownloadURL(storageRef);
       }
       const normalizedBikes = editBikes
@@ -345,7 +346,8 @@ export default function MoreScreen() {
           const response = await fetch(photoUrl);
           const blob = await response.blob();
           const storageRef = ref(storage, `users/${user.id}/bikes/${bike.id}.jpg`);
-          await uploadBytes(storageRef, blob, { contentType: blob.type || 'image/jpeg' });
+          const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
+          await uploadBytes(storageRef, blob, { contentType });
           photoUrl = await getDownloadURL(storageRef);
         }
         return { ...bike, photoUrl };
