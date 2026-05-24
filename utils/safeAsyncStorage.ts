@@ -5,6 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 const memoryStorage = new Map<string, string>();
 const failedStorageKeys = new Set<string>();
 let repairPromise: Promise<void> | null = null;
+let nativeStorageUnavailable = false;
 
 function logStorageWarning(operation: string, key: string, error: unknown) {
   const warningKey = `${operation}:${key}`;
@@ -50,6 +51,10 @@ async function repairExpoStorageDirectory() {
 
 const SafeAsyncStorage = {
   async getItem(key: string) {
+    if (nativeStorageUnavailable) {
+      return memoryStorage.get(key) ?? null;
+    }
+
     try {
       const value = await AsyncStorage.getItem(key);
       if (value != null) {
@@ -67,6 +72,7 @@ const SafeAsyncStorage = {
       } catch {
         // Fall through to the in-memory copy for this session.
       }
+      nativeStorageUnavailable = true;
       logStorageWarning('getItem', key, error);
       return memoryStorage.get(key) ?? null;
     }
@@ -74,6 +80,10 @@ const SafeAsyncStorage = {
 
   async setItem(key: string, value: string) {
     memoryStorage.set(key, value);
+    if (nativeStorageUnavailable) {
+      return;
+    }
+
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
@@ -84,12 +94,17 @@ const SafeAsyncStorage = {
       } catch {
         // Fall through to the warning and in-memory persistence.
       }
+      nativeStorageUnavailable = true;
       logStorageWarning('setItem', key, error);
     }
   },
 
   async removeItem(key: string) {
     memoryStorage.delete(key);
+    if (nativeStorageUnavailable) {
+      return;
+    }
+
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
@@ -100,6 +115,7 @@ const SafeAsyncStorage = {
       } catch {
         // Fall through to the warning.
       }
+      nativeStorageUnavailable = true;
       logStorageWarning('removeItem', key, error);
     }
   },

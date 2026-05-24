@@ -36,7 +36,7 @@ export default function MemberProfileScreen() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { getMemberById, rides } = useCrew();
+  const { getMemberById, rides, isLoading } = useCrew();
   const member = getMemberById(id || '');
 
   const stats = useMemo(() => {
@@ -54,6 +54,14 @@ export default function MemberProfileScreen() {
       checkedIn: attended.filter((ride) => ride.checkedIn?.includes(member.id)).length,
     };
   }, [member, rides]);
+
+  if (!member && isLoading) {
+    return (
+      <View style={[styles.container, styles.center, { paddingTop: insets.top }]}>
+        <Text style={styles.emptyTitle}>Loading member...</Text>
+      </View>
+    );
+  }
 
   if (!member) {
     return (

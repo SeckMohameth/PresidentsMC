@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
-import { Camera, Copy, Database, FileJson, FileText, RefreshCcw, Shield, Star, UserMinus, UserPlus } from 'lucide-react-native';
+import { Camera, Copy, Database, FileJson, FileText, RefreshCcw, Shield, UserMinus, UserPlus } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { CrewMember, JoinRequest } from '@/types';
@@ -65,6 +65,7 @@ export default function AdminSettingsScreen() {
     crewStats,
     statsHistory,
     joinRequests,
+    currentUser,
     approveJoinRequest,
     denyJoinRequest,
     removeMember,
@@ -225,12 +226,13 @@ export default function AdminSettingsScreen() {
     ]);
   };
 
-  const toggleOfficer = async (member: CrewMember) => {
+  const updateMemberRole = async (member: CrewMember, role: CrewMember['role']) => {
+    if (member.role === role) return;
     try {
-      await setMemberRole(member.id, member.role === 'officer' ? 'member' : 'officer');
+      await setMemberRole(member.id, role);
     } catch (error: any) {
       if (__DEV__) {
-        console.log('[AdminSettings] Toggle officer error:', error);
+        console.log('[AdminSettings] Update member role error:', error);
       }
       const message =
         error?.message === 'OWNER_ROLE_LOCKED'
@@ -517,12 +519,24 @@ export default function AdminSettingsScreen() {
                 <Text style={styles.memberName}>{member.name}</Text>
                 <Text style={styles.memberMeta}>{member.role}</Text>
               </View>
-              {isAdmin && member.id !== crew?.ownerId ? (
-                <View style={styles.rowActions}>
-                  <Pressable style={styles.iconButton} onPress={() => toggleOfficer(member)}>
-                    <Star size={16} color={colors.text} />
-                  </Pressable>
-                  <Pressable style={styles.iconButton} onPress={() => handleRemove(member)}>
+              {isAdmin && member.id !== crew?.ownerId && member.id !== currentUser?.id ? (
+                <View style={styles.memberActions}>
+                  {(['admin', 'officer', 'member'] as const).map((role) => {
+                    const selected = member.role === role;
+                    return (
+                      <Pressable
+                        key={role}
+                        style={[styles.roleButton, selected && styles.roleButtonSelected]}
+                        onPress={() => updateMemberRole(member, role)}
+                        disabled={selected}
+                      >
+                        <Text style={[styles.roleButtonText, selected && styles.roleButtonTextSelected]}>
+                          {role === 'admin' ? 'Admin' : role === 'officer' ? 'Officer' : 'Member'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable style={[styles.iconButton, styles.removeMemberButton]} onPress={() => handleRemove(member)}>
                     <UserMinus size={16} color={colors.error} />
                   </Pressable>
                 </View>
@@ -637,6 +651,33 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  memberActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 8,
+    flex: 1.2,
+  },
+  roleButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  roleButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  roleButtonText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  roleButtonTextSelected: {
+    color: colors.onPrimary,
+  },
   iconButton: {
     width: 36,
     height: 36,
@@ -652,6 +693,10 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   denyButton: {
     borderWidth: 1,
     borderColor: colors.deleted,
+  },
+  removeMemberButton: {
+    borderWidth: 1,
+    borderColor: colors.error,
   },
   memberRow: {
     flexDirection: 'row',

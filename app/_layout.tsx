@@ -179,6 +179,12 @@ function RootLayoutNav() {
           headerShown: false,
         }} 
       />
+      <Stack.Screen
+        name="member/[id]"
+        options={{
+          headerShown: false,
+        }}
+      />
       <Stack.Screen 
         name="admin-settings" 
         options={{ 

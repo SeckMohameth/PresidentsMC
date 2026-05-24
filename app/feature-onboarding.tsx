@@ -7,13 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { Bell, Bike, Camera, Map, Shield, Users } from 'lucide-react-native';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
-import { storage } from '@/utils/firebase';
 import { getAvatarSource } from '@/utils/avatar';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
+import { uploadImageUri } from '@/utils/storageUpload';
 
 const heroImage = require('../assets/images/crew-image-mc.avif');
 
@@ -108,12 +107,7 @@ export default function FeatureOnboardingScreen() {
       return avatar;
     }
 
-    const response = await fetch(avatar);
-    const blob = await response.blob();
-    const storageRef = ref(storage, `users/${user.id}/avatar.jpg`);
-    const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
-    await uploadBytes(storageRef, blob, { contentType });
-    return getDownloadURL(storageRef);
+    return uploadImageUri(avatar, `users/${user.id}/avatar.jpg`);
   };
 
   const complete = async () => {

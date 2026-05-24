@@ -1182,9 +1182,19 @@ async function exitCrew(userId: string, deleteAccount: boolean): Promise<ExitCre
     const remainingMembers = members.filter(
       (member) => member.id !== userId && !member.isDeveloperSupport
     );
+    const remainingAdmins = remainingMembers.filter((member) => member.role === 'admin');
+    const leavingAdmin = isOwner || user.role === 'admin' || members.some(
+      (member) => member.id === userId && member.role === 'admin'
+    );
+    if (leavingAdmin && remainingMembers.length > 0 && remainingAdmins.length === 0) {
+      throw new HttpsError(
+        'failed-precondition',
+        'ANOTHER_ADMIN_REQUIRED'
+      );
+    }
     const nextOwner =
-      isOwner && remainingMembers.length > 0
-        ? pickNextOwner(members, userId) ?? remainingMembers[0]
+      isOwner && remainingAdmins.length > 0
+        ? pickNextOwner(remainingAdmins, userId) ?? remainingAdmins[0]
         : null;
     const now = new Date();
     const archiveFields = buildArchiveFields(now);

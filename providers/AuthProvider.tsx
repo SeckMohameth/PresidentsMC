@@ -23,11 +23,11 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { useRevenueCat } from '@/providers/RevenueCatProvider';
-import { auth, db, functions, storage } from '@/utils/firebase';
+import { auth, db, functions } from '@/utils/firebase';
 import { getDevicePushToken } from '@/utils/pushNotifications';
 import SafeAsyncStorage from '@/utils/safeAsyncStorage';
+import { uploadImageUri } from '@/utils/storageUpload';
 import { BikeProfile, UserPreferences } from '@/types';
 import { DEFAULT_AVATAR } from '@/utils/avatar';
 import {
@@ -524,12 +524,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       let logoUrl = '';
 
       if (logoUri && !logoUri.startsWith('http')) {
-        const response = await fetch(logoUri);
-        const blob = await response.blob();
-        const storageRef = ref(storage, `crews/${crewId}/logo.jpg`);
-        const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
-        await uploadBytes(storageRef, blob, { contentType });
-        logoUrl = await getDownloadURL(storageRef);
+        logoUrl = await uploadImageUri(logoUri, `crews/${crewId}/logo.jpg`);
       } else if (logoUri) {
         logoUrl = logoUri;
       }

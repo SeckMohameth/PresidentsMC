@@ -277,7 +277,7 @@ export default function MembersScreen() {
             style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
             onPress={() => setFilter('all')}
           >
-            <Users size={14} color={filter === 'all' ? colors.text : colors.textTertiary} />
+            <Users size={14} color={filter === 'all' ? colors.onPrimary : colors.textTertiary} />
             <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
               All ({visibleMembers.length})
             </Text>
@@ -286,7 +286,7 @@ export default function MembersScreen() {
             style={[styles.filterChip, filter === 'admin' && styles.filterChipActive]}
             onPress={() => setFilter('admin')}
           >
-            <Shield size={14} color={filter === 'admin' ? colors.text : colors.primary} />
+            <Shield size={14} color={filter === 'admin' ? colors.onPrimary : colors.primary} />
             <Text style={[styles.filterText, filter === 'admin' && styles.filterTextActive]}>
               Admins ({stats.admins})
             </Text>
@@ -295,7 +295,7 @@ export default function MembersScreen() {
             style={[styles.filterChip, filter === 'officer' && styles.filterChipActive]}
             onPress={() => setFilter('officer')}
           >
-            <Star size={14} color={filter === 'officer' ? colors.text : colors.warning} />
+            <Star size={14} color={filter === 'officer' ? colors.onPrimary : colors.warning} />
             <Text style={[styles.filterText, filter === 'officer' && styles.filterTextActive]}>
               Officers ({stats.officers})
             </Text>
@@ -543,7 +543,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     marginRight: 12,
   },
   crewLogoText: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 18,
     fontWeight: '700' as const,
   },
@@ -588,7 +588,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '500',
   },
   filterTextActive: {
-    color: colors.text,
+    color: colors.onPrimary,
   },
   listContent: {
     paddingVertical: 8,

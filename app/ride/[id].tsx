@@ -417,7 +417,7 @@ export default function RideDetailScreen() {
               <Text style={styles.sectionTitle}>Ride Weather</Text>
               <View style={styles.weatherCard}>
                 <View style={styles.weatherIcon}>
-                  <CloudSun size={24} color={colors.primary} />
+                  <CloudSun size={24} color={colors.info} />
                 </View>
                 <View style={styles.weatherBody}>
                   <Text style={styles.weatherTitle}>
@@ -982,7 +982,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: colors.primaryMuted,
+    backgroundColor: colors.infoMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,

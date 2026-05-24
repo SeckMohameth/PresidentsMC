@@ -293,10 +293,10 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   heroCard: {
     flexDirection: 'row',
     gap: 14,
-    backgroundColor: 'rgba(18,18,19,0.94)',
+    backgroundColor: colors.infoMuted,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(229,229,229,0.14)',
+    borderColor: colors.info,
     padding: 16,
     marginBottom: 16,
   },

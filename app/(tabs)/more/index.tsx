@@ -4,8 +4,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { storage } from '@/utils/firebase';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   Users,
   Settings,
@@ -28,7 +27,8 @@ import {
   UserPlus,
   UserMinus,
   Trash2,
-  X
+  X,
+  MessageSquarePlus
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { AppColors, useThemeColors } from '@/constants/colors';
@@ -41,6 +41,7 @@ import { trackAnalyticsEvent } from '@/utils/analytics';
 import * as Clipboard from 'expo-clipboard';
 import { BikeProfile, CrewMember } from '@/types';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
+import { uploadImageUri } from '@/utils/storageUpload';
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -91,6 +92,7 @@ type ExitPreview = {
 const WEBSITE_URL = 'https://www.mostudios.io/';
 const PRIVACY_URL = 'https://www.mostudios.io/privacy';
 const TERMS_URL = 'https://www.mostudios.io/terms';
+const FEEDBACK_URL = 'https://www.momadeit.online/apps/pjs8MBE7YCvnzUzLCIFd';
 
 function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
   if (!currentUserId) return null;
@@ -101,7 +103,7 @@ function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
   };
 
   return [...members]
-    .filter((member) => member.id !== currentUserId)
+    .filter((member) => member.id !== currentUserId && member.role === 'admin')
     .sort((a, b) => {
       const roleDiff = priority(a.role) - priority(b.role);
       if (roleDiff !== 0) return roleDiff;
@@ -111,15 +113,25 @@ function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { currentUser, crew, isAdmin, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
-  const { signOut, deleteAccount, updateProfile, resendVerificationEmail, user } = useAuth();
+  const { signOut, deleteAccount, updateProfile, user } = useAuth();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
   const pendingJoinRequests = joinRequests.filter((request) => request.status === 'pending');
+  const visibleMemberCount = members.filter((member) => !member.isDeveloperSupport).length;
+  const otherAdmins = members.filter(
+    (member) => member.id !== currentUser?.id && member.role === 'admin' && !member.isDeveloperSupport
+  );
+  const needsAdminBeforeExit =
+    !!currentUser &&
+    (isOwner || currentUser.role === 'admin') &&
+    visibleMemberCount > 1 &&
+    otherAdmins.length === 0;
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -128,7 +140,6 @@ export default function MoreScreen() {
   const [editBikes, setEditBikes] = useState<BikeProfile[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [supportModalVisible, setSupportModalVisible] = useState(false);
-  const [isSendingVerification, setIsSendingVerification] = useState(false);
   const [crewInviteCode, setCrewInviteCode] = useState('');
   const [isInviteCodeLoading, setIsInviteCodeLoading] = useState(false);
 
@@ -142,6 +153,13 @@ export default function MoreScreen() {
       };
     }
 
+    if (needsAdminBeforeExit) {
+      return {
+        title: 'Promote an Admin First',
+        message: `Promote another member to admin before leaving ${crew.name}. Members can leave anytime, but the club must keep at least one admin.`,
+      };
+    }
+
     if (!isOwner) {
       return {
         title: 'Leave Club',
@@ -149,7 +167,7 @@ export default function MoreScreen() {
       };
     }
 
-    if (members.length <= 1) {
+    if (visibleMemberCount <= 1) {
       return {
         title: 'Archive Club',
         message: `You are the last member of ${crew.name}. Leaving will archive the crew immediately and permanently purge it after 30 days.`,
@@ -173,6 +191,13 @@ export default function MoreScreen() {
     const base =
       'This permanently deletes your account and personal data. This cannot be undone. Photos you added will stay in club albums, but they will be anonymized to "Former Member".';
 
+    if (needsAdminBeforeExit) {
+      return {
+        title: 'Promote an Admin First',
+        message: `${base} Promote another member to admin before deleting your account so the club still has an admin.`,
+      };
+    }
+
     if (!isOwner) {
       return {
         title: 'Delete Account',
@@ -180,7 +205,7 @@ export default function MoreScreen() {
       };
     }
 
-    if (members.length <= 1) {
+    if (visibleMemberCount <= 1) {
       return {
         title: 'Delete Account and Archive Crew',
       message: `${base} Because you are the last member, ${crew.name} will be archived immediately and permanently purged after 30 days.`,
@@ -325,12 +350,7 @@ export default function MoreScreen() {
     try {
       let avatarUrl = editAvatar;
       if (avatarUrl && !avatarUrl.startsWith('http') && !isDefaultAvatar(avatarUrl) && user?.id) {
-        const response = await fetch(avatarUrl);
-        const blob = await response.blob();
-        const storageRef = ref(storage, `users/${user.id}/avatar.jpg`);
-        const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
-        await uploadBytes(storageRef, blob, { contentType });
-        avatarUrl = await getDownloadURL(storageRef);
+        avatarUrl = await uploadImageUri(avatarUrl, `users/${user.id}/avatar.jpg`);
       }
       const normalizedBikes = editBikes
         .map((bike, index) => ({
@@ -343,12 +363,7 @@ export default function MoreScreen() {
       const uploadedBikes = await Promise.all(normalizedBikes.map(async (bike) => {
         let photoUrl = bike.photoUrl || '';
         if (photoUrl && !photoUrl.startsWith('http') && user?.id) {
-          const response = await fetch(photoUrl);
-          const blob = await response.blob();
-          const storageRef = ref(storage, `users/${user.id}/bikes/${bike.id}.jpg`);
-          const contentType = blob.type?.startsWith('image/') ? blob.type : 'image/jpeg';
-          await uploadBytes(storageRef, blob, { contentType });
-          photoUrl = await getDownloadURL(storageRef);
+          photoUrl = await uploadImageUri(photoUrl, `users/${user.id}/bikes/${bike.id}.jpg`);
         }
         return { ...bike, photoUrl };
       }));
@@ -397,6 +412,11 @@ export default function MoreScreen() {
   };
 
   const handleLeaveCrew = () => {
+    if (needsAdminBeforeExit) {
+      Alert.alert(leavePreview.title, leavePreview.message);
+      return;
+    }
+
     Alert.alert(
       leavePreview.title,
       leavePreview.message,
@@ -416,13 +436,19 @@ export default function MoreScreen() {
                 ? `Ownership transferred to ${result.nextOwnerName || 'the next owner'}.`
                 : `You left ${result.crewName || 'the crew'}.`;
             Alert.alert('Club Updated', successMessage);
-          } catch {
+          } catch (error: any) {
             void trackAnalyticsEvent({
               eventName: 'crew_leave_failed',
               crewId: crew?.id ?? null,
               route: '/(tabs)/more',
             });
-            Alert.alert('Error', 'Unable to leave crew right now.');
+            const message = String(error?.message ?? '');
+            Alert.alert(
+              'Error',
+              message.includes('ANOTHER_ADMIN_REQUIRED')
+                ? 'Promote another member to admin before leaving the club.'
+                : 'Unable to leave crew right now.'
+            );
           }
         } },
       ]
@@ -451,6 +477,11 @@ export default function MoreScreen() {
   };
 
   const handleDeleteAccount = () => {
+    if (needsAdminBeforeExit) {
+      Alert.alert(deletePreview.title, deletePreview.message);
+      return;
+    }
+
     Alert.alert(
       deletePreview.title,
       deletePreview.message,
@@ -479,13 +510,19 @@ export default function MoreScreen() {
                 'Account Deleted',
                 'Your account was deleted. Photos and authored club content were kept and anonymized.'
               );
-            } catch {
+            } catch (error: any) {
               void trackAnalyticsEvent({
                 eventName: 'crew_delete_failed',
                 crewId: crew?.id ?? null,
                 route: '/(tabs)/more',
               });
-              Alert.alert('Delete Failed', 'Please sign in again and retry deleting your account.');
+              const message = String(error?.message ?? '');
+              Alert.alert(
+                'Delete Failed',
+                message.includes('ANOTHER_ADMIN_REQUIRED')
+                  ? 'Promote another member to admin before deleting your account.'
+                  : 'Please sign in again and retry deleting your account.'
+              );
             }
           },
         },
@@ -507,7 +544,7 @@ export default function MoreScreen() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 8 },
+          { paddingTop: insets.top + 8, paddingBottom: tabBarHeight + insets.bottom + 32 },
           isTablet && styles.scrollContentTablet,
         ]}
         showsVerticalScrollIndicator={false}
@@ -563,36 +600,6 @@ export default function MoreScreen() {
             <Pencil size={18} color={colors.textTertiary} />
           </Pressable>
         </Pressable>
-
-        {user && !user.emailVerified && (
-          <View style={styles.verificationCard}>
-            <View style={styles.verificationCopy}>
-              <Text style={styles.verificationTitle}>Verify your email</Text>
-              <Text style={styles.verificationText}>
-                Verification stays optional for beta, but password resets and launch support are safer when your inbox is confirmed.
-              </Text>
-            </View>
-            <Pressable
-              style={[styles.verificationButton, isSendingVerification && styles.verificationButtonDisabled]}
-              disabled={isSendingVerification}
-              onPress={async () => {
-                setIsSendingVerification(true);
-                try {
-                  await resendVerificationEmail();
-                  Alert.alert('Email Sent', `Verification email sent to ${user.email}.`);
-                } catch {
-                  Alert.alert('Error', 'Unable to send verification email right now.');
-                } finally {
-                  setIsSendingVerification(false);
-                }
-              }}
-            >
-              <Text style={styles.verificationButtonText}>
-                {isSendingVerification ? 'Sending...' : 'Send Email'}
-              </Text>
-            </Pressable>
-          </View>
-        )}
 
         {(isAdmin || canManageJoinRequests) && pendingJoinRequests.length > 0 && (
           <Pressable style={styles.joinRequestsCard} onPress={() => router.push('/admin-settings')}>
@@ -671,6 +678,11 @@ export default function MoreScreen() {
         <View style={styles.menuSection}>
           <Text style={styles.menuSectionTitle}>Support</Text>
           <View style={styles.menuCard}>
+            <MenuItem
+              icon={<MessageSquarePlus size={20} color={colors.info} />}
+              label="Submit Feedback"
+              onPress={() => openSupportLink(FEEDBACK_URL)}
+            />
             <MenuItem 
               icon={<HelpCircle size={20} color={colors.textSecondary} />}
               label="Help & Support"
@@ -859,6 +871,17 @@ export default function MoreScreen() {
               <View style={{ width: 48 }} />
             </View>
 
+            <Pressable style={styles.feedbackCard} onPress={() => openSupportLink(FEEDBACK_URL)}>
+              <View style={styles.feedbackIcon}>
+                <MessageSquarePlus size={22} color={colors.info} />
+              </View>
+              <View style={styles.supportText}>
+                <Text style={styles.feedbackTitle}>Submit Feedback</Text>
+                <Text style={styles.feedbackSubtitle}>Report a bug or request a feature</Text>
+              </View>
+              <ChevronRight size={20} color={colors.info} />
+            </Pressable>
+
             <Pressable style={styles.supportRow} onPress={() => openSupportLink('mailto:support@mostudios.io')}>
               <View style={styles.supportIcon}>
                 <Mail size={18} color={colors.primary} />
@@ -935,7 +958,6 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
   },
   scrollContentTablet: {
     maxWidth: 840,
@@ -958,43 +980,6 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  verificationCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 12,
-  },
-  verificationCopy: {
-    gap: 4,
-  },
-  verificationTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  verificationText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  verificationButton: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  verificationButtonDisabled: {
-    opacity: 0.6,
-  },
-  verificationButtonText: {
-    color: colors.background,
-    fontSize: 13,
-    fontWeight: '700',
   },
   profileAvatarContainer: {
     position: 'relative',
@@ -1304,6 +1289,35 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   supportText: {
     flex: 1,
+  },
+  feedbackCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.infoMuted,
+    borderWidth: 1,
+    borderColor: colors.info,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+  feedbackIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  feedbackSubtitle: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 2,
   },
   supportTitle: {
     color: colors.text,

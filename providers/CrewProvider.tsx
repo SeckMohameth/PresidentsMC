@@ -16,7 +16,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { deleteObject, ref } from 'firebase/storage';
 import { db, functions, storage } from '@/utils/firebase';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 import { useAuth } from '@/providers/AuthProvider';
@@ -34,6 +34,7 @@ import {
 } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 import { getDefaultRideCoverUri } from '@/constants/coverImages';
+import { isRemoteImageUri, uploadImageUri } from '@/utils/storageUpload';
 
 export type InviteCodeSettings = {
   inviteCode: string;
@@ -62,23 +63,8 @@ function generateInviteCode(length = 8) {
 
 async function uploadImageIfNeeded(uri: string, path: string) {
   if (!uri) return uri;
-  const isRemotePersistedImage =
-    uri.startsWith('https://images.unsplash.com/') ||
-    uri.startsWith('https://firebasestorage.googleapis.com/') ||
-    uri.includes('.firebasestorage.app/');
-  if (isRemotePersistedImage) return uri;
-
-  const response = await fetch(uri);
-  const blob = await response.blob();
-  const storageRef = ref(storage, path);
-  const contentType =
-    blob.type?.startsWith('image/')
-      ? blob.type
-      : path.toLowerCase().endsWith('.png')
-        ? 'image/png'
-        : 'image/jpeg';
-  await uploadBytes(storageRef, blob, { contentType });
-  return getDownloadURL(storageRef);
+  if (isRemoteImageUri(uri)) return uri;
+  return uploadImageUri(uri, path);
 }
 
 async function deleteStoragePath(path: string) {
@@ -1180,7 +1166,12 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     (id: string) => announcements.find((announcement) => announcement.id === id),
     [announcements]
   );
-  const getMemberById = useCallback((id: string) => members.find((member) => member.id === id), [members]);
+  const getMemberById = useCallback((id: string) => {
+    const visibleMember = members.find((member) => member.id === id);
+    if (visibleMember) return visibleMember;
+    if (currentUser?.id === id) return currentUser;
+    return undefined;
+  }, [currentUser, members]);
   const getAlbumById = useCallback((id: string) => albums.find((album) => album.id === id), [albums]);
 
   return {
