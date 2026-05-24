@@ -45,6 +45,13 @@
         }
       ],
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow PresidentsMC to access your photos to add them to shared ride albums.",
+          "savePhotosPermission": "Allow PresidentsMC to save photos to your library."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow PresidentsMC to access your location for ride check-ins."

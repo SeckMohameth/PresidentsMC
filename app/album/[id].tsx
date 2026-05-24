@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
+import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, X, Camera, Plus } from 'lucide-react-native';
@@ -8,7 +9,6 @@ import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
 import { RidePhoto } from '@/types';
-import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 
 export default function AlbumScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,6 +20,9 @@ export default function AlbumScreen() {
   const album = getAlbumById(id || '');
   const [selectedPhoto, setSelectedPhoto] = useState<RidePhoto | null>(null);
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [libraryAssets, setLibraryAssets] = useState<MediaLibrary.Asset[]>([]);
   const isTablet = width >= 768;
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -43,37 +46,61 @@ export default function AlbumScreen() {
   }
 
   const handleAddPhoto = async () => {
-    if (isAddingPhoto) return;
+    if (isAddingPhoto || isLoadingLibrary) return;
 
-    const hasAccess = await requestPhotoLibraryAccess(
-      'Please grant photo permissions to add ride photos.'
-    );
-    if (!hasAccess) return;
-
-    let result;
+    setIsLoadingLibrary(true);
     try {
-      result = await pickSingleImage({ quality: 0.8 });
+      const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant photo permissions to add album photos.');
+        return;
+      }
+
+      const result = await MediaLibrary.getAssetsAsync({
+        first: 90,
+        mediaType: 'photo',
+        sortBy: [['creationTime', false]],
+      });
+
+      setLibraryAssets(result.assets);
+      setIsLibraryOpen(true);
     } catch (error) {
       if (__DEV__) {
-        console.log('[Album] Photo picker error:', error);
+        console.log('[Album] Photo library error:', error);
       }
-      Alert.alert('Photo Error', getPhotoPickerErrorMessage(error));
-      return;
+      Alert.alert('Photo Error', 'Unable to open your photo library right now.');
+    } finally {
+      setIsLoadingLibrary(false);
     }
+  };
 
-    if (!result.canceled && result.assets[0]) {
-      setIsAddingPhoto(true);
-      try {
-        if (isRideAlbum && ride) {
-          await addPhoto({ rideId: ride.id, imageUrl: result.assets[0].uri });
-        } else if (album) {
-          await addAlbumPhoto({ albumId: album.id, imageUrl: result.assets[0].uri });
-        }
-      } catch {
-        Alert.alert('Upload Failed', 'Unable to add this photo right now. Please try again.');
-      } finally {
-        setIsAddingPhoto(false);
+  const handleSelectLibraryAsset = async (asset: MediaLibrary.Asset) => {
+    if (isAddingPhoto) return;
+
+    setIsAddingPhoto(true);
+    try {
+      const assetInfo = await MediaLibrary.getAssetInfoAsync(asset, {
+        shouldDownloadFromNetwork: true,
+      });
+      const imageUri = assetInfo.localUri || assetInfo.uri || asset.uri;
+      if (!imageUri || imageUri.startsWith('ph://')) {
+        throw new Error('Photo is not available locally yet.');
       }
+
+      if (isRideAlbum && ride) {
+        await addPhoto({ rideId: ride.id, imageUrl: imageUri });
+      } else if (album) {
+        await addAlbumPhoto({ albumId: album.id, imageUrl: imageUri });
+      }
+
+      setIsLibraryOpen(false);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[Album] Photo upload error:', error);
+      }
+      Alert.alert('Upload Failed', 'Unable to add this photo right now. Please try another photo.');
+    } finally {
+      setIsAddingPhoto(false);
     }
   };
 
@@ -109,11 +136,11 @@ export default function AlbumScreen() {
           <Text style={styles.headerSubtitle}>{formatDate(date)} • {photos.length} photos</Text>
         </View>
         <Pressable
-          style={[styles.addButton, isAddingPhoto && styles.disabledButton]}
+          style={[styles.addButton, (isAddingPhoto || isLoadingLibrary) && styles.disabledButton]}
           onPress={handleAddPhoto}
-          disabled={isAddingPhoto}
+          disabled={isAddingPhoto || isLoadingLibrary}
         >
-          <Plus size={20} color={colors.onPrimary} />
+          {isLoadingLibrary ? <ActivityIndicator color={colors.onPrimary} /> : <Plus size={20} color={colors.onPrimary} />}
         </Pressable>
       </View>
 
@@ -127,12 +154,12 @@ export default function AlbumScreen() {
             Be the first to add photos to this album.
           </Text>
           <Pressable
-            style={[styles.emptyButton, isAddingPhoto && styles.disabledButton]}
+            style={[styles.emptyButton, (isAddingPhoto || isLoadingLibrary) && styles.disabledButton]}
             onPress={handleAddPhoto}
-            disabled={isAddingPhoto}
+            disabled={isAddingPhoto || isLoadingLibrary}
           >
-            <Plus size={18} color={colors.onPrimary} />
-            <Text style={styles.emptyButtonText}>{isAddingPhoto ? 'Adding...' : 'Add Photos'}</Text>
+            {isLoadingLibrary ? <ActivityIndicator color={colors.onPrimary} /> : <Plus size={18} color={colors.onPrimary} />}
+            <Text style={styles.emptyButtonText}>{isAddingPhoto || isLoadingLibrary ? 'Adding...' : 'Add Photos'}</Text>
           </Pressable>
         </View>
       ) : (
@@ -153,6 +180,48 @@ export default function AlbumScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <Modal
+        visible={isLibraryOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setIsLibraryOpen(false)}
+      >
+        <View style={styles.libraryModal}>
+          <View style={[styles.libraryHeader, { paddingTop: insets.top + 10 }]}>
+            <Text style={styles.libraryTitle}>Choose Photo</Text>
+            <Pressable style={styles.libraryClose} onPress={() => setIsLibraryOpen(false)}>
+              <X size={22} color={colors.text} />
+            </Pressable>
+          </View>
+          <FlatList
+            data={libraryAssets}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            contentContainerStyle={styles.libraryGrid}
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.libraryAsset}
+                onPress={() => handleSelectLibraryAsset(item)}
+                disabled={isAddingPhoto}
+              >
+                <Image source={{ uri: item.uri }} style={styles.libraryImage} contentFit="cover" />
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <View style={styles.libraryEmpty}>
+                <Text style={styles.emptyDescription}>No photos found.</Text>
+              </View>
+            }
+          />
+          {isAddingPhoto ? (
+            <View style={styles.uploadOverlay}>
+              <ActivityIndicator color="#FFFFFF" />
+              <Text style={styles.uploadText}>Uploading...</Text>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       <Modal
         visible={!!selectedPhoto}
@@ -294,6 +363,66 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.onPrimary,
     fontSize: 16,
     fontWeight: '600',
+  },
+  libraryModal: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  libraryHeader: {
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    justifyContent: 'flex-end',
+  },
+  libraryTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  libraryClose: {
+    position: 'absolute',
+    right: 16,
+    bottom: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  libraryGrid: {
+    padding: 3,
+  },
+  libraryAsset: {
+    width: '33.333%',
+    aspectRatio: 1,
+    padding: 3,
+  },
+  libraryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+  },
+  libraryEmpty: {
+    minHeight: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(0,0,0,0.56)',
+  },
+  uploadText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
   },
   modalContainer: {
     flex: 1,
