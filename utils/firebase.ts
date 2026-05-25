@@ -2,9 +2,8 @@ import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import * as FirebaseAuth from '@firebase/auth';
+import { getAuth, initializeAuth, inMemoryPersistence } from 'firebase/auth';
 import { Platform } from 'react-native';
-import SafeAsyncStorage from '@/utils/safeAsyncStorage';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -26,22 +25,15 @@ if (!isConfigComplete) {
 }
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const getReactNativePersistence = (
-  FirebaseAuth as typeof FirebaseAuth & {
-    getReactNativePersistence: (storage: typeof SafeAsyncStorage) => unknown;
-  }
-).getReactNativePersistence;
 
 const auth =
   Platform.OS === 'web'
-    ? FirebaseAuth.getAuth(app)
+    ? getAuth(app)
     : (() => {
         try {
-          return FirebaseAuth.initializeAuth(app, {
-            persistence: getReactNativePersistence(SafeAsyncStorage) as never,
-          });
+          return initializeAuth(app, { persistence: inMemoryPersistence });
         } catch {
-          return FirebaseAuth.getAuth(app);
+          return getAuth(app);
         }
       })();
 const db = usesFirebaseDefaultDatabase

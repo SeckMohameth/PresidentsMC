@@ -1,9 +1,10 @@
+import "@/utils/fatalErrorHandler"; // must be first — intercepts JS fatals before native crash
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRootNavigationState, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
 import { AnalyticsProvider } from "@/providers/AnalyticsProvider";
 import { CrewProvider } from "@/providers/CrewProvider";
@@ -238,6 +239,20 @@ export default function RootLayout() {
         </AuthProvider>
       </RevenueCatProvider>
     </QueryClientProvider>
+  );
+}
+
+// Expo Router ErrorBoundary — catches render errors and shows them on screen
+// instead of crashing the app. Remove this once the crash is identified and fixed.
+export function ErrorBoundary({ error }: { error: Error }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000', padding: 24, paddingTop: 80, justifyContent: 'flex-start' }}>
+      <Text style={{ color: '#ff4444', fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>
+        Debug: Render Error
+      </Text>
+      <Text style={{ color: '#fff', fontSize: 13, marginBottom: 8 }}>{error?.message}</Text>
+      <Text style={{ color: '#aaa', fontSize: 11 }}>{error?.stack?.substring(0, 1000)}</Text>
+    </View>
   );
 }
 
