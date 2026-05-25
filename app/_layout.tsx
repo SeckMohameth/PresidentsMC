@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRootNavigationState, useRouter, useSegments } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -12,8 +11,6 @@ import { RevenueCatProvider } from "@/providers/RevenueCatProvider";
 import Colors, { useThemeColors } from "@/constants/colors";
 import "@/utils/firebase";
 import PushNotificationManager from "@/components/PushNotificationManager";
-
-SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient();
 
@@ -222,10 +219,6 @@ function RootLayoutNav() {
 export default function RootLayout() {
   const colors = useThemeColors();
   const statusBarStyle = colors.background === Colors.light.background ? 'dark' : 'light';
-
-  useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
