@@ -13,7 +13,7 @@ import Colors, { useThemeColors } from "@/constants/colors";
 import "@/utils/firebase";
 import PushNotificationManager from "@/components/PushNotificationManager";
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient();
 
@@ -224,7 +224,7 @@ export default function RootLayout() {
   const statusBarStyle = colors.background === Colors.light.background ? 'dark' : 'light';
 
   useEffect(() => {
-    SplashScreen.hideAsync();
+    SplashScreen.hideAsync().catch(() => {});
   }, []);
 
   return (

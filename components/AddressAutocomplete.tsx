@@ -53,6 +53,8 @@ export default function AddressAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedPlaceRef = useRef<string | null>(null);
   const latestQueryRef = useRef('');
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -89,6 +91,7 @@ export default function AddressAutocomplete({
   }, []);
 
   const handleChangeText = (text: string) => {
+    selectedPlaceRef.current = null;
     onChangeText(text);
 
     if (debounceTimer.current) {
@@ -101,6 +104,13 @@ export default function AddressAutocomplete({
   };
 
   const handleSelect = async (result: PlaceSuggestion) => {
+    if (selectedPlaceRef.current === result.placeId) return;
+    selectedPlaceRef.current = result.placeId;
+
+    if (blurTimer.current) {
+      clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
     onChangeText(result.description);
     setShowDropdown(false);
     setResults([]);
@@ -141,7 +151,7 @@ export default function AddressAutocomplete({
           }}
           onBlur={() => {
             // Delay hiding so the user can tap a result
-            setTimeout(() => setShowDropdown(false), 200);
+            blurTimer.current = setTimeout(() => setShowDropdown(false), 400);
           }}
         />
         {isLoading && (
@@ -158,9 +168,10 @@ export default function AddressAutocomplete({
             <Pressable
               key={item.placeId}
               style={styles.dropdownItem}
-              onPress={() => {
+              onPressIn={() => {
                 void handleSelect(item);
               }}
+              onPress={() => undefined}
             >
               <Text style={styles.dropdownText} numberOfLines={2}>
                 {item.mainText || item.description}

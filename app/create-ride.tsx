@@ -516,6 +516,8 @@ export default function CreateRideScreen() {
             { paddingBottom: insets.bottom + 20 },
             isTablet && styles.scrollContentTablet,
           ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.section}>

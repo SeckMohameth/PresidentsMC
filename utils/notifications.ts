@@ -5,26 +5,39 @@ import { Platform } from 'react-native';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/utils/firebase';
 
-function logNotificationDebug(message: string) {
+let notificationHandlerReady = false;
+
+function logNotificationDebug(message: string, error?: unknown) {
   if (__DEV__) {
-    console.log(message);
+    console.log(message, error ?? '');
   }
 }
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+export function setupNotificationHandler() {
+  if (notificationHandlerReady) return;
+
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+    notificationHandlerReady = true;
+  } catch (error) {
+    logNotificationDebug('[Notifications] Handler setup failed', error);
+  }
+}
 
 export async function registerForPushNotificationsAsync(
   userId: string,
   options: { requestPermission?: boolean } = {}
 ) {
+  setupNotificationHandler();
+
   const shouldRequestPermission = options.requestPermission !== false;
 
   if (!Device.isDevice) {

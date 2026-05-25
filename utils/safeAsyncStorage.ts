@@ -6,6 +6,7 @@ const memoryStorage = new Map<string, string>();
 const failedStorageKeys = new Set<string>();
 let repairPromise: Promise<void> | null = null;
 let nativeStorageUnavailable = false;
+let nativeStorageReady = false;
 
 function logStorageWarning(operation: string, key: string, error: unknown) {
   const warningKey = `${operation}:${key}`;
@@ -16,7 +17,7 @@ function logStorageWarning(operation: string, key: string, error: unknown) {
 }
 
 async function repairExpoStorageDirectory() {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web' || nativeStorageReady) return;
 
   if (!repairPromise) {
     repairPromise = (async () => {
@@ -41,6 +42,7 @@ async function repairExpoStorageDirectory() {
           await FileSystem.makeDirectoryAsync(anonymousPath, { intermediates: true }).catch(() => {});
         })
       );
+      nativeStorageReady = true;
     })().finally(() => {
       repairPromise = null;
     });
@@ -49,9 +51,24 @@ async function repairExpoStorageDirectory() {
   await repairPromise;
 }
 
+async function prepareNativeStorage(operation: string, key: string) {
+  if (nativeStorageUnavailable || Platform.OS === 'web') {
+    return !nativeStorageUnavailable;
+  }
+
+  try {
+    await repairExpoStorageDirectory();
+    return true;
+  } catch (error) {
+    nativeStorageUnavailable = true;
+    logStorageWarning(operation, key, error);
+    return false;
+  }
+}
+
 const SafeAsyncStorage = {
   async getItem(key: string) {
-    if (nativeStorageUnavailable) {
+    if (!(await prepareNativeStorage('getItem', key))) {
       return memoryStorage.get(key) ?? null;
     }
 
@@ -80,7 +97,7 @@ const SafeAsyncStorage = {
 
   async setItem(key: string, value: string) {
     memoryStorage.set(key, value);
-    if (nativeStorageUnavailable) {
+    if (!(await prepareNativeStorage('setItem', key))) {
       return;
     }
 
@@ -101,7 +118,7 @@ const SafeAsyncStorage = {
 
   async removeItem(key: string) {
     memoryStorage.delete(key);
-    if (nativeStorageUnavailable) {
+    if (!(await prepareNativeStorage('removeItem', key))) {
       return;
     }
 
