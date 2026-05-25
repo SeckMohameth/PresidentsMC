@@ -1,12 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
 
 const memoryStorage = new Map<string, string>();
 const failedStorageKeys = new Set<string>();
-let repairPromise: Promise<void> | null = null;
 let nativeStorageUnavailable = false;
-let nativeStorageReady = false;
 
 function logStorageWarning(operation: string, key: string, error: unknown) {
   const warningKey = `${operation}:${key}`;
@@ -16,59 +13,21 @@ function logStorageWarning(operation: string, key: string, error: unknown) {
   }
 }
 
-async function repairExpoStorageDirectory() {
-  if (Platform.OS === 'web' || nativeStorageReady) return;
-
-  if (!repairPromise) {
-    repairPromise = (async () => {
-      const roots = [FileSystem.documentDirectory, FileSystem.cacheDirectory].filter(Boolean);
-
-      await Promise.all(
-        roots.map(async (root) => {
-          const basePath = `${root}ExponentExperienceData`;
-          const anonymousPath = `${basePath}/@anonymous`;
-
-          const baseInfo = await FileSystem.getInfoAsync(basePath).catch(() => null);
-          if (baseInfo?.exists && !baseInfo.isDirectory) {
-            await FileSystem.deleteAsync(basePath, { idempotent: true }).catch(() => {});
-          }
-          await FileSystem.makeDirectoryAsync(basePath, { intermediates: true }).catch(() => {});
-
-          const info = await FileSystem.getInfoAsync(anonymousPath).catch(() => null);
-          if (info?.exists && !info.isDirectory) {
-            await FileSystem.deleteAsync(anonymousPath, { idempotent: true }).catch(() => {});
-          }
-
-          await FileSystem.makeDirectoryAsync(anonymousPath, { intermediates: true }).catch(() => {});
-        })
-      );
-      nativeStorageReady = true;
-    })().finally(() => {
-      repairPromise = null;
-    });
+async function prepareNativeStorage() {
+  if (Platform.OS === 'ios') {
+    return false;
   }
 
-  await repairPromise;
-}
-
-async function prepareNativeStorage(operation: string, key: string) {
   if (nativeStorageUnavailable || Platform.OS === 'web') {
     return !nativeStorageUnavailable;
   }
 
-  try {
-    await repairExpoStorageDirectory();
-    return true;
-  } catch (error) {
-    nativeStorageUnavailable = true;
-    logStorageWarning(operation, key, error);
-    return false;
-  }
+  return true;
 }
 
 const SafeAsyncStorage = {
   async getItem(key: string) {
-    if (!(await prepareNativeStorage('getItem', key))) {
+    if (!(await prepareNativeStorage())) {
       return memoryStorage.get(key) ?? null;
     }
 
@@ -79,16 +38,6 @@ const SafeAsyncStorage = {
       }
       return value ?? memoryStorage.get(key) ?? null;
     } catch (error) {
-      await repairExpoStorageDirectory();
-      try {
-        const value = await AsyncStorage.getItem(key);
-        if (value != null) {
-          memoryStorage.set(key, value);
-        }
-        return value ?? memoryStorage.get(key) ?? null;
-      } catch {
-        // Fall through to the in-memory copy for this session.
-      }
       nativeStorageUnavailable = true;
       logStorageWarning('getItem', key, error);
       return memoryStorage.get(key) ?? null;
@@ -97,20 +46,13 @@ const SafeAsyncStorage = {
 
   async setItem(key: string, value: string) {
     memoryStorage.set(key, value);
-    if (!(await prepareNativeStorage('setItem', key))) {
+    if (!(await prepareNativeStorage())) {
       return;
     }
 
     try {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
-      await repairExpoStorageDirectory();
-      try {
-        await AsyncStorage.setItem(key, value);
-        return;
-      } catch {
-        // Fall through to the warning and in-memory persistence.
-      }
       nativeStorageUnavailable = true;
       logStorageWarning('setItem', key, error);
     }
@@ -118,20 +60,13 @@ const SafeAsyncStorage = {
 
   async removeItem(key: string) {
     memoryStorage.delete(key);
-    if (!(await prepareNativeStorage('removeItem', key))) {
+    if (!(await prepareNativeStorage())) {
       return;
     }
 
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      await repairExpoStorageDirectory();
-      try {
-        await AsyncStorage.removeItem(key);
-        return;
-      } catch {
-        // Fall through to the warning.
-      }
       nativeStorageUnavailable = true;
       logStorageWarning('removeItem', key, error);
     }
