@@ -7,7 +7,8 @@
     "icon": "./assets/images/app-icon.png",
     "scheme": "presidentsmc",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
+    "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.mostudios.presidentsmc",
