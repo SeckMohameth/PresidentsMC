@@ -1,11 +1,10 @@
-import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import Colors from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
@@ -15,11 +14,16 @@ const heroImage = require('../assets/images/crew-image-mc.avif');
 export default function OnboardingScreen() {
   const { completeOnboarding } = useAuth();
   const { width } = useWindowDimensions();
-  const pressScale = useSharedValue(1);
+  const buttonScale = useRef(new Animated.Value(1)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
 
-  const buttonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pressScale.value }],
-  }));
+  useEffect(() => {
+    Animated.timing(logoOpacity, { toValue: 1, duration: 520, useNativeDriver: true }).start();
+    Animated.timing(contentOpacity, { toValue: 1, duration: 620, delay: 120, useNativeDriver: true }).start();
+    Animated.timing(buttonOpacity, { toValue: 1, duration: 620, delay: 260, useNativeDriver: true }).start();
+  }, []);
 
   const getStarted = async () => {
     if (Platform.OS !== 'web') {
@@ -44,7 +48,7 @@ export default function OnboardingScreen() {
       />
 
       <SafeAreaView style={styles.safeArea}>
-        <Animated.View entering={FadeInUp.duration(520)} style={styles.logoRow}>
+        <Animated.View style={[styles.logoRow, { opacity: logoOpacity }]}>
           <Text style={styles.logoText}>P</Text>
           <View style={styles.logoPill}>
             <Text style={styles.logoPillText}>MC</Text>
@@ -52,7 +56,7 @@ export default function OnboardingScreen() {
         </Animated.View>
 
         <View style={styles.content}>
-          <Animated.View entering={FadeInDown.delay(120).duration(620)} style={styles.copyBlock}>
+          <Animated.View style={[styles.copyBlock, { opacity: contentOpacity }]}>
             <Text style={styles.eyebrow}>{CLUB_NAME}</Text>
             <Text style={[styles.title, width < 380 && styles.titleSmall]}>
               Ride together. Stay connected.
@@ -62,15 +66,15 @@ export default function OnboardingScreen() {
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(260).duration(620)} style={buttonStyle}>
+          <Animated.View style={{ opacity: buttonOpacity, transform: [{ scale: buttonScale }] }}>
             <Pressable
               style={styles.button}
               onPress={getStarted}
               onPressIn={() => {
-                pressScale.value = withSpring(0.97, { damping: 16, stiffness: 240 });
+                Animated.spring(buttonScale, { toValue: 0.97, damping: 16, stiffness: 240, useNativeDriver: true }).start();
               }}
               onPressOut={() => {
-                pressScale.value = withSpring(1, { damping: 16, stiffness: 240 });
+                Animated.spring(buttonScale, { toValue: 1, damping: 16, stiffness: 240, useNativeDriver: true }).start();
               }}
             >
               <LinearGradient

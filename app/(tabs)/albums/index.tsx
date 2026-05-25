@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, Images, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { formatDate, isToday } from '@/utils/helpers';
@@ -101,11 +100,7 @@ export default function AlbumsScreen() {
         ) : (
           <View style={styles.albumGrid}>
             {albumItems.map((album, index) => (
-              <Animated.View
-                key={album.id}
-                entering={FadeInDown.delay(index * 55).duration(320)}
-                layout={Layout.springify().damping(18)}
-              >
+              <View key={album.id}>
               <Pressable
                 style={({ pressed }) => [
                   styles.albumCard,
@@ -136,7 +131,7 @@ export default function AlbumsScreen() {
                   </View>
                 )}
               </Pressable>
-              </Animated.View>
+              </View>
             ))}
           </View>
         )}

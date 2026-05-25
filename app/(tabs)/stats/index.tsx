@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindo
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike, CheckCircle2, Clock, Gauge } from 'lucide-react-native';
-import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import StatCard from '@/components/StatCard';
@@ -44,7 +43,7 @@ export default function StatsScreen() {
     const didCheckIn = !!currentUser?.id && ride.checkedIn?.includes(currentUser.id);
 
     return (
-      <Animated.View key={ride.id} entering={FadeInDown.duration(260)} layout={Layout.springify().damping(18)} style={styles.rideHistoryCard}>
+      <View key={ride.id} style={styles.rideHistoryCard}>
         <View style={styles.rideHistoryHeader}>
           <View style={styles.rideHistoryTitleWrap}>
             <Text style={styles.rideHistoryTitle}>{ride.title}</Text>
@@ -106,7 +105,7 @@ export default function StatsScreen() {
             {didCheckIn ? 'You checked in for this ride.' : didAttend ? 'You were marked as going.' : 'You did not attend this ride.'}
           </Text>
         )}
-      </Animated.View>
+      </View>
     );
   };
 
@@ -154,7 +153,7 @@ export default function StatsScreen() {
       >
         {activeTab === 'crew' ? (
           <>
-            <Animated.View entering={FadeInDown.duration(420)} layout={Layout.springify().damping(18)} style={styles.heroCard}>
+            <View style={styles.heroCard}>
               <Image 
                 source={{ uri: crew?.coverImage }}
                 style={styles.heroImage}
@@ -170,7 +169,7 @@ export default function StatsScreen() {
                   <Text style={styles.heroSubtitle}>Est. {crewEstablishedYear}</Text>
                 ) : null}
               </View>
-            </Animated.View>
+            </View>
 
             <Text style={styles.sectionTitle}>All Time</Text>
             <View style={styles.statsGrid}>
@@ -245,7 +244,7 @@ export default function StatsScreen() {
                   .filter((item) => item.period === historyPeriod)
                   .slice(0, 10)
                   .map((item) => (
-                    <Animated.View key={item.id} entering={FadeInDown.duration(260)} layout={Layout.springify().damping(18)} style={styles.historyCard}>
+                    <View key={item.id} style={styles.historyCard}>
                       <View style={styles.historyHeader}>
                         <Text style={styles.historyRange}>
                           {new Date(item.periodStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
@@ -258,7 +257,7 @@ export default function StatsScreen() {
                         <Text style={styles.historyStat}>Miles: {formatMiles(item.totalMiles)}</Text>
                         <Text style={styles.historyStat}>Photos: {formatNumber(item.totalPhotos)}</Text>
                       </View>
-                    </Animated.View>
+                    </View>
                   ))
               )}
             </View>
@@ -274,7 +273,7 @@ export default function StatsScreen() {
           </>
         ) : (
           <>
-            <Animated.View entering={FadeInDown.duration(420)} layout={Layout.springify().damping(18)} style={styles.profileCard}>
+            <View style={styles.profileCard}>
               <Image 
                 source={getAvatarSource(currentUser?.avatar)}
                 style={styles.profileImage}
@@ -293,7 +292,7 @@ export default function StatsScreen() {
               <Text style={styles.memberSince}>
                 Member since {new Date(memberStats.memberSince).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </Text>
-            </Animated.View>
+            </View>
 
             <Text style={styles.sectionTitle}>My Biker Stats</Text>
             <View style={styles.statsGrid}>

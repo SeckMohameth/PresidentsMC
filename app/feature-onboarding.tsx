@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { Bell, Bike, Camera, Map, Shield, Users } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
@@ -166,7 +165,7 @@ export default function FeatureOnboardingScreen() {
     if (item.isProfileSetup) {
       return (
         <View style={[styles.slide, { width }]}>
-          <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.featurePanel}>
+          <View style={styles.featurePanel}>
             <View style={styles.panelTopRow}>
               <View style={styles.iconBox}>
                 <Users size={25} color={colors.text} strokeWidth={1.8} />
@@ -217,14 +216,14 @@ export default function FeatureOnboardingScreen() {
               maxLength={120}
               multiline
             />
-          </Animated.View>
+          </View>
         </View>
       );
     }
 
     return (
       <View style={[styles.slide, { width }]}>
-        <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.featurePanel}>
+        <View style={styles.featurePanel}>
           <View style={styles.panelTopRow}>
             <View style={styles.iconBox}>
               <Icon size={25} color={colors.text} strokeWidth={1.8} />
@@ -235,19 +234,14 @@ export default function FeatureOnboardingScreen() {
           <Text style={styles.slideTitle}>{item.title}</Text>
           <Text style={styles.slideBody}>{item.body}</Text>
           <View style={styles.bulletList}>
-            {item.bullets.map((bullet, bulletIndex) => (
-              <Animated.View
-                key={bullet}
-                entering={FadeInDown.delay(140 + bulletIndex * 70).duration(320)}
-                layout={Layout.springify().damping(18)}
-                style={styles.bulletRow}
-              >
+            {item.bullets.map((bullet) => (
+              <View key={bullet} style={styles.bulletRow}>
                 <View style={styles.bulletDot} />
                 <Text style={styles.bulletText}>{bullet}</Text>
-              </Animated.View>
+              </View>
             ))}
           </View>
-        </Animated.View>
+        </View>
       </View>
     );
   };
@@ -263,7 +257,7 @@ export default function FeatureOnboardingScreen() {
       </View>
 
       <SafeAreaView style={styles.safeArea}>
-        <Animated.View entering={FadeInUp.duration(420)} style={styles.header}>
+        <View style={styles.header}>
           <View style={styles.clubMark}>
             <Users size={18} color={colors.background} strokeWidth={2.2} />
           </View>
@@ -271,7 +265,7 @@ export default function FeatureOnboardingScreen() {
             <Text style={styles.kicker}>Welcome to</Text>
             <Text style={styles.clubName}>{CLUB_NAME}</Text>
           </View>
-        </Animated.View>
+        </View>
 
         <FlatList
           ref={listRef}

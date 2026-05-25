@@ -1,15 +1,6 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, View, Text, StyleSheet } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
-import Animated, {
-  FadeInUp,
-  Layout,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import { AppColors, useThemeColors } from '@/constants/colors';
 
 interface StatCardProps {
@@ -24,25 +15,17 @@ export default function StatCard({ icon: Icon, label, value, subtitle, color }: 
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const accentColor = color ?? colors.primary;
-  const pulse = useSharedValue(1);
+  const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    pulse.value = withSequence(
-      withTiming(1.03, { duration: 120 }),
-      withSpring(1, { damping: 14, stiffness: 180 })
-    );
+    Animated.sequence([
+      Animated.timing(pulse, { toValue: 1.03, duration: 120, useNativeDriver: true }),
+      Animated.spring(pulse, { toValue: 1, damping: 14, stiffness: 180, useNativeDriver: true }),
+    ]).start();
   }, [pulse, value]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-  }));
-
   return (
-    <Animated.View
-      entering={FadeInUp.duration(360)}
-      layout={Layout.springify().damping(18)}
-      style={[styles.container, animatedStyle]}
-    >
+    <Animated.View style={[styles.container, { transform: [{ scale: pulse }] }]}>
       <View style={[styles.iconContainer, { backgroundColor: `${accentColor}15` }]}>
         <Icon size={22} color={accentColor} />
       </View>
