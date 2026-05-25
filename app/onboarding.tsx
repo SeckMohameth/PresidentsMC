@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
   },
   heroImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
   },

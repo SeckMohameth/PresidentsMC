@@ -7,10 +7,8 @@
     "icon": "./assets/images/app-icon.png",
     "scheme": "presidentsmc",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "jsEngine": "jsc",
       "bundleIdentifier": "app.mostudios.presidentsmc",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow PresidentsMC to access your photos to upload ride photos and update your profile picture.",
@@ -26,9 +24,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "package": "app.mostudios.presidentsmc",
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "app.mostudios.presidentsmc"
     },
     "web": {
       "output": "static",
@@ -37,6 +33,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      "expo-image",
       "expo-notifications",
       [
         "expo-image-picker",
@@ -59,6 +56,8 @@
         }
       ],
       "expo-web-browser",
+      "expo-sharing",
+      "expo-status-bar",
       "@react-native-community/datetimepicker",
       [
         "expo-splash-screen",

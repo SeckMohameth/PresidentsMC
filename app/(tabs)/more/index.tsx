@@ -4,7 +4,6 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   Users,
   Settings,
@@ -113,7 +112,7 @@ function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = Platform.OS === 'ios' ? 74 : 66;
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -1452,7 +1451,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '800',
   },
   bikePhotoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.18)',
     borderBottomWidth: 180,
     borderBottomColor: 'rgba(0,0,0,0.72)',
