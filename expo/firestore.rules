@@ -1,0 +1,179 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function crewPath(crewId) {
+      return /databases/$(database)/documents/crews/$(crewId);
+    }
+
+    function memberPath(crewId, userId) {
+      return /databases/$(database)/documents/crews/$(crewId)/members/$(userId);
+    }
+
+    function crewDoc(crewId) {
+      return get(crewPath(crewId));
+    }
+
+    function isCrewMember(crewId) {
+      return signedIn() && exists(memberPath(crewId, request.auth.uid));
+    }
+
+    function isCrewOwner(crewId) {
+      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
+    }
+
+    function isCrewLeader(crewId) {
+      return isCrewMember(crewId)
+        && ['admin', 'officer'].hasAny([get(memberPath(crewId, request.auth.uid)).data.role]);
+    }
+
+    function hasActiveSubscription(crewId) {
+      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+    }
+
+    function validSelfCrewState(data) {
+      return data.crewId == null
+        ? data.role == 'member'
+        : exists(memberPath(data.crewId, request.auth.uid))
+          && get(memberPath(data.crewId, request.auth.uid)).data.role == data.role;
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create: if isSelf(userId)
+        && request.resource.data.id == userId
+        && request.resource.data.role == 'member'
+        && request.resource.data.crewId == null;
+      allow update: if isSelf(userId)
+        && request.resource.data.id == userId
+        && validSelfCrewState(request.resource.data)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'name',
+          'avatar',
+          'preferences',
+          'hasOnboarded',
+          'lastActiveAt',
+          'crewId',
+          'role',
+          'pendingCrewId'
+        ]);
+      allow delete: if isSelf(userId);
+
+      match /pushTokens/{token} {
+        allow read, create, update, delete: if isSelf(userId);
+      }
+    }
+
+    match /crews/{crewId} {
+      allow read: if isCrewMember(crewId)
+        || (resource.data.isDiscoverable == true && resource.data.status == 'active');
+      allow create: if signedIn()
+        && request.resource.data.id == crewId
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.memberCount == 1
+        && request.resource.data.status == 'active'
+        && request.resource.data.archivedAt == null
+        && request.resource.data.purgeAt == null
+        && (
+          request.resource.data.subscriptionOwnerId == null
+          || request.resource.data.subscriptionOwnerId == request.auth.uid
+        );
+      allow update: if isCrewOwner(crewId)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'name',
+          'description',
+          'logoUrl',
+          'isDiscoverable',
+          'requiresApproval',
+          'nameLower'
+        ]);
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if isCrewMember(crewId);
+        allow create: if isSelf(memberId)
+          && crewDoc(crewId).data.ownerId == request.auth.uid
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.role == 'admin';
+        allow update: if isSelf(memberId)
+          && isCrewMember(crewId)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name',
+            'avatar'
+          ]);
+        allow delete: if false;
+      }
+
+      match /private/{docId} {
+        allow read: if false;
+        allow create: if isCrewOwner(crewId)
+          && docId == 'settings'
+          && request.resource.data.keys().hasOnly([
+            'inviteCode',
+            'updatedAt'
+          ])
+          && request.resource.data.inviteCode is string;
+        allow update: if isCrewOwner(crewId)
+          && docId == 'settings'
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'inviteCode',
+            'updatedAt'
+          ])
+          && request.resource.data.inviteCode is string;
+        allow delete: if false;
+      }
+
+      match /announcements/{announcementId} {
+        allow read: if isCrewMember(crewId);
+        allow create, update, delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+      }
+
+      match /rides/{rideId} {
+        allow read: if isCrewMember(crewId);
+        allow create, delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+        allow update: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+          || (isCrewMember(crewId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+              'attendees',
+              'checkedIn',
+              'photos'
+            ]));
+      }
+
+      match /joinRequests/{requestId} {
+        allow read: if (signedIn() && requestId == request.auth.uid) || isCrewLeader(crewId);
+        allow create: if signedIn()
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.crewId == crewId
+          && request.resource.data.status == 'pending'
+          && !isCrewMember(crewId);
+        allow update: if false;
+        allow delete: if signedIn() && requestId == request.auth.uid && resource.data.status == 'pending';
+      }
+
+      match /statsHistory/{snapshotId} {
+        allow read: if isCrewMember(crewId);
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /crewInviteCodes/{inviteCode} {
+      allow read, update, delete: if false;
+      allow create: if signedIn()
+        && request.resource.data.code == inviteCode
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.crewId is string
+        && exists(crewPath(request.resource.data.crewId))
+        && get(crewPath(request.resource.data.crewId)).data.ownerId == request.auth.uid;
+    }
+  }
+}

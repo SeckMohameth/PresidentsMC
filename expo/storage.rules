@@ -1,0 +1,66 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function crewDoc(crewId) {
+      return firestore.get(/databases/(default)/documents/crews/$(crewId));
+    }
+
+    function crewMemberDoc(crewId, userId) {
+      return firestore.get(/databases/(default)/documents/crews/$(crewId)/members/$(userId));
+    }
+
+    function isCrewMember(crewId) {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(request.auth.uid));
+    }
+
+    function isCrewOwner(crewId) {
+      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
+    }
+
+    function isCrewLeader(crewId) {
+      return isCrewMember(crewId)
+        && ['admin', 'officer'].hasAny([crewMemberDoc(crewId, request.auth.uid).data.role]);
+    }
+
+    function hasActiveSubscription(crewId) {
+      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+    }
+
+    match /users/{userId}/avatar.jpg {
+      allow read, write: if isSelf(userId);
+    }
+
+    match /crews/{crewId}/logo.jpg {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewOwner(crewId) && crewDoc(crewId).data.status == 'active';
+    }
+
+    match /crews/{crewId}/announcements/{fileName} {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+    }
+
+    match /crews/{crewId}/rides/{rideId}/cover.jpg {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+    }
+
+    match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
+      allow read, write: if isCrewMember(crewId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
