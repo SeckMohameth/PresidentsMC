@@ -11,11 +11,12 @@ import { formatRelativeTime, getInitials } from '@/utils/helpers';
 
 interface AnnouncementCardProps {
   announcement: Announcement;
+  resolvedAuthorAvatar?: string;
   onEdit?: () => void;
   onToggleLike?: () => void;
 }
 
-export default function AnnouncementCard({ announcement, onEdit, onToggleLike }: AnnouncementCardProps) {
+export default function AnnouncementCard({ announcement, resolvedAuthorAvatar, onEdit, onToggleLike }: AnnouncementCardProps) {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -24,6 +25,7 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
   const [isOpeningLink, setIsOpeningLink] = useState(false);
   const likedBy = announcement.likedBy || [];
   const hasLiked = !!user?.id && likedBy.includes(user.id);
+  const authorAvatar = resolvedAuthorAvatar ?? announcement.authorAvatar;
 
   const getRoleBadge = () => {
     if (announcement.authorRole === 'admin') {
@@ -60,9 +62,9 @@ export default function AnnouncementCard({ announcement, onEdit, onToggleLike }:
       )}
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          {announcement.authorAvatar ? (
+          {authorAvatar ? (
             <Image 
-              source={getAvatarSource(announcement.authorAvatar)}
+              source={getAvatarSource(authorAvatar)}
               style={styles.avatar}
               contentFit="cover"
             />

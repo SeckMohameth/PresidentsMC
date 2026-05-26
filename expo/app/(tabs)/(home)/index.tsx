@@ -15,7 +15,7 @@ import { getAvatarSource } from '@/utils/avatar';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { crew, currentUser, announcements, upcomingRides, canManageAnnouncements, isAdmin, isLoading, toggleAnnouncementLike } = useCrew();
+  const { crew, currentUser, announcements, upcomingRides, canManageAnnouncements, isAdmin, isLoading, toggleAnnouncementLike, getMemberById } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -154,14 +154,19 @@ export default function HomeScreen() {
               <Text style={styles.emptyText}>No announcements yet</Text>
             </View>
           ) : (
-            announcements.map(announcement => (
+            announcements.map(announcement => {
+              const author = getMemberById(announcement.authorId);
+
+              return (
               <AnnouncementCard 
                 key={announcement.id} 
                 announcement={announcement}
+                resolvedAuthorAvatar={author?.avatar}
                 onToggleLike={() => toggleAnnouncementLike(announcement.id)}
                 onEdit={isAdmin ? () => router.push({ pathname: '/create-announcement', params: { announcementId: announcement.id } }) : undefined}
               />
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>
