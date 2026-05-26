@@ -78,7 +78,15 @@ eas submit --platform ios --latest
 
 - Entitlement: `PresidentsMC Pro`
 - Monthly product ID: `monthly`
+  - Reference name: `PresidentsMC Monthly`
+  - Duration: 1 month
+  - Price: $3.99/month
 - Yearly product ID: `yearly`
+  - Reference name: `PresidentsMC Yearly`
+  - Duration: 1 year
+  - Price: $34.99/year
+
+Create the matching subscriptions in App Store Connect and Google Play Console, then attach both products to the `PresidentsMC Pro` entitlement in RevenueCat. The product IDs above must match the app constants.
 
 Required environment values:
 
