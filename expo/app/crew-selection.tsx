@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  ImageBackground,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, Hash, LogOut, ShieldCheck, Trash2, UserPlus } from 'lucide-react-native';
@@ -20,7 +20,7 @@ import { CLUB_ID, CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
 
-const WAITING_ROOM_IMAGE = require('../assets/images/waiting-room.jpg');
+const WAITING_ROOM_IMAGE = require('../assets/images/custom-images/optimized/waiting-room.jpg');
 
 export default function CrewSelectionScreen() {
   const { user, signOut, requestJoin, joinCrew, deleteAccount, isJoiningCrew } = useAuth();
@@ -150,12 +150,13 @@ export default function CrewSelectionScreen() {
 
   return (
     <View style={styles.container}>
-      <ImageBackground source={WAITING_ROOM_IMAGE} style={styles.background} resizeMode="cover">
+      <View style={styles.background}>
+        <Image source={WAITING_ROOM_IMAGE} style={styles.backgroundImage} contentFit="cover" />
         <LinearGradient
           colors={['rgba(0,0,0,0.34)', 'rgba(0,0,0,0.72)', 'rgba(0,0,0,0.92)']}
           style={styles.backgroundOverlay}
         />
-      </ImageBackground>
+      </View>
       <SafeAreaView style={styles.safeArea}>
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <LogOut size={20} color={colors.textTertiary} />
@@ -292,6 +293,9 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   background: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backgroundImage: {
     ...StyleSheet.absoluteFillObject,
   },
   backgroundOverlay: {
