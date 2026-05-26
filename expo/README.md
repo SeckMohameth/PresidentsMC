@@ -1,15 +1,26 @@
-# Crew: Bike Clubs & Rides
+# PresidentsMC
 
-Crew is a React Native app for private bike and motorcycle clubs to organize rides, manage members, post announcements, share ride photos, and track activity.
+PresidentsMC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
+
+This rebuild keeps the PresidentsMC product experience on the stable Crew native base: Expo SDK 54, React Native 0.81.5, and the new architecture enabled.
+
+## Preview
+
+<p>
+  <img src="./docs/screenshots/onboarding.png" alt="PresidentsMC onboarding screen" width="260" />
+  <img src="./docs/screenshots/home.png" alt="PresidentsMC home screen" width="260" />
+</p>
 
 ## Stack
 
 - Expo Router
-- React Native
+- React Native 0.81.5
+- Expo SDK 54
 - Firebase Auth, Firestore, Storage, Functions
 - RevenueCat for subscriptions
+- EAS Build and TestFlight for iOS distribution
 
-## Local development
+## Local Development
 
 From the repo root:
 
@@ -24,39 +35,57 @@ cd expo
 bun run start
 ```
 
-Additional commands:
+Additional checks:
 
 ```bash
-bun run start-web
 bun run lint
-./node_modules/.bin/tsc --noEmit
+bun x tsc --noEmit
+bunx expo-doctor
 ```
 
 ## Firebase
 
-This project uses:
+This project uses the PresidentsMC Firebase project:
 
-- Firestore rules in `firestore.rules`
-- Storage rules in `storage.rules`
-- Cloud Functions in `functions/src/index.ts`
+- Project ID: `presidentsmc-50010`
+- Firestore rules: `firestore.rules`
+- Storage rules: `storage.rules`
+- Cloud Functions: `functions/src/index.ts`
 
 Deploy from `expo/`:
 
 ```bash
-firebase deploy --only functions --project crew-86290
-firebase deploy --only firestore:indexes --project crew-86290
+firebase deploy --only functions --project presidentsmc-50010
+firebase deploy --only firestore:indexes --project presidentsmc-50010
 ```
 
-## Release notes
+## Release
 
-- iOS bundle ID: `app.mostudios.crewapp`
-- Android package: `app.mostudios.crewapp`
-- RevenueCat entitlement: `crew_admin`
-- RevenueCat packages: `$rc_monthly` and `$rc_annual`
+- App name: `PresidentsMC`
+- iOS bundle ID: `app.mostudios.presidentsmc`
+- Android package: `app.mostudios.presidentsmc`
+- EAS project ID: `3fa3b774-aa73-4229-90a2-b834111adbf2`
 
-## Testing notes
+Build for TestFlight:
 
-- Real purchases require a development build or TestFlight.
-- Push notifications require a physical device and a development build or release build.
-- Account deletion, ownership transfer, invite-code joins, and subscription sync depend on deployed Firebase Functions.
-- For tester-only paywall bypass builds, use the `testflight` EAS profile. It sets `EXPO_PUBLIC_TESTFLIGHT_CREW_ADMIN_BYPASS=true` so users can continue from the crew paywall without billing.
+```bash
+eas secret:push --scope project --env-file .env
+eas build --platform ios --profile production --clear-cache
+eas submit --platform ios --latest
+```
+
+## RevenueCat
+
+- Entitlement: `PresidentsMC Pro`
+- Monthly product ID: `monthly`
+- Yearly product ID: `yearly`
+
+Required environment values:
+
+```bash
+EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=...
+EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=...
+EXPO_PUBLIC_REVENUECAT_TEST_API_KEY=...
+```
+
+Real purchases require a development build or TestFlight. Expo Go is only useful for basic UI/runtime checks.
