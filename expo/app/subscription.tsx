@@ -87,8 +87,9 @@ export default function SubscriptionScreen() {
   const getMonthlyPrice = () => FALLBACK_MONTHLY_PRICE;
   const getYearlyPrice = () => FALLBACK_YEARLY_PRICE;
   const getYearlyMonthlyPrice = () => FALLBACK_YEARLY_MONTHLY_PRICE;
+  const isDeveloperSupport = currentUser?.isDeveloperSupport === true;
   const isSubscriptionCoveredByClub = isSubscriptionActive && crew?.subscriptionOwnerId !== currentUser?.id;
-  const canManageOwnSubscription = isSubscriptionActive && crew?.subscriptionOwnerId === currentUser?.id;
+  const canManageOwnSubscription = !isDeveloperSupport && isSubscriptionActive && crew?.subscriptionOwnerId === currentUser?.id;
 
   const openExternalLink = async (url: string) => {
     try {
@@ -100,6 +101,7 @@ export default function SubscriptionScreen() {
 
   const syncClubSubscription = async (status: 'active' | 'trialing') => {
     if (!crew?.id || !currentUser?.id) return;
+    if (isDeveloperSupport) return;
     if (
       isSubscriptionActive &&
       crew.subscriptionOwnerId &&
@@ -117,6 +119,13 @@ export default function SubscriptionScreen() {
   const handleSubscribe = async () => {
     if (!(isAdmin || isOfficer)) {
       Alert.alert('Admins Only', 'Only club admins can manage the club subscription.');
+      return;
+    }
+    if (isDeveloperSupport) {
+      Alert.alert(
+        'Developer Support',
+        'This support account can test the app, but it cannot own the club subscription.'
+      );
       return;
     }
     if (isSubscriptionCoveredByClub) {

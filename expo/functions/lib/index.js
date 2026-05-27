@@ -1051,6 +1051,25 @@ exports.revenueCatWebhook = (0, https_1.onRequest)({ secrets: [revenueCatWebhook
         response.status(200).json({ ok: true, ignored: true });
         return;
     }
+    const memberSnap = await crewRef.collection('members').doc(parsed.appUserId).get();
+    const member = memberSnap.exists ? memberSnap.data() : null;
+    const canOwnSubscription = memberSnap.exists &&
+        member?.isDeveloperSupport !== true &&
+        (member?.role === 'admin' || member?.role === 'officer');
+    if (!canOwnSubscription) {
+        if (member?.isDeveloperSupport === true) {
+            const crewSnap = await crewRef.get();
+            const crew = crewSnap.exists ? crewSnap.data() : null;
+            if (crew?.subscriptionOwnerId === parsed.appUserId) {
+                await crewRef.set({
+                    subscriptionStatus: 'inactive',
+                    subscriptionOwnerId: null,
+                }, { merge: true });
+            }
+        }
+        response.status(200).json({ ok: true, ignored: true });
+        return;
+    }
     await crewRef.set({
         subscriptionStatus: parsed.status,
         subscriptionOwnerId: parsed.status === 'inactive' ? null : parsed.appUserId,

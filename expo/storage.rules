@@ -33,7 +33,11 @@ service firebase.storage {
     }
 
     function hasActiveSubscription(crewId) {
-      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+      let ownerId = crewDoc(crewId).data.subscriptionOwnerId;
+      return ownerId is string
+        && ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus])
+        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(ownerId))
+        && crewMemberDoc(crewId, ownerId).data.isDeveloperSupport != true;
     }
 
     match /users/{userId}/avatar.jpg {

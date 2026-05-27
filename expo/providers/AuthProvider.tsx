@@ -113,7 +113,7 @@ async function ensureSingleClubOwner(profile: {
       totalMiles: 0,
       totalPhotos: 0,
       ownerId: profile.id,
-      subscriptionOwnerId: profile.id,
+      subscriptionOwnerId: null,
       subscriptionStatus: 'inactive',
       billingRequired: true,
       status: 'active',

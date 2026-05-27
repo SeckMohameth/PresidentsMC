@@ -36,11 +36,16 @@ service cloud.firestore {
     }
 
     function hasActiveSubscription(crewId) {
-      return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
+      let ownerId = crewDoc(crewId).data.subscriptionOwnerId;
+      return ownerId is string
+        && ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus])
+        && exists(memberPath(crewId, ownerId))
+        && get(memberPath(crewId, ownerId)).data.isDeveloperSupport != true;
     }
 
     function isSubscriptionActivation(crewId) {
       return isCrewLeader(crewId)
+        && get(memberPath(crewId, request.auth.uid)).data.isDeveloperSupport != true
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'billingRequired',
           'subscriptionOwnerId',

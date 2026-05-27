@@ -91,6 +91,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const [currentUser, setCurrentUser] = useState<CrewMember | null>(null);
   const [crew, setCrew] = useState<Crew | null>(null);
+  const [allMembers, setAllMembers] = useState<CrewMember[]>([]);
   const [members, setMembers] = useState<CrewMember[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [rides, setRides] = useState<Ride[]>([]);
@@ -105,8 +106,12 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const isDeveloperSupport = !!currentUser?.isDeveloperSupport;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
   const permissions = currentUser?.permissions || {};
-  const isSubscriptionActive =
-    crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing';
+  const subscriptionOwnerIsBillable = !!crew?.subscriptionOwnerId && allMembers.some(
+    (member) => member.id === crew.subscriptionOwnerId && !member.isDeveloperSupport
+  );
+  const isSubscriptionActive = subscriptionOwnerIsBillable && (
+    crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing'
+  );
   const isBillingRequired = crew?.billingRequired === true;
   const canUseAdminTools = isAdmin || isOfficer || isDeveloperSupport;
   const hasPaidFeatureAccess = !isBillingRequired || isSubscriptionActive;
@@ -155,6 +160,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   useEffect(() => {
     if (!crewId) {
       setCrew(null);
+      setAllMembers([]);
       setMembers([]);
       setAnnouncements([]);
       setRides([]);
@@ -195,6 +201,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
           joinedAt: normalizeDate(data.joinedAt),
         };
       });
+      setAllMembers(list);
       setMembers(list.filter((member) => !member.isDeveloperSupport));
       const self = list.find((member) => member.id === user?.id) || null;
       setCurrentUser(self);
