@@ -65,6 +65,8 @@ firebase deploy --only firestore:indexes --project presidentsmc-50010
 - iOS bundle ID: `app.mostudios.presidentsmc`
 - Android package: `app.mostudios.presidentsmc`
 - EAS project ID: `3fa3b774-aa73-4229-90a2-b834111adbf2`
+- Privacy Policy: `https://sites.google.com/view/presidentsmc-privacy/home`
+- Terms of Use: `https://sites.google.com/view/presidentsmc-terms/home`
 
 Build for TestFlight:
 
@@ -89,6 +91,8 @@ eas submit --platform ios --latest
 Create the matching subscriptions in App Store Connect and Google Play Console, then attach both products to the `PresidentsMC Pro` entitlement in RevenueCat. The product IDs above must match the app constants.
 
 See [RevenueCat setup](./docs/revenuecat-setup.md) for the full store and dashboard checklist.
+
+For the first App Store subscription review, the subscriptions must be attached to a newly uploaded app version under **In-App Purchases and Subscriptions** before submitting the app version to App Review. Each subscription also needs complete metadata, pricing, availability, localization, and a review screenshot.
 
 Required environment values:
 

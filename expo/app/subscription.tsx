@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ArrowLeft, Camera, Check, Map, Shield, Users, Zap } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useCrew } from '@/providers/CrewProvider';
 import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
@@ -30,8 +31,6 @@ const features = [
   { icon: Zap, text: 'Real-time check-ins' },
 ];
 
-const TERMS_URL = 'https://www.mostudios.io/terms';
-const PRIVACY_URL = 'https://www.mostudios.io/privacy';
 const FALLBACK_MONTHLY_PRICE = '$3.99';
 const FALLBACK_YEARLY_PRICE = '$34.99';
 const FALLBACK_YEARLY_MONTHLY_PRICE = '$2.92';
@@ -387,11 +386,11 @@ export default function SubscriptionScreen() {
             Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period.
             You will be charged {selectedPlan === 'yearly' ? `${getYearlyPrice()}/year` : `${getMonthlyPrice()}/month`} to your Apple or Google account.
             Manage or cancel anytime in account settings. By continuing, you agree to our{' '}
-            <Text style={styles.termsLink} onPress={() => void openExternalLink(TERMS_URL)}>
+            <Text style={styles.termsLink} onPress={() => void openExternalLink(TERMS_OF_USE_URL)}>
               Terms of Use
             </Text>{' '}
             and{' '}
-            <Text style={styles.termsLink} onPress={() => void openExternalLink(PRIVACY_URL)}>
+            <Text style={styles.termsLink} onPress={() => void openExternalLink(PRIVACY_POLICY_URL)}>
               Privacy Policy
             </Text>
             .

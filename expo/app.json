@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.mostudios.presidentsmc",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Allow PresidentsMC to access your photos to upload ride photos and update your profile picture.",
         "NSCameraUsageDescription": "Allow PresidentsMC to use your camera for profile photos and ride photos.",

@@ -10,12 +10,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useAuth } from '@/providers/AuthProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
@@ -26,6 +28,14 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const openExternalLink = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Unable to open link', 'Please try again.');
+    }
+  };
 
   const handleSignIn = async () => {
     if (!email.trim()) {
@@ -204,6 +214,16 @@ export default function SignInScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.legalLinks}>
+              <TouchableOpacity onPress={() => void openExternalLink(TERMS_OF_USE_URL)}>
+                <Text style={styles.legalLink}>Terms of Use</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalDivider}>|</Text>
+              <TouchableOpacity onPress={() => void openExternalLink(PRIVACY_POLICY_URL)}>
+                <Text style={styles.legalLink}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
+
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -310,5 +330,21 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '600' as const,
     color: colors.primary,
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+    gap: 10,
+  },
+  legalLink: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: colors.primary,
+  },
+  legalDivider: {
+    fontSize: 13,
+    color: colors.textTertiary,
   },
 });

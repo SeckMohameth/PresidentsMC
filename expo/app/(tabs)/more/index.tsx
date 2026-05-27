@@ -32,6 +32,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_NAME } from '@/constants/club';
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useCrew } from '@/providers/CrewProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { getAvatarSource, isDefaultAvatar } from '@/utils/avatar';
@@ -89,8 +90,6 @@ type ExitPreview = {
 };
 
 const WEBSITE_URL = 'https://www.mostudios.io/';
-const PRIVACY_URL = 'https://www.mostudios.io/privacy';
-const TERMS_URL = 'https://www.mostudios.io/terms';
 const FEEDBACK_URL = 'https://www.momadeit.online/apps/pjs8MBE7YCvnzUzLCIFd';
 
 function pickOwnershipCandidate(members: CrewMember[], currentUserId?: string) {
@@ -928,7 +927,7 @@ export default function MoreScreen() {
               </View>
             </Pressable>
 
-            <Pressable style={styles.supportRow} onPress={() => openSupportLink(TERMS_URL)}>
+            <Pressable style={styles.supportRow} onPress={() => openSupportLink(TERMS_OF_USE_URL)}>
               <View style={styles.supportIcon}>
                 <Shield size={18} color={colors.primary} />
               </View>
@@ -938,7 +937,7 @@ export default function MoreScreen() {
               </View>
             </Pressable>
 
-            <Pressable style={styles.supportRow} onPress={() => openSupportLink(PRIVACY_URL)}>
+            <Pressable style={styles.supportRow} onPress={() => openSupportLink(PRIVACY_POLICY_URL)}>
               <View style={styles.supportIcon}>
                 <Shield size={18} color={colors.primary} />
               </View>

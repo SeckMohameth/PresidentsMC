@@ -25,6 +25,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
+import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useAuth } from '@/providers/AuthProvider';
 import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import type { CrewAdminStatus } from '@/providers/RevenueCatProvider';
@@ -41,8 +42,6 @@ const features = [
   { icon: Zap, text: 'Real-time check-ins' },
 ];
 
-const TERMS_URL = 'https://www.mostudios.io/terms';
-const PRIVACY_URL = 'https://www.mostudios.io/privacy';
 const paywallHeroImage = require('../assets/images/custom-images/optimized/harley.jpg');
 
 export default function CreateCrewPaywallScreen() {
@@ -669,11 +668,11 @@ export default function CreateCrewPaywallScreen() {
 
           <Text style={styles.termsText}>
             Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. You will be charged {selectedPlan === 'yearly' ? `${getYearlyPrice()}/year` : `${getMonthlyPrice()}/month`} to your Apple or Google account. Manage or cancel anytime in account settings. By continuing, you agree to our{' '}
-            <Text style={styles.termsLink} onPress={() => void openExternalLink(TERMS_URL)}>
+            <Text style={styles.termsLink} onPress={() => void openExternalLink(TERMS_OF_USE_URL)}>
               Terms of Use
             </Text>{' '}
             and{' '}
-            <Text style={styles.termsLink} onPress={() => void openExternalLink(PRIVACY_URL)}>
+            <Text style={styles.termsLink} onPress={() => void openExternalLink(PRIVACY_POLICY_URL)}>
               Privacy Policy
             </Text>
             .
