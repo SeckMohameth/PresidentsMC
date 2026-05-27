@@ -115,7 +115,7 @@ async function ensureSingleClubOwner(profile: {
       ownerId: profile.id,
       subscriptionOwnerId: profile.id,
       subscriptionStatus: 'inactive',
-      billingRequired: false,
+      billingRequired: true,
       status: 'active',
       archivedAt: null,
       purgeAt: null,
@@ -504,7 +504,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     isDiscoverable = true,
     requiresApproval = true,
     subscriptionStatus = 'inactive',
-    billingRequired = false,
+    billingRequired = true,
   }: {
     name: string;
     description: string;

@@ -108,16 +108,16 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const isSubscriptionActive =
     crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing';
   const isBillingRequired = crew?.billingRequired === true;
-  const canUseAdminTools = !isBillingRequired || isSubscriptionActive || isOwner || isDeveloperSupport;
-  const hasActiveDelegation = !isBillingRequired || isSubscriptionActive;
+  const canUseAdminTools = isAdmin || isOfficer || isDeveloperSupport;
+  const hasPaidFeatureAccess = !isBillingRequired || isSubscriptionActive;
   const canManageRides =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageRides === true) && hasActiveDelegation);
+    isDeveloperSupport || ((isAdmin || isOfficer || permissions.manageRides === true) && hasPaidFeatureAccess);
   const canManageAnnouncements =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAnnouncements === true) && hasActiveDelegation);
+    isDeveloperSupport || isAdmin || isOfficer || permissions.manageAnnouncements === true;
   const canManageAlbums =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageAlbums === true) && hasActiveDelegation);
+    isDeveloperSupport || ((isAdmin || isOfficer || permissions.manageAlbums === true) && hasPaidFeatureAccess);
   const canManageJoinRequests =
-    isDeveloperSupport || isOwner || ((isAdmin || isOfficer || permissions.manageJoinRequests === true) && hasActiveDelegation);
+    isDeveloperSupport || isAdmin || isOfficer || permissions.manageJoinRequests === true;
   const canPost = canManageRides || canManageAnnouncements;
 
   const assertAdminActive = useCallback(() => {

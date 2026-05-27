@@ -12,6 +12,24 @@ The app expects these exact identifiers:
 
 Create matching subscriptions in App Store Connect and Google Play Console, then import or attach them in RevenueCat.
 
+## Access Model
+
+PresidentsMC is a private club app. Members can sign up, request access, and be approved for free.
+
+Free admins can:
+
+- Approve and manage members.
+- Create announcements.
+- Manage invite access.
+
+The club subscription unlocks:
+
+- Creating and managing rides.
+- Creating club photo albums.
+- Ride/photo-driven stats.
+
+One active admin subscription marks the club subscription active for the club. Clubs can decide internally which admin pays or rotates payment.
+
 ## App Store Connect
 
 Create two auto-renewable subscriptions:

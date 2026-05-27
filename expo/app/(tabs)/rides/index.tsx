@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus, Calendar, History } from 'lucide-react-native';
+import { Plus, Calendar, History, Lock } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import RideCard from '@/components/RideCard';
@@ -12,7 +12,7 @@ type TabType = 'upcoming' | 'past';
 export default function RidesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { upcomingRides, pastRides, canManageRides } = useCrew();
+  const { upcomingRides, pastRides, canManageRides, isAdmin, isOfficer, isBillingRequired, isSubscriptionActive } = useCrew();
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
@@ -27,13 +27,14 @@ export default function RidesScreen() {
   }, []);
 
   const rides = activeTab === 'upcoming' ? upcomingRides : pastRides;
+  const showLockedRideCreate = !canManageRides && (isAdmin || isOfficer) && isBillingRequired && !isSubscriptionActive;
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerTop}>
           <Text style={styles.title}>Rides</Text>
-          {canManageRides && (
+          {canManageRides ? (
             <Pressable 
               style={styles.createButton}
               onPress={() => router.push('/create-ride')}
@@ -41,7 +42,15 @@ export default function RidesScreen() {
               <Plus size={20} color={colors.onPrimary} />
               <Text style={styles.createButtonText}>New Ride</Text>
             </Pressable>
-          )}
+          ) : showLockedRideCreate ? (
+            <Pressable
+              style={[styles.createButton, styles.lockedButton]}
+              onPress={() => router.push('/subscription' as any)}
+            >
+              <Lock size={18} color={colors.text} />
+              <Text style={styles.lockedButtonText}>Unlock Rides</Text>
+            </Pressable>
+          ) : null}
         </View>
         <View style={styles.tabs}>
           <Pressable 
@@ -108,6 +117,15 @@ export default function RidesScreen() {
                 <Text style={styles.emptyButtonText}>Schedule a Ride</Text>
               </Pressable>
             )}
+            {activeTab === 'upcoming' && showLockedRideCreate && (
+              <Pressable
+                style={styles.emptyButton}
+                onPress={() => router.push('/subscription' as any)}
+              >
+                <Lock size={18} color={colors.onPrimary} />
+                <Text style={styles.emptyButtonText}>Unlock Rides</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           rides.map(ride => (
@@ -157,6 +175,16 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.onPrimary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  lockedButton: {
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  lockedButtonText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
   },
   tabs: {
     flexDirection: 'row',

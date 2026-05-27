@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindo
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Camera, Images, Plus } from 'lucide-react-native';
+import { Camera, Images, Lock, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
@@ -14,7 +14,7 @@ const DEFAULT_ALBUM_IMAGE = require('../../../assets/images/helmet.jpg');
 export default function AlbumsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { rides, albums, crewStats, canManageAlbums } = useCrew();
+  const { rides, albums, crewStats, canManageAlbums, isAdmin, isOfficer, isBillingRequired, isSubscriptionActive } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -50,18 +50,24 @@ export default function AlbumsScreen() {
       imageUrl: ride.photos[0]?.imageUrl || ride.coverImage,
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const showLockedAlbumCreate = !canManageAlbums && (isAdmin || isOfficer) && isBillingRequired && !isSubscriptionActive;
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.headerTopRow}>
           <Text style={styles.title}>Albums</Text>
-          {canManageAlbums && (
+          {canManageAlbums ? (
             <Pressable style={styles.createButton} onPress={() => router.push('/create-album' as any)}>
               <Plus size={18} color={colors.onPrimary} />
               <Text style={styles.createButtonText}>New</Text>
             </Pressable>
-          )}
+          ) : showLockedAlbumCreate ? (
+            <Pressable style={[styles.createButton, styles.lockedButton]} onPress={() => router.push('/subscription' as any)}>
+              <Lock size={16} color={colors.text} />
+              <Text style={styles.lockedButtonText}>Unlock</Text>
+            </Pressable>
+          ) : null}
         </View>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -96,6 +102,12 @@ export default function AlbumsScreen() {
             <Text style={styles.emptyDescription}>
               Ride albums appear here on ride day. Admins can also create club albums anytime.
             </Text>
+            {showLockedAlbumCreate && (
+              <Pressable style={styles.emptyButton} onPress={() => router.push('/subscription' as any)}>
+                <Lock size={18} color={colors.onPrimary} />
+                <Text style={styles.emptyButtonText}>Unlock Albums</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           <View style={styles.albumGrid}>
@@ -168,6 +180,16 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   createButtonText: {
     color: colors.onPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  lockedButton: {
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  lockedButtonText: {
+    color: colors.text,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -288,5 +310,20 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 24,
+  },
+  emptyButtonText: {
+    color: colors.onPrimary,
+    fontSize: 15,
+    fontWeight: '800',
   },
 });

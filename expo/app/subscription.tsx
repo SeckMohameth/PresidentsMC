@@ -14,10 +14,13 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { doc, updateDoc } from 'firebase/firestore';
 import { ArrowLeft, Camera, Check, Map, Shield, Users, Zap } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
+import { useCrew } from '@/providers/CrewProvider';
 import { getCrewAdminStatus, useRevenueCat } from '@/providers/RevenueCatProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
+import { db } from '@/utils/firebase';
 
 const features = [
   { icon: Users, text: 'Unlimited club members' },
@@ -34,6 +37,7 @@ const paywallHeroImage = require('../assets/images/custom-images/optimized/harle
 export default function SubscriptionScreen() {
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const { crew, currentUser } = useCrew();
   const {
     monthlyPackage,
     yearlyPackage,
@@ -96,6 +100,15 @@ export default function SubscriptionScreen() {
     }
   };
 
+  const syncClubSubscription = async (status: 'active' | 'trialing') => {
+    if (!crew?.id || !currentUser?.id) return;
+    await updateDoc(doc(db, 'crews', crew.id), {
+      billingRequired: true,
+      subscriptionStatus: status,
+      subscriptionOwnerId: currentUser.id,
+    });
+  };
+
   const handleSubscribe = async () => {
     if (!isEnabled) {
       Alert.alert('Subscriptions Unavailable', 'RevenueCat is not enabled for this build.');
@@ -115,6 +128,9 @@ export default function SubscriptionScreen() {
       const nextStatus = getCrewAdminStatus(customerInfo);
 
       if (didUnlock || nextStatus !== 'inactive') {
+        if (nextStatus === 'active' || nextStatus === 'trialing') {
+          await syncClubSubscription(nextStatus);
+        }
         void trackAnalyticsEvent({
           eventName: 'purchase_success',
           route: '/subscription',
@@ -140,6 +156,9 @@ export default function SubscriptionScreen() {
     try {
       const customerInfo = await restorePurchases();
       const nextStatus = getCrewAdminStatus(customerInfo);
+      if (nextStatus === 'active' || nextStatus === 'trialing') {
+        await syncClubSubscription(nextStatus);
+      }
       Alert.alert(
         nextStatus === 'inactive' ? 'No Subscription Found' : 'Restored',
         nextStatus === 'inactive'

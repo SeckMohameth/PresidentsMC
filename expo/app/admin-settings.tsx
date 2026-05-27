@@ -74,7 +74,6 @@ export default function AdminSettingsScreen() {
     getInviteSettings,
     updateInviteSettings,
     isAdmin,
-    isOwner,
     isBillingRequired,
     isSubscriptionActive,
     canManageJoinRequests,
@@ -309,11 +308,11 @@ export default function AdminSettingsScreen() {
           <View style={styles.backButton} />
         </View>
 
-        {isBillingRequired && !isOwner && !isSubscriptionActive && (
+        {isBillingRequired && !isSubscriptionActive && (
           <View style={styles.banner}>
             <Shield size={16} color={colors.warning} />
             <Text style={styles.bannerText}>
-              Subscription inactive. Admin actions are locked until the club subscription is active.
+              Subscription inactive. Member approvals and announcements stay free. Rides and photo albums unlock when the club subscription is active.
             </Text>
           </View>
         )}
