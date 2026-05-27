@@ -41,10 +41,8 @@ const paywallHeroImage = require('../assets/images/custom-images/optimized/harle
 export default function SubscriptionScreen() {
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { crew, currentUser } = useCrew();
+  const { crew, currentUser, isAdmin, isOfficer, isSubscriptionActive } = useCrew();
   const {
-    monthlyPackage,
-    yearlyPackage,
     crewAdminStatus,
     isEnabled,
     isLoading,
@@ -90,6 +88,8 @@ export default function SubscriptionScreen() {
   const getMonthlyPrice = () => FALLBACK_MONTHLY_PRICE;
   const getYearlyPrice = () => FALLBACK_YEARLY_PRICE;
   const getYearlyMonthlyPrice = () => FALLBACK_YEARLY_MONTHLY_PRICE;
+  const isSubscriptionCoveredByClub = isSubscriptionActive && crew?.subscriptionOwnerId !== currentUser?.id;
+  const canManageOwnSubscription = isSubscriptionActive && crew?.subscriptionOwnerId === currentUser?.id;
 
   const openExternalLink = async (url: string) => {
     try {
@@ -101,6 +101,13 @@ export default function SubscriptionScreen() {
 
   const syncClubSubscription = async (status: 'active' | 'trialing') => {
     if (!crew?.id || !currentUser?.id) return;
+    if (
+      isSubscriptionActive &&
+      crew.subscriptionOwnerId &&
+      crew.subscriptionOwnerId !== currentUser.id
+    ) {
+      return;
+    }
     await updateDoc(doc(db, 'crews', crew.id), {
       billingRequired: true,
       subscriptionStatus: status,
@@ -109,6 +116,18 @@ export default function SubscriptionScreen() {
   };
 
   const handleSubscribe = async () => {
+    if (!(isAdmin || isOfficer)) {
+      Alert.alert('Admins Only', 'Only club admins can manage the club subscription.');
+      return;
+    }
+    if (isSubscriptionCoveredByClub) {
+      Alert.alert('Club Covered', 'Another admin already covers this club subscription.');
+      return;
+    }
+    if (canManageOwnSubscription) {
+      await presentCustomerCenter();
+      return;
+    }
     if (!isEnabled) {
       Alert.alert('Subscriptions Unavailable', 'RevenueCat is not enabled for this build.');
       return;
@@ -171,11 +190,38 @@ export default function SubscriptionScreen() {
 
   const isBusy = isPurchasing || isPresentingPaywall || isLoading;
   const statusLabel =
-    crewAdminStatus === 'trialing'
-      ? 'Trial active'
-      : crewAdminStatus === 'active'
-        ? 'Subscription active'
-        : 'Subscription inactive';
+    isSubscriptionCoveredByClub
+      ? 'Covered by another admin'
+      : isSubscriptionActive
+        ? 'Club subscription active'
+        : crewAdminStatus === 'trialing'
+          ? 'Trial active'
+          : crewAdminStatus === 'active'
+            ? 'Subscription active'
+            : 'Subscription inactive';
+
+  if (!(isAdmin || isOfficer)) {
+    return (
+      <View style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <ArrowLeft size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Club Subscription</Text>
+            <View style={styles.placeholder} />
+          </View>
+          <View style={styles.accessDenied}>
+            <Shield size={32} color={colors.textTertiary} />
+            <Text style={styles.accessDeniedTitle}>Admins Only</Text>
+            <Text style={styles.accessDeniedText}>
+              Members never need to subscribe. A club admin handles PresidentsMC Pro for the club.
+            </Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -220,9 +266,17 @@ export default function SubscriptionScreen() {
           </Animated.View>
 
           <View style={styles.statusBadge}>
-            <Check size={16} color={crewAdminStatus === 'inactive' ? colors.textTertiary : colors.success} />
+            <Check size={16} color={isSubscriptionActive || crewAdminStatus !== 'inactive' ? colors.success : colors.textTertiary} />
             <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
+          {isSubscriptionCoveredByClub && (
+            <View style={styles.coveredNotice}>
+              <Text style={styles.coveredNoticeTitle}>No purchase needed</Text>
+              <Text style={styles.coveredNoticeText}>
+                This club already has an active subscription. Only the paying admin can manage billing.
+              </Text>
+            </View>
+          )}
 
           <View style={styles.trialBanner}>
             <Text style={styles.trialText}>Monthly {getMonthlyPrice()} · Yearly {getYearlyPrice()}</Text>
@@ -297,13 +351,19 @@ export default function SubscriptionScreen() {
           <TouchableOpacity
             style={[styles.subscribeButton, isBusy && styles.buttonDisabled]}
             onPress={handleSubscribe}
-            disabled={isBusy}
+            disabled={isBusy || isSubscriptionCoveredByClub}
             activeOpacity={0.85}
           >
             {isBusy ? (
               <ActivityIndicator color={colors.background} />
             ) : (
-              <Text style={styles.subscribeButtonText}>View Plans</Text>
+              <Text style={styles.subscribeButtonText}>
+                {canManageOwnSubscription
+                  ? 'Manage Subscription'
+                  : isSubscriptionCoveredByClub
+                    ? 'Club Covered'
+                    : 'View Plans'}
+              </Text>
             )}
           </TouchableOpacity>
 
@@ -318,7 +378,7 @@ export default function SubscriptionScreen() {
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => void presentCustomerCenter()}
-            disabled={!isEnabled}
+            disabled={!isEnabled || !canManageOwnSubscription}
           >
             <Text style={styles.secondaryButtonText}>Manage Subscription</Text>
           </TouchableOpacity>
@@ -440,6 +500,44 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     fontWeight: '700',
+  },
+  coveredNotice: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 12,
+  },
+  coveredNoticeTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  coveredNoticeText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  accessDenied: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 36,
+  },
+  accessDeniedTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  accessDeniedText: {
+    color: colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   trialBanner: {
     backgroundColor: colors.surfaceElevated,

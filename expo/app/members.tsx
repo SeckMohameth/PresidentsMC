@@ -177,12 +177,22 @@ export default function MembersScreen() {
 
   const handleRoleChange = (member: CrewMember) => {
     if (!isAdmin) return;
-    if (member.id === currentUser?.id) {
-      Alert.alert('Not Allowed', 'You cannot change your own role here.');
+    const isSelf = member.id === currentUser?.id;
+    const isOwner = member.id === crew?.ownerId;
+    if (isOwner) {
+      Alert.alert('Owner Protected', 'The club owner must stay an admin.');
+      return;
+    }
+    if (isSelf && member.role === 'admin' && stats.admins <= 1) {
+      Alert.alert('Another Admin Required', 'Promote another admin before demoting yourself.');
       return;
     }
 
     const handleUpdateRole = async (role: CrewMember['role']) => {
+      if (role !== 'admin' && member.role === 'admin' && stats.admins <= 1) {
+        Alert.alert('Another Admin Required', 'The club must keep at least one admin.');
+        return;
+      }
       try {
         await setMemberRole(member.id, role);
       } catch {

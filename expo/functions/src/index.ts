@@ -65,6 +65,13 @@ type CrewMemberDoc = {
   name?: string;
   avatar?: string;
   role?: UserRole;
+  leadershipTitle?: string;
+  permissions?: {
+    manageRides?: boolean;
+    manageAnnouncements?: boolean;
+    manageAlbums?: boolean;
+    manageJoinRequests?: boolean;
+  };
   joinedCrewAt?: string;
   joinedAt?: string;
   ridesAttended?: number;
@@ -575,23 +582,28 @@ async function getActingMemberContext(userId: string) {
   };
 }
 
-function requireActiveLeadership(member: CrewMemberDoc, crew: CrewDoc) {
+function requireLeadership(member: CrewMemberDoc) {
   const role = member.role;
   if (role !== 'admin' && role !== 'officer') {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
   }
+}
+
+function requireActiveLeadership(member: CrewMemberDoc, crew: CrewDoc) {
+  requireLeadership(member);
   if (!isActiveSubscription(crew.subscriptionStatus)) {
     throw new HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
   }
 }
 
-function requireAdmin(member: CrewMemberDoc, crew: CrewDoc) {
+function requireAdmin(member: CrewMemberDoc) {
   if (member.role !== 'admin') {
     throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
   }
-  if (!isActiveSubscription(crew.subscriptionStatus)) {
-    throw new HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
-  }
+}
+
+function countAdmins(members: CrewMemberDoc[]) {
+  return members.filter((member) => member.role === 'admin').length;
 }
 
 async function exitCrew(userId: string, deleteAccount: boolean): Promise<ExitCrewResult> {
@@ -982,8 +994,64 @@ export const getCrewInviteCode = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
+  requireLeadership(context.member);
   const inviteCode = await getOrCreateCrewInviteCode(context.crewRef, context.crew);
-  return { inviteCode };
+  const privateSettingsSnap = await context.crewRef.collection('private').doc('settings').get();
+  return {
+    inviteCode,
+    expiresAt: privateSettingsSnap.data()?.expiresAt ?? null,
+  };
+});
+
+export const setCrewInviteCode = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const context = await getActingMemberContext(userId);
+  requireLeadership(context.member);
+
+  const currentCode = await getOrCreateCrewInviteCode(context.crewRef, context.crew);
+  const nextCode = String(request.data?.inviteCode ?? currentCode)
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  const expiresAtRaw = request.data?.expiresAt;
+  const expiresAt = typeof expiresAtRaw === 'string' && expiresAtRaw.trim() ? expiresAtRaw : null;
+  if (nextCode.length < 4 || nextCode.length > 16) {
+    throw new HttpsError('invalid-argument', 'INVITE_CODE_LENGTH');
+  }
+
+  await adminDb.runTransaction(async (transaction) => {
+    const lookupRef = adminDb.collection('crewInviteCodes').doc(nextCode);
+    const lookupSnap = await transaction.get(lookupRef);
+    if (lookupSnap.exists) {
+      const data = lookupSnap.data() as { crewId?: string };
+      if (data.crewId && data.crewId !== context.crewRef.id) {
+        throw new HttpsError('failed-precondition', 'INVITE_CODE_TAKEN');
+      }
+    }
+
+    const now = new Date().toISOString();
+    transaction.set(context.crewRef.collection('private').doc('settings'), {
+      inviteCode: nextCode,
+      expiresAt,
+      updatedAt: now,
+    }, { merge: true });
+    transaction.set(lookupRef, {
+      code: nextCode,
+      crewId: context.crewRef.id,
+      expiresAt,
+      createdBy: userId,
+      updatedAt: now,
+    }, { merge: true });
+    if (nextCode !== currentCode) {
+      transaction.delete(adminDb.collection('crewInviteCodes').doc(currentCode));
+    }
+  });
+
+  return { inviteCode: nextCode, expiresAt };
 });
 
 export const leaveCrew = onCall(async (request) => {
@@ -1041,7 +1109,7 @@ export const approveJoinRequest = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireActiveLeadership(context.member, context.crew);
+  requireLeadership(context.member);
 
   const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
   const joinRequestSnap = await joinRequestRef.get();
@@ -1124,7 +1192,7 @@ export const denyJoinRequest = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireActiveLeadership(context.member, context.crew);
+  requireLeadership(context.member);
 
   await context.crewRef.collection('joinRequests').doc(requestId).set(
     {
@@ -1150,7 +1218,7 @@ export const removeCrewMember = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireAdmin(context.member, context.crew);
+  requireAdmin(context.member);
 
   if (context.crew.ownerId === memberId) {
     throw new HttpsError('failed-precondition', 'OWNER_REMOVE_NOT_ALLOWED');
@@ -1164,21 +1232,28 @@ export const removeCrewMember = onCall(async (request) => {
   }
 
   await adminDb.runTransaction(async (transaction) => {
-    const [freshTargetMemberSnap, targetUserSnap] = await Promise.all([
+    const [freshTargetMemberSnap, targetUserSnap, membersSnap] = await Promise.all([
       transaction.get(targetMemberRef),
       transaction.get(targetUserRef),
+      transaction.get(context.crewRef.collection('members')),
     ]);
 
     if (!freshTargetMemberSnap.exists) {
       return;
     }
+    const targetMember = freshTargetMemberSnap.data() as CrewMemberDoc;
+    const admins = countAdmins(membersSnap.docs.map((docSnap) => docSnap.data() as CrewMemberDoc));
+    if (targetMember.role === 'admin' && admins <= 1) {
+      throw new HttpsError('failed-precondition', 'ANOTHER_ADMIN_REQUIRED');
+    }
 
     transaction.delete(targetMemberRef);
-    transaction.set(
-      context.crewRef,
-      { memberCount: FieldValue.increment(-1) },
-      { merge: true }
-    );
+    transaction.set(context.crewRef, {
+      memberCount: FieldValue.increment(-1),
+      ...(context.crew.subscriptionOwnerId === memberId
+        ? { subscriptionOwnerId: null, subscriptionStatus: 'inactive' as SubscriptionStatus }
+        : {}),
+    }, { merge: true });
     if (targetUserSnap.exists) {
       transaction.set(targetUserRef, { crewId: null, role: 'member' }, { merge: true });
     }
@@ -1200,7 +1275,7 @@ export const setCrewMemberRole = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireAdmin(context.member, context.crew);
+  requireAdmin(context.member);
 
   if (context.crew.ownerId === memberId && role !== 'admin') {
     throw new HttpsError('failed-precondition', 'OWNER_ROLE_LOCKED');
@@ -1213,10 +1288,89 @@ export const setCrewMemberRole = onCall(async (request) => {
     throw new HttpsError('not-found', 'MEMBER_NOT_FOUND');
   }
 
-  await Promise.all([
-    targetMemberRef.set({ role }, { merge: true }),
-    targetUserRef.set({ role }, { merge: true }),
-  ]);
+  await adminDb.runTransaction(async (transaction) => {
+    const [freshTargetMemberSnap, membersSnap] = await Promise.all([
+      transaction.get(targetMemberRef),
+      transaction.get(context.crewRef.collection('members')),
+    ]);
+    if (!freshTargetMemberSnap.exists) {
+      throw new HttpsError('not-found', 'MEMBER_NOT_FOUND');
+    }
+    const targetMember = freshTargetMemberSnap.data() as CrewMemberDoc;
+    if (targetMember.role === 'admin' && role !== 'admin') {
+      const admins = countAdmins(membersSnap.docs.map((docSnap) => docSnap.data() as CrewMemberDoc));
+      if (admins <= 1) {
+        throw new HttpsError('failed-precondition', 'ANOTHER_ADMIN_REQUIRED');
+      }
+    }
+
+    transaction.set(targetMemberRef, { role }, { merge: true });
+    transaction.set(targetUserRef, { role }, { merge: true });
+  });
+
+  return { ok: true };
+});
+
+export const setCrewMemberLeadership = onCall(async (request) => {
+  const userId = request.auth?.uid;
+  if (!userId) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const memberId = String(request.data?.memberId ?? '').trim();
+  const roleValue = request.data?.role ? String(request.data.role).trim() : undefined;
+  const role = roleValue as UserRole | undefined;
+  const leadershipTitle = String(request.data?.leadershipTitle ?? '').trim().slice(0, 48);
+  const rawPermissions = request.data?.permissions ?? {};
+  if (!memberId || (roleValue && !['admin', 'officer', 'member'].includes(roleValue))) {
+    throw new HttpsError('invalid-argument', 'INVALID_MEMBER_LEADERSHIP');
+  }
+
+  const context = await getActingMemberContext(userId);
+  requireAdmin(context.member);
+
+  if (context.crew.ownerId === memberId && role && role !== 'admin') {
+    throw new HttpsError('failed-precondition', 'OWNER_ROLE_LOCKED');
+  }
+
+  const targetMemberRef = context.crewRef.collection('members').doc(memberId);
+  const targetUserRef = adminDb.collection('users').doc(memberId);
+  await adminDb.runTransaction(async (transaction) => {
+    const [freshTargetMemberSnap, membersSnap] = await Promise.all([
+      transaction.get(targetMemberRef),
+      transaction.get(context.crewRef.collection('members')),
+    ]);
+    if (!freshTargetMemberSnap.exists) {
+      throw new HttpsError('not-found', 'MEMBER_NOT_FOUND');
+    }
+
+    const targetMember = freshTargetMemberSnap.data() as CrewMemberDoc;
+    if (targetMember.role === 'admin' && role && role !== 'admin') {
+      const admins = countAdmins(membersSnap.docs.map((docSnap) => docSnap.data() as CrewMemberDoc));
+      if (admins <= 1) {
+        throw new HttpsError('failed-precondition', 'ANOTHER_ADMIN_REQUIRED');
+      }
+    }
+
+    const permissions = {
+      manageRides: rawPermissions.manageRides === true,
+      manageAnnouncements: rawPermissions.manageAnnouncements === true,
+      manageAlbums: rawPermissions.manageAlbums === true,
+      manageJoinRequests: rawPermissions.manageJoinRequests === true,
+    };
+    const memberUpdates: Record<string, unknown> = {
+      leadershipTitle,
+      permissions,
+    };
+    if (role) {
+      memberUpdates.role = role;
+    }
+
+    transaction.set(targetMemberRef, memberUpdates, { merge: true });
+    if (role) {
+      transaction.set(targetUserRef, { role }, { merge: true });
+    }
+  });
 
   return { ok: true };
 });

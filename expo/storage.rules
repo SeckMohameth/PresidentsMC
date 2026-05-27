@@ -47,7 +47,7 @@ service firebase.storage {
 
     match /crews/{crewId}/announcements/{fileName} {
       allow read: if isCrewMember(crewId);
-      allow write: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+      allow write: if isCrewLeader(crewId);
     }
 
     match /crews/{crewId}/rides/{rideId}/cover.jpg {
@@ -56,7 +56,18 @@ service firebase.storage {
     }
 
     match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
-      allow read, write: if isCrewMember(crewId);
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewMember(crewId) && hasActiveSubscription(crewId);
+    }
+
+    match /crews/{crewId}/albums/{albumId}/cover.jpg {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+    }
+
+    match /crews/{crewId}/albums/{albumId}/photos/{fileName} {
+      allow read: if isCrewMember(crewId);
+      allow write: if isCrewMember(crewId) && hasActiveSubscription(crewId);
     }
 
     match /{allPaths=**} {

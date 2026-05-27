@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onJoinRequestUpdated = exports.onJoinRequestCreated = exports.onCrewMemberWritten = exports.onCrewRideWritten = exports.purgeArchivedCrews = exports.revenueCatWebhook = exports.setCrewMemberRole = exports.removeCrewMember = exports.denyJoinRequest = exports.approveJoinRequest = exports.deleteAccountAndCleanup = exports.leaveCrew = exports.getCrewInviteCode = exports.joinCrewByInvite = exports.recordAnalyticsEvents = exports.unsplashSearch = void 0;
+exports.onJoinRequestUpdated = exports.onJoinRequestCreated = exports.onCrewMemberWritten = exports.onCrewRideWritten = exports.purgeArchivedCrews = exports.revenueCatWebhook = exports.setCrewMemberLeadership = exports.setCrewMemberRole = exports.removeCrewMember = exports.denyJoinRequest = exports.approveJoinRequest = exports.deleteAccountAndCleanup = exports.leaveCrew = exports.setCrewInviteCode = exports.getCrewInviteCode = exports.joinCrewByInvite = exports.recordAnalyticsEvents = exports.unsplashSearch = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -390,22 +390,25 @@ async function getActingMemberContext(userId) {
         member: memberSnap.data(),
     };
 }
-function requireActiveLeadership(member, crew) {
+function requireLeadership(member) {
     const role = member.role;
     if (role !== 'admin' && role !== 'officer') {
         throw new https_1.HttpsError('permission-denied', 'NOT_AUTHORIZED');
     }
+}
+function requireActiveLeadership(member, crew) {
+    requireLeadership(member);
     if (!isActiveSubscription(crew.subscriptionStatus)) {
         throw new https_1.HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
     }
 }
-function requireAdmin(member, crew) {
+function requireAdmin(member) {
     if (member.role !== 'admin') {
         throw new https_1.HttpsError('permission-denied', 'NOT_AUTHORIZED');
     }
-    if (!isActiveSubscription(crew.subscriptionStatus)) {
-        throw new https_1.HttpsError('failed-precondition', 'SUBSCRIPTION_INACTIVE');
-    }
+}
+function countAdmins(members) {
+    return members.filter((member) => member.role === 'admin').length;
 }
 async function exitCrew(userId, deleteAccount) {
     const result = await adminDb.runTransaction(async (transaction) => {
@@ -704,8 +707,58 @@ exports.getCrewInviteCode = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('unauthenticated', 'AUTH_REQUIRED');
     }
     const context = await getActingMemberContext(userId);
+    requireLeadership(context.member);
     const inviteCode = await getOrCreateCrewInviteCode(context.crewRef, context.crew);
-    return { inviteCode };
+    const privateSettingsSnap = await context.crewRef.collection('private').doc('settings').get();
+    return {
+        inviteCode,
+        expiresAt: privateSettingsSnap.data()?.expiresAt ?? null,
+    };
+});
+exports.setCrewInviteCode = (0, https_1.onCall)(async (request) => {
+    const userId = request.auth?.uid;
+    if (!userId) {
+        throw new https_1.HttpsError('unauthenticated', 'AUTH_REQUIRED');
+    }
+    const context = await getActingMemberContext(userId);
+    requireLeadership(context.member);
+    const currentCode = await getOrCreateCrewInviteCode(context.crewRef, context.crew);
+    const nextCode = String(request.data?.inviteCode ?? currentCode)
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
+    const expiresAtRaw = request.data?.expiresAt;
+    const expiresAt = typeof expiresAtRaw === 'string' && expiresAtRaw.trim() ? expiresAtRaw : null;
+    if (nextCode.length < 4 || nextCode.length > 16) {
+        throw new https_1.HttpsError('invalid-argument', 'INVITE_CODE_LENGTH');
+    }
+    await adminDb.runTransaction(async (transaction) => {
+        const lookupRef = adminDb.collection('crewInviteCodes').doc(nextCode);
+        const lookupSnap = await transaction.get(lookupRef);
+        if (lookupSnap.exists) {
+            const data = lookupSnap.data();
+            if (data.crewId && data.crewId !== context.crewRef.id) {
+                throw new https_1.HttpsError('failed-precondition', 'INVITE_CODE_TAKEN');
+            }
+        }
+        const now = new Date().toISOString();
+        transaction.set(context.crewRef.collection('private').doc('settings'), {
+            inviteCode: nextCode,
+            expiresAt,
+            updatedAt: now,
+        }, { merge: true });
+        transaction.set(lookupRef, {
+            code: nextCode,
+            crewId: context.crewRef.id,
+            expiresAt,
+            createdBy: userId,
+            updatedAt: now,
+        }, { merge: true });
+        if (nextCode !== currentCode) {
+            transaction.delete(adminDb.collection('crewInviteCodes').doc(currentCode));
+        }
+    });
+    return { inviteCode: nextCode, expiresAt };
 });
 exports.leaveCrew = (0, https_1.onCall)(async (request) => {
     const userId = request.auth?.uid;
@@ -753,7 +806,7 @@ exports.approveJoinRequest = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'REQUEST_ID_REQUIRED');
     }
     const context = await getActingMemberContext(userId);
-    requireActiveLeadership(context.member, context.crew);
+    requireLeadership(context.member);
     const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
     const joinRequestSnap = await joinRequestRef.get();
     if (!joinRequestSnap.exists) {
@@ -813,7 +866,7 @@ exports.denyJoinRequest = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'REQUEST_ID_REQUIRED');
     }
     const context = await getActingMemberContext(userId);
-    requireActiveLeadership(context.member, context.crew);
+    requireLeadership(context.member);
     await context.crewRef.collection('joinRequests').doc(requestId).set({
         status: 'denied',
         decidedAt: new Date().toISOString(),
@@ -831,7 +884,7 @@ exports.removeCrewMember = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'MEMBER_ID_REQUIRED');
     }
     const context = await getActingMemberContext(userId);
-    requireAdmin(context.member, context.crew);
+    requireAdmin(context.member);
     if (context.crew.ownerId === memberId) {
         throw new https_1.HttpsError('failed-precondition', 'OWNER_REMOVE_NOT_ALLOWED');
     }
@@ -842,15 +895,26 @@ exports.removeCrewMember = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('not-found', 'MEMBER_NOT_FOUND');
     }
     await adminDb.runTransaction(async (transaction) => {
-        const [freshTargetMemberSnap, targetUserSnap] = await Promise.all([
+        const [freshTargetMemberSnap, targetUserSnap, membersSnap] = await Promise.all([
             transaction.get(targetMemberRef),
             transaction.get(targetUserRef),
+            transaction.get(context.crewRef.collection('members')),
         ]);
         if (!freshTargetMemberSnap.exists) {
             return;
         }
+        const targetMember = freshTargetMemberSnap.data();
+        const admins = countAdmins(membersSnap.docs.map((docSnap) => docSnap.data()));
+        if (targetMember.role === 'admin' && admins <= 1) {
+            throw new https_1.HttpsError('failed-precondition', 'ANOTHER_ADMIN_REQUIRED');
+        }
         transaction.delete(targetMemberRef);
-        transaction.set(context.crewRef, { memberCount: firestore_2.FieldValue.increment(-1) }, { merge: true });
+        transaction.set(context.crewRef, {
+            memberCount: firestore_2.FieldValue.increment(-1),
+            ...(context.crew.subscriptionOwnerId === memberId
+                ? { subscriptionOwnerId: null, subscriptionStatus: 'inactive' }
+                : {}),
+        }, { merge: true });
         if (targetUserSnap.exists) {
             transaction.set(targetUserRef, { crewId: null, role: 'member' }, { merge: true });
         }
@@ -868,7 +932,7 @@ exports.setCrewMemberRole = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'INVALID_MEMBER_ROLE');
     }
     const context = await getActingMemberContext(userId);
-    requireAdmin(context.member, context.crew);
+    requireAdmin(context.member);
     if (context.crew.ownerId === memberId && role !== 'admin') {
         throw new https_1.HttpsError('failed-precondition', 'OWNER_ROLE_LOCKED');
     }
@@ -878,10 +942,79 @@ exports.setCrewMemberRole = (0, https_1.onCall)(async (request) => {
     if (!targetMemberSnap.exists) {
         throw new https_1.HttpsError('not-found', 'MEMBER_NOT_FOUND');
     }
-    await Promise.all([
-        targetMemberRef.set({ role }, { merge: true }),
-        targetUserRef.set({ role }, { merge: true }),
-    ]);
+    await adminDb.runTransaction(async (transaction) => {
+        const [freshTargetMemberSnap, membersSnap] = await Promise.all([
+            transaction.get(targetMemberRef),
+            transaction.get(context.crewRef.collection('members')),
+        ]);
+        if (!freshTargetMemberSnap.exists) {
+            throw new https_1.HttpsError('not-found', 'MEMBER_NOT_FOUND');
+        }
+        const targetMember = freshTargetMemberSnap.data();
+        if (targetMember.role === 'admin' && role !== 'admin') {
+            const admins = countAdmins(membersSnap.docs.map((docSnap) => docSnap.data()));
+            if (admins <= 1) {
+                throw new https_1.HttpsError('failed-precondition', 'ANOTHER_ADMIN_REQUIRED');
+            }
+        }
+        transaction.set(targetMemberRef, { role }, { merge: true });
+        transaction.set(targetUserRef, { role }, { merge: true });
+    });
+    return { ok: true };
+});
+exports.setCrewMemberLeadership = (0, https_1.onCall)(async (request) => {
+    const userId = request.auth?.uid;
+    if (!userId) {
+        throw new https_1.HttpsError('unauthenticated', 'AUTH_REQUIRED');
+    }
+    const memberId = String(request.data?.memberId ?? '').trim();
+    const roleValue = request.data?.role ? String(request.data.role).trim() : undefined;
+    const role = roleValue;
+    const leadershipTitle = String(request.data?.leadershipTitle ?? '').trim().slice(0, 48);
+    const rawPermissions = request.data?.permissions ?? {};
+    if (!memberId || (roleValue && !['admin', 'officer', 'member'].includes(roleValue))) {
+        throw new https_1.HttpsError('invalid-argument', 'INVALID_MEMBER_LEADERSHIP');
+    }
+    const context = await getActingMemberContext(userId);
+    requireAdmin(context.member);
+    if (context.crew.ownerId === memberId && role && role !== 'admin') {
+        throw new https_1.HttpsError('failed-precondition', 'OWNER_ROLE_LOCKED');
+    }
+    const targetMemberRef = context.crewRef.collection('members').doc(memberId);
+    const targetUserRef = adminDb.collection('users').doc(memberId);
+    await adminDb.runTransaction(async (transaction) => {
+        const [freshTargetMemberSnap, membersSnap] = await Promise.all([
+            transaction.get(targetMemberRef),
+            transaction.get(context.crewRef.collection('members')),
+        ]);
+        if (!freshTargetMemberSnap.exists) {
+            throw new https_1.HttpsError('not-found', 'MEMBER_NOT_FOUND');
+        }
+        const targetMember = freshTargetMemberSnap.data();
+        if (targetMember.role === 'admin' && role && role !== 'admin') {
+            const admins = countAdmins(membersSnap.docs.map((docSnap) => docSnap.data()));
+            if (admins <= 1) {
+                throw new https_1.HttpsError('failed-precondition', 'ANOTHER_ADMIN_REQUIRED');
+            }
+        }
+        const permissions = {
+            manageRides: rawPermissions.manageRides === true,
+            manageAnnouncements: rawPermissions.manageAnnouncements === true,
+            manageAlbums: rawPermissions.manageAlbums === true,
+            manageJoinRequests: rawPermissions.manageJoinRequests === true,
+        };
+        const memberUpdates = {
+            leadershipTitle,
+            permissions,
+        };
+        if (role) {
+            memberUpdates.role = role;
+        }
+        transaction.set(targetMemberRef, memberUpdates, { merge: true });
+        if (role) {
+            transaction.set(targetUserRef, { role }, { merge: true });
+        }
+    });
     return { ok: true };
 });
 exports.revenueCatWebhook = (0, https_1.onRequest)({ secrets: [revenueCatWebhookSecret] }, async (request, response) => {

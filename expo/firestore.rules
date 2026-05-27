@@ -39,6 +39,18 @@ service cloud.firestore {
       return ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
     }
 
+    function isSubscriptionActivation(crewId) {
+      return isCrewLeader(crewId)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'billingRequired',
+          'subscriptionOwnerId',
+          'subscriptionStatus'
+        ])
+        && request.resource.data.billingRequired == true
+        && request.resource.data.subscriptionOwnerId == request.auth.uid
+        && ['active', 'trialing'].hasAny([request.resource.data.subscriptionStatus]);
+    }
+
     function validSelfCrewState(data) {
       return data.crewId == null
         ? data.role == 'member'
@@ -86,15 +98,17 @@ service cloud.firestore {
           request.resource.data.subscriptionOwnerId == null
           || request.resource.data.subscriptionOwnerId == request.auth.uid
         );
-      allow update: if isCrewOwner(crewId)
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
-          'name',
-          'description',
-          'logoUrl',
-          'isDiscoverable',
-          'requiresApproval',
-          'nameLower'
-        ]);
+      allow update: if (
+          isCrewOwner(crewId)
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name',
+            'description',
+            'logoUrl',
+            'isDiscoverable',
+            'requiresApproval',
+            'nameLower'
+          ])
+        ) || isSubscriptionActivation(crewId);
       allow delete: if false;
 
       match /members/{memberId} {
@@ -114,17 +128,19 @@ service cloud.firestore {
 
       match /private/{docId} {
         allow read: if false;
-        allow create: if isCrewOwner(crewId)
+        allow create: if isCrewLeader(crewId)
           && docId == 'settings'
           && request.resource.data.keys().hasOnly([
             'inviteCode',
+            'expiresAt',
             'updatedAt'
           ])
           && request.resource.data.inviteCode is string;
-        allow update: if isCrewOwner(crewId)
+        allow update: if isCrewLeader(crewId)
           && docId == 'settings'
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'inviteCode',
+            'expiresAt',
             'updatedAt'
           ])
           && request.resource.data.inviteCode is string;
@@ -133,18 +149,29 @@ service cloud.firestore {
 
       match /announcements/{announcementId} {
         allow read: if isCrewMember(crewId);
-        allow create, update, delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
+        allow create, update, delete: if isCrewLeader(crewId);
       }
 
       match /rides/{rideId} {
         allow read: if isCrewMember(crewId);
-        allow create, delete: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId));
-        allow update: if isCrewOwner(crewId) || (isCrewLeader(crewId) && hasActiveSubscription(crewId))
-          || (isCrewMember(crewId)
+        allow create, delete: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+        allow update: if (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+          || (isCrewMember(crewId) && hasActiveSubscription(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'attendees',
               'checkedIn',
               'photos'
+            ]));
+      }
+
+      match /albums/{albumId} {
+        allow read: if isCrewMember(crewId);
+        allow create, delete: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+        allow update: if (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+          || (isCrewMember(crewId) && hasActiveSubscription(crewId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+              'photos',
+              'updatedAt'
             ]));
       }
 
@@ -167,13 +194,18 @@ service cloud.firestore {
     }
 
     match /crewInviteCodes/{inviteCode} {
-      allow read, update, delete: if false;
+      allow read, delete: if false;
       allow create: if signedIn()
         && request.resource.data.code == inviteCode
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.crewId is string
         && exists(crewPath(request.resource.data.crewId))
-        && get(crewPath(request.resource.data.crewId)).data.ownerId == request.auth.uid;
+        && isCrewLeader(request.resource.data.crewId);
+      allow update: if signedIn()
+        && request.resource.data.code == inviteCode
+        && request.resource.data.crewId is string
+        && resource.data.crewId == request.resource.data.crewId
+        && isCrewLeader(request.resource.data.crewId);
     }
   }
 }
