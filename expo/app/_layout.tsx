@@ -143,6 +143,12 @@ function RootLayoutNav() {
           headerShown: false,
         }} 
       />
+      <Stack.Screen
+        name="subscription"
+        options={{
+          headerShown: false,
+        }}
+      />
       <Stack.Screen 
         name="ride/[id]" 
         options={{ 

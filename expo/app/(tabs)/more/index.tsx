@@ -647,13 +647,20 @@ export default function MoreScreen() {
               badgeText={`${members.length}`}
             />
             {isAdmin && (
-              <MenuItem 
-                icon={<Shield size={20} color={colors.warning} />}
-                label="Admin Settings"
-                onPress={() => router.push('/admin-settings')}
-                showBadge={pendingJoinRequests.length > 0}
-                badgeText={`${pendingJoinRequests.length}`}
-              />
+              <>
+                <MenuItem
+                  icon={<Crown size={20} color={colors.primary} />}
+                  label="Club Subscription"
+                  onPress={() => router.push('/subscription' as any)}
+                />
+                <MenuItem
+                  icon={<Shield size={20} color={colors.warning} />}
+                  label="Admin Settings"
+                  onPress={() => router.push('/admin-settings')}
+                  showBadge={pendingJoinRequests.length > 0}
+                  badgeText={`${pendingJoinRequests.length}`}
+                />
+              </>
             )}
           </View>
         </View>
