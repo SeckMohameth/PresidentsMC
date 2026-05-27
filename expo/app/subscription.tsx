@@ -370,7 +370,9 @@ export default function SubscriptionScreen() {
                   ? 'Manage Subscription'
                   : isSubscriptionCoveredByClub
                     ? 'Club Covered'
-                    : 'View Plans'}
+                    : selectedPlan === 'yearly'
+                      ? 'Subscribe Yearly'
+                      : 'Subscribe Monthly'}
               </Text>
             )}
           </TouchableOpacity>
