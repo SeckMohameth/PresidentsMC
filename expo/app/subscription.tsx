@@ -87,14 +87,9 @@ export default function SubscriptionScreen() {
     });
   }, [fadeAnim, scaleAnim, slideAnim]);
 
-  const getMonthlyPrice = () => monthlyPackage?.product?.priceString || FALLBACK_MONTHLY_PRICE;
-  const getYearlyPrice = () => yearlyPackage?.product?.priceString || FALLBACK_YEARLY_PRICE;
-  const getYearlyMonthlyPrice = () => {
-    if (yearlyPackage?.product?.price) {
-      return `$${(yearlyPackage.product.price / 12).toFixed(2)}`;
-    }
-    return FALLBACK_YEARLY_MONTHLY_PRICE;
-  };
+  const getMonthlyPrice = () => FALLBACK_MONTHLY_PRICE;
+  const getYearlyPrice = () => FALLBACK_YEARLY_PRICE;
+  const getYearlyMonthlyPrice = () => FALLBACK_YEARLY_MONTHLY_PRICE;
 
   const openExternalLink = async (url: string) => {
     try {
