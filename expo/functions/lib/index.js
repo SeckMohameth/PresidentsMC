@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onJoinRequestUpdated = exports.onJoinRequestCreated = exports.onCrewMemberWritten = exports.onCrewRideWritten = exports.purgeArchivedCrews = exports.revenueCatWebhook = exports.setCrewMemberLeadership = exports.setCrewMemberRole = exports.removeCrewMember = exports.denyJoinRequest = exports.approveJoinRequest = exports.deleteAccountAndCleanup = exports.leaveCrew = exports.setCrewInviteCode = exports.getCrewInviteCode = exports.joinCrewByInvite = exports.recordAnalyticsEvents = exports.unsplashSearch = void 0;
+exports.onJoinRequestUpdated = exports.onJoinRequestCreated = exports.onCrewMemberWritten = exports.onCrewRideWritten = exports.purgeArchivedCrews = exports.revenueCatWebhook = exports.setCrewMemberLeadership = exports.setCrewMemberRole = exports.removeCrewMember = exports.denyJoinRequest = exports.approveJoinRequest = exports.deleteAccountAndCleanup = exports.leaveCrew = exports.setCrewInviteCode = exports.getCrewInviteCode = exports.joinCrewByInvite = exports.recordAnalyticsEvents = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -9,7 +9,6 @@ const auth_1 = require("firebase-admin/auth");
 const firestore_2 = require("firebase-admin/firestore");
 const storage_1 = require("firebase-admin/storage");
 const params_1 = require("firebase-functions/params");
-const unsplashAccessKey = (0, params_1.defineSecret)('UNSPLASH_ACCESS_KEY');
 const revenueCatWebhookSecret = (0, params_1.defineSecret)('REVENUECAT_WEBHOOK_SECRET');
 (0, app_1.initializeApp)();
 const adminDb = (0, firestore_2.getFirestore)();
@@ -533,32 +532,6 @@ function normalizeAnalyticsEvent(input, fallbackUserId) {
         properties: input.properties ?? {},
     };
 }
-exports.unsplashSearch = (0, https_1.onCall)({ secrets: [unsplashAccessKey] }, async (request) => {
-    const query = String(request.data?.query ?? '').trim();
-    if (query.length < 2) {
-        throw new https_1.HttpsError('invalid-argument', 'Query must be at least 2 characters.');
-    }
-    const perPageRaw = Number(request.data?.perPage ?? 30);
-    const perPage = Number.isFinite(perPageRaw) ? Math.min(perPageRaw, 30) : 30;
-    const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&client_id=${unsplashAccessKey.value()}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-        throw new https_1.HttpsError('internal', 'Unsplash request failed.');
-    }
-    const data = (await res.json());
-    return {
-        results: (data.results ?? []).map((photo) => ({
-            id: photo.id,
-            urls: photo.urls,
-            user: {
-                name: photo.user.name,
-                username: photo.user.username,
-                links: { html: photo.user.links?.html },
-            },
-            links: { html: photo.links?.html },
-        })),
-    };
-});
 exports.recordAnalyticsEvents = (0, https_1.onCall)(async (request) => {
     const rawEvents = Array.isArray(request.data?.events)
         ? request.data.events

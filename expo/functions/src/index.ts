@@ -16,7 +16,6 @@ import {
 import { getStorage } from 'firebase-admin/storage';
 import { defineSecret } from 'firebase-functions/params';
 
-const unsplashAccessKey = defineSecret('UNSPLASH_ACCESS_KEY');
 const revenueCatWebhookSecret = defineSecret('REVENUECAT_WEBHOOK_SECRET');
 
 initializeApp();
@@ -34,13 +33,6 @@ const INVITE_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 type UserRole = 'admin' | 'officer' | 'member';
 type SubscriptionStatus = 'active' | 'inactive' | 'past_due' | 'trialing';
-
-type UnsplashPhoto = {
-  id: string;
-  urls: { small: string; regular: string };
-  user: { name: string; username: string; links?: { html?: string } };
-  links: { html?: string };
-};
 
 type CrewDoc = {
   id: string;
@@ -762,40 +754,6 @@ function normalizeAnalyticsEvent(input: AnalyticsEventInput, fallbackUserId: str
     properties: input.properties ?? {},
   };
 }
-
-export const unsplashSearch = onCall({ secrets: [unsplashAccessKey] }, async (request) => {
-  const query = String(request.data?.query ?? '').trim();
-  if (query.length < 2) {
-    throw new HttpsError('invalid-argument', 'Query must be at least 2 characters.');
-  }
-
-  const perPageRaw = Number(request.data?.perPage ?? 30);
-  const perPage = Number.isFinite(perPageRaw) ? Math.min(perPageRaw, 30) : 30;
-
-  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-    query
-  )}&per_page=${perPage}&client_id=${unsplashAccessKey.value()}`;
-
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new HttpsError('internal', 'Unsplash request failed.');
-  }
-
-  const data = (await res.json()) as { results?: UnsplashPhoto[] };
-
-  return {
-    results: (data.results ?? []).map((photo) => ({
-      id: photo.id,
-      urls: photo.urls,
-      user: {
-        name: photo.user.name,
-        username: photo.user.username,
-        links: { html: photo.user.links?.html },
-      },
-      links: { html: photo.links?.html },
-    })),
-  };
-});
 
 export const recordAnalyticsEvents = onCall(async (request) => {
   const rawEvents = Array.isArray(request.data?.events)
