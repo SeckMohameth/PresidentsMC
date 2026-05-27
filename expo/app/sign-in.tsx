@@ -12,6 +12,7 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
@@ -20,6 +21,8 @@ import { CLUB_NAME } from '@/constants/club';
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useAuth } from '@/providers/AuthProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
+
+const authBackgroundImage = require('../assets/images/auth.jpg');
 
 export default function SignInScreen() {
   const { signIn, isSigningIn, resetPassword } = useAuth();
@@ -129,6 +132,8 @@ export default function SignInScreen() {
 
   return (
     <View style={styles.container}>
+      <Image source={authBackgroundImage} style={styles.backgroundImage} contentFit="cover" />
+      <View style={styles.backgroundOverlay} />
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -149,11 +154,11 @@ export default function SignInScreen() {
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
-                <Mail size={20} color={colors.textTertiary} />
+                <Mail size={20} color="rgba(255, 255, 255, 0.72)" />
                 <TextInput
                   style={styles.input}
                   placeholder="Email"
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor="rgba(255, 255, 255, 0.62)"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -164,11 +169,11 @@ export default function SignInScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Lock size={20} color={colors.textTertiary} />
+                <Lock size={20} color="rgba(255, 255, 255, 0.72)" />
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor="rgba(255, 255, 255, 0.62)"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -180,9 +185,9 @@ export default function SignInScreen() {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {showPassword ? (
-                    <EyeOff size={20} color={colors.textTertiary} />
+                    <EyeOff size={20} color="rgba(255, 255, 255, 0.72)" />
                   ) : (
-                    <Eye size={20} color={colors.textTertiary} />
+                    <Eye size={20} color="rgba(255, 255, 255, 0.72)" />
                   )}
                 </TouchableOpacity>
               </View>
@@ -199,7 +204,7 @@ export default function SignInScreen() {
                 testID="sign-in-button"
               >
                 {isSigningIn ? (
-                  <ActivityIndicator color={colors.background} />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.buttonText}>Sign In</Text>
                 )}
@@ -236,6 +241,13 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.68)',
+  },
   safeArea: {
     flex: 1,
   },
@@ -264,12 +276,12 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700' as const,
-    color: colors.text,
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.76)',
     textAlign: 'center',
   },
   form: {
@@ -278,17 +290,17 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(5, 5, 5, 0.74)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: colors.text,
+    color: '#FFFFFF',
     paddingVertical: 14,
     marginLeft: 12,
   },
@@ -313,7 +325,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   buttonText: {
     fontSize: 17,
     fontWeight: '600' as const,
-    color: colors.background,
+    color: '#FFFFFF',
   },
   footer: {
     flexDirection: 'row',
@@ -324,7 +336,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    color: colors.textSecondary,
+    color: 'rgba(255, 255, 255, 0.76)',
   },
   footerLink: {
     fontSize: 15,
@@ -345,6 +357,6 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   legalDivider: {
     fontSize: 13,
-    color: colors.textTertiary,
+    color: 'rgba(255, 255, 255, 0.48)',
   },
 });
