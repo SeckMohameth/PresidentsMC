@@ -32,6 +32,10 @@ const features = [
 
 const TERMS_URL = 'https://www.mostudios.io/terms';
 const PRIVACY_URL = 'https://www.mostudios.io/privacy';
+const FALLBACK_MONTHLY_PRICE = '$3.99';
+const FALLBACK_YEARLY_PRICE = '$34.99';
+const FALLBACK_YEARLY_MONTHLY_PRICE = '$2.92';
+const FALLBACK_YEARLY_SAVINGS = '$12.89';
 const paywallHeroImage = require('../assets/images/custom-images/optimized/harley.jpg');
 
 export default function SubscriptionScreen() {
@@ -83,13 +87,13 @@ export default function SubscriptionScreen() {
     });
   }, [fadeAnim, scaleAnim, slideAnim]);
 
-  const getMonthlyPrice = () => monthlyPackage?.product?.priceString || '$3.99';
-  const getYearlyPrice = () => yearlyPackage?.product?.priceString || '$34.99';
+  const getMonthlyPrice = () => monthlyPackage?.product?.priceString || FALLBACK_MONTHLY_PRICE;
+  const getYearlyPrice = () => yearlyPackage?.product?.priceString || FALLBACK_YEARLY_PRICE;
   const getYearlyMonthlyPrice = () => {
     if (yearlyPackage?.product?.price) {
       return `$${(yearlyPackage.product.price / 12).toFixed(2)}`;
     }
-    return '$2.92';
+    return FALLBACK_YEARLY_MONTHLY_PRICE;
   };
 
   const openExternalLink = async (url: string) => {
@@ -226,7 +230,10 @@ export default function SubscriptionScreen() {
           </View>
 
           <View style={styles.trialBanner}>
-            <Text style={styles.trialText}>Monthly {getMonthlyPrice()} · Yearly {getYearlyPrice()} · Save 27%</Text>
+            <Text style={styles.trialText}>Monthly {getMonthlyPrice()} · Yearly {getYearlyPrice()}</Text>
+            <Text style={styles.trialSubtext}>
+              Save 27% with yearly, about {getYearlyMonthlyPrice()}/month.
+            </Text>
           </View>
 
           <View style={styles.featuresSection}>
@@ -241,56 +248,56 @@ export default function SubscriptionScreen() {
             ))}
           </View>
 
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={styles.loadingText}>Loading plans...</Text>
-            </View>
-          ) : (
-            <View style={styles.plansSection}>
-              <TouchableOpacity
-                style={[styles.planCard, selectedPlan === 'yearly' && styles.planCardSelected]}
-                onPress={() => setSelectedPlan('yearly')}
-                activeOpacity={0.85}
-              >
-                <View style={styles.bestValueBadge}>
-                  <Text style={styles.bestValueText}>BEST VALUE</Text>
-                </View>
-                <View style={styles.planHeader}>
-                  <View>
-                    <Text style={styles.planName}>Yearly</Text>
-                    <Text style={styles.planSavings}>Save 27% · Best value</Text>
-                  </View>
-                  <View style={[styles.radioOuter, selectedPlan === 'yearly' && styles.radioOuterSelected]}>
-                    {selectedPlan === 'yearly' && <View style={styles.radioInner} />}
-                  </View>
-                </View>
-                <View style={styles.planPricing}>
-                  <Text style={styles.planPrice}>{getYearlyPrice()}</Text>
-                  <Text style={styles.planPeriod}>/year</Text>
-                </View>
-                <Text style={styles.planBilling}>Billed annually · about {getYearlyMonthlyPrice()}/month</Text>
-              </TouchableOpacity>
+          <View style={styles.plansSection}>
+            {isLoading && (
+              <View style={styles.loadingInline}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.loadingText}>Checking store pricing...</Text>
+              </View>
+            )}
 
-              <TouchableOpacity
-                style={[styles.planCard, selectedPlan === 'monthly' && styles.planCardSelected]}
-                onPress={() => setSelectedPlan('monthly')}
-                activeOpacity={0.85}
-              >
-                <View style={styles.planHeader}>
-                  <Text style={styles.planName}>Monthly</Text>
-                  <View style={[styles.radioOuter, selectedPlan === 'monthly' && styles.radioOuterSelected]}>
-                    {selectedPlan === 'monthly' && <View style={styles.radioInner} />}
-                  </View>
+            <TouchableOpacity
+              style={[styles.planCard, selectedPlan === 'yearly' && styles.planCardSelected]}
+              onPress={() => setSelectedPlan('yearly')}
+              activeOpacity={0.85}
+            >
+              <View style={styles.bestValueBadge}>
+                <Text style={styles.bestValueText}>BEST VALUE</Text>
+              </View>
+              <View style={styles.planHeader}>
+                <View>
+                  <Text style={styles.planName}>Yearly</Text>
+                  <Text style={styles.planSavings}>Save 27% · Save {FALLBACK_YEARLY_SAVINGS}/year</Text>
                 </View>
-                <View style={styles.planPricing}>
-                  <Text style={styles.planPrice}>{getMonthlyPrice()}</Text>
-                  <Text style={styles.planPeriod}>/month</Text>
+                <View style={[styles.radioOuter, selectedPlan === 'yearly' && styles.radioOuterSelected]}>
+                  {selectedPlan === 'yearly' && <View style={styles.radioInner} />}
                 </View>
-                <Text style={styles.planBilling}>Billed monthly · cancel anytime</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+              </View>
+              <View style={styles.planPricing}>
+                <Text style={styles.planPrice}>{getYearlyPrice()}</Text>
+                <Text style={styles.planPeriod}>/year</Text>
+              </View>
+              <Text style={styles.planBilling}>Billed annually · about {getYearlyMonthlyPrice()}/month</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.planCard, selectedPlan === 'monthly' && styles.planCardSelected]}
+              onPress={() => setSelectedPlan('monthly')}
+              activeOpacity={0.85}
+            >
+              <View style={styles.planHeader}>
+                <Text style={styles.planName}>Monthly</Text>
+                <View style={[styles.radioOuter, selectedPlan === 'monthly' && styles.radioOuterSelected]}>
+                  {selectedPlan === 'monthly' && <View style={styles.radioInner} />}
+                </View>
+              </View>
+              <View style={styles.planPricing}>
+                <Text style={styles.planPrice}>{getMonthlyPrice()}</Text>
+                <Text style={styles.planPeriod}>/month</Text>
+              </View>
+              <Text style={styles.planBilling}>Billed monthly · cancel anytime</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[styles.subscribeButton, isBusy && styles.buttonDisabled]}
@@ -453,6 +460,13 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
   },
+  trialSubtext: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
+  },
   featuresSection: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -481,12 +495,14 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
-  loadingContainer: {
-    padding: 40,
+  loadingInline: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 4,
   },
   loadingText: {
-    marginTop: 12,
     fontSize: 14,
     color: colors.textSecondary,
   },
