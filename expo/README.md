@@ -88,6 +88,8 @@ eas submit --platform ios --latest
 
 Create the matching subscriptions in App Store Connect and Google Play Console, then attach both products to the `PresidentsMC Pro` entitlement in RevenueCat. The product IDs above must match the app constants.
 
+See [RevenueCat setup](./docs/revenuecat-setup.md) for the full store and dashboard checklist.
+
 Required environment values:
 
 ```bash
