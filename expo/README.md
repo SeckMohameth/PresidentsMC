@@ -2,40 +2,25 @@
 
 PresidentsMC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
 
-This rebuild keeps the PresidentsMC product experience on the stable Crew native base: Expo SDK 54, React Native 0.81.5, and the new architecture enabled.
-
-## Preview
-
-<p>
-  <img src="./docs/screenshots/onboarding.png" alt="PresidentsMC onboarding screen" width="260" />
-  <img src="./docs/screenshots/home.png" alt="PresidentsMC home screen" width="260" />
-</p>
-
-## Stack
-
-- Expo Router
-- React Native 0.81.5
-- Expo SDK 54
-- Firebase Auth, Firestore, Storage, Functions
-- RevenueCat for subscriptions
-- EAS Build and TestFlight for iOS distribution
+This folder contains the Expo app. See the root [README](../README.md) for the public project overview.
 
 ## Local Development
 
 From the repo root:
 
 ```bash
+bun install --cwd expo
 bun run start
 ```
 
-From the Expo app directly:
+From this folder:
 
 ```bash
-cd expo
+bun install
 bun run start
 ```
 
-Additional checks:
+Useful checks:
 
 ```bash
 bun run lint
@@ -43,63 +28,14 @@ bun x tsc --noEmit
 bunx expo-doctor
 ```
 
-## Firebase
+## Configuration
 
-This project uses the PresidentsMC Firebase project:
-
-- Project ID: `presidentsmc-50010`
-- Firestore rules: `firestore.rules`
-- Storage rules: `storage.rules`
-- Cloud Functions: `functions/src/index.ts`
-
-Deploy from `expo/`:
+Copy the example environment file and fill in your own Firebase and RevenueCat values:
 
 ```bash
-firebase deploy --only functions --project presidentsmc-50010
-firebase deploy --only firestore:indexes --project presidentsmc-50010
+cp .env.example .env
 ```
 
-## Release
+The real `.env` file is intentionally ignored by git. Do not commit store credentials, Firebase service-account keys, RevenueCat webhook secrets, or App Store / Google Play private keys.
 
-- App name: `PresidentsMC`
-- iOS bundle ID: `app.mostudios.presidentsmc`
-- Android package: `app.mostudios.presidentsmc`
-- EAS project ID: `3fa3b774-aa73-4229-90a2-b834111adbf2`
-- Privacy Policy: `https://sites.google.com/view/presidentsmc-privacy/home`
-- Terms of Use: `https://sites.google.com/view/presidentsmc-terms/home`
-
-Build for TestFlight:
-
-```bash
-eas secret:push --scope project --env-file .env
-eas build --platform ios --profile production --clear-cache
-eas submit --platform ios --latest
-```
-
-## RevenueCat
-
-- Entitlement: `PresidentsMC Pro`
-- Monthly product ID: `monthly`
-  - Reference name: `PresidentsMC Monthly`
-  - Duration: 1 month
-  - Price: $3.99/month
-- Yearly product ID: `yearly`
-  - Reference name: `PresidentsMC Yearly`
-  - Duration: 1 year
-  - Price: $34.99/year
-
-Create the matching subscriptions in App Store Connect and Google Play Console, then attach both products to the `PresidentsMC Pro` entitlement in RevenueCat. The product IDs above must match the app constants.
-
-See [RevenueCat setup](./docs/revenuecat-setup.md) for the full store and dashboard checklist.
-
-For the first App Store subscription review, the subscriptions must be attached to a newly uploaded app version under **In-App Purchases and Subscriptions** before submitting the app version to App Review. Each subscription also needs complete metadata, pricing, availability, localization, and a review screenshot.
-
-Required environment values:
-
-```bash
-EXPO_PUBLIC_REVENUECAT_IOS_API_KEY=...
-EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY=...
-EXPO_PUBLIC_REVENUECAT_TEST_API_KEY=...
-```
-
-Real purchases require a development build or TestFlight. Expo Go is only useful for basic UI/runtime checks.
+For store subscription setup notes, see [RevenueCat setup](./docs/revenuecat-setup.md).
