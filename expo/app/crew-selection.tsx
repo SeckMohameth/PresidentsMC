@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   StyleSheet,
   Text,
@@ -21,6 +22,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
 
 const WAITING_ROOM_IMAGE = require('../assets/images/custom-images/optimized/waiting-room.jpg');
+const ADMIN_SUPPORT_EMAIL = 'mohameth@mostudios.io';
+const ADMIN_SUPPORT_URL = 'https://www.mostudios.io/support';
 
 export default function CrewSelectionScreen() {
   const { user, signOut, requestJoin, joinCrew, deleteAccount, isJoiningCrew } = useAuth();
@@ -148,6 +151,14 @@ export default function CrewSelectionScreen() {
     }
   };
 
+  const openSupportLink = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Unable to open link', 'Please try again.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.background}>
@@ -271,6 +282,16 @@ export default function CrewSelectionScreen() {
           <Text style={styles.note}>
             Members use the app free after approval. Admin tools are managed by the club owner.
           </Text>
+          <View style={styles.adminSupport}>
+            <Text style={styles.adminSupportText}>Club admin?</Text>
+            <TouchableOpacity onPress={() => void openSupportLink(`mailto:${ADMIN_SUPPORT_EMAIL}`)}>
+              <Text style={styles.adminSupportLink}>{ADMIN_SUPPORT_EMAIL}</Text>
+            </TouchableOpacity>
+            <Text style={styles.adminSupportText}>or</Text>
+            <TouchableOpacity onPress={() => void openSupportLink(ADMIN_SUPPORT_URL)}>
+              <Text style={styles.adminSupportLink}>mostudios.io/support</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={styles.deleteAccountButton}
             onPress={handleDeleteAccount}
@@ -472,6 +493,26 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center',
     marginTop: 18,
+  },
+  adminSupport: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: 10,
+  },
+  adminSupportText: {
+    color: 'rgba(255,255,255,0.46)',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  adminSupportLink: {
+    color: 'rgba(255,255,255,0.74)',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   deleteAccountButton: {
     marginTop: 14,

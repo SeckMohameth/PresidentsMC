@@ -6,6 +6,15 @@ export function isRemoteImageUri(uri?: string | null) {
   return uri.startsWith('http://') || uri.startsWith('https://');
 }
 
+export function isPersistedImageUri(uri?: string | null) {
+  if (!uri) return false;
+  return (
+    uri.startsWith('https://firebasestorage.googleapis.com/') ||
+    uri.includes('.firebasestorage.app/') ||
+    uri.startsWith('https://images.unsplash.com/')
+  );
+}
+
 export function getImageContentType(blobType?: string, path?: string) {
   if (blobType?.startsWith('image/')) return blobType;
 
@@ -18,7 +27,7 @@ export function getImageContentType(blobType?: string, path?: string) {
 
 export async function uploadImageUri(uri: string, path: string) {
   if (!uri) return uri;
-  if (isRemoteImageUri(uri)) return uri;
+  if (isPersistedImageUri(uri)) return uri;
 
   const blob = await uriToBlob(uri);
   const storageRef = ref(storage, path);

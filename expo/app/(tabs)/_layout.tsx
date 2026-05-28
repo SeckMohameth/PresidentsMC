@@ -31,8 +31,9 @@ export default function TabLayout() {
           borderRightColor: colors.border,
           borderBottomColor: colors.background,
           borderRadius: 28,
-          paddingTop: 10,
-          height: Platform.OS === 'ios' ? 74 : 66,
+          paddingTop: 8,
+          paddingBottom: Platform.OS === 'ios' ? 8 : 6,
+          height: Platform.OS === 'ios' ? 78 : 70,
           shadowColor: '#000',
           shadowOpacity: 0.55,
           shadowRadius: 18,
@@ -42,7 +43,8 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '800',
-          marginTop: 2,
+          marginTop: 4,
+          lineHeight: 12,
           textTransform: 'uppercase',
         },
         headerShown: false,
@@ -110,9 +112,8 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   activeIconContainer: {
     backgroundColor: 'rgba(229,229,229,0.14)',
-    borderRadius: 14,
-    padding: 7,
-    marginBottom: -5,
+    borderRadius: 12,
+    padding: 5,
     borderWidth: 1,
     borderColor: 'rgba(229,229,229,0.22)',
   },

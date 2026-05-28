@@ -11,7 +11,7 @@ const storage_1 = require("firebase-admin/storage");
 const params_1 = require("firebase-functions/params");
 const revenueCatWebhookSecret = (0, params_1.defineSecret)('REVENUECAT_WEBHOOK_SECRET');
 (0, app_1.initializeApp)();
-const adminDb = (0, firestore_2.getFirestore)();
+const adminDb = (0, firestore_2.getFirestore)(process.env.FIRESTORE_DATABASE_ID || 'default');
 const adminAuth = (0, auth_1.getAuth)();
 const storage = (0, storage_1.getStorage)();
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';

@@ -23,6 +23,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
 const authBackgroundImage = require('../assets/images/auth.jpg');
+const ADMIN_SUPPORT_EMAIL = 'mohameth@mostudios.io';
+const ADMIN_SUPPORT_URL = 'https://www.mostudios.io/support';
 
 export default function SignInScreen() {
   const { signIn, isSigningIn, resetPassword } = useAuth();
@@ -229,6 +231,17 @@ export default function SignInScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={styles.adminSupport}>
+              <Text style={styles.adminSupportText}>Club admin?</Text>
+              <TouchableOpacity onPress={() => void openExternalLink(`mailto:${ADMIN_SUPPORT_EMAIL}`)}>
+                <Text style={styles.adminSupportLink}>{ADMIN_SUPPORT_EMAIL}</Text>
+              </TouchableOpacity>
+              <Text style={styles.adminSupportText}>or</Text>
+              <TouchableOpacity onPress={() => void openExternalLink(ADMIN_SUPPORT_URL)}>
+                <Text style={styles.adminSupportLink}>mostudios.io/support</Text>
+              </TouchableOpacity>
+            </View>
+
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -358,5 +371,23 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   legalDivider: {
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.48)',
+  },
+  adminSupport: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 14,
+    gap: 5,
+  },
+  adminSupportText: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.52)',
+  },
+  adminSupportLink: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: 'rgba(255, 255, 255, 0.78)',
+    textDecorationLine: 'underline',
   },
 });

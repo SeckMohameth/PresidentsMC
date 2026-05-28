@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { MapPin, Clock, Users, ChevronRight, Gauge, Navigation } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, useThemeColors } from '@/constants/colors';
+import { getDefaultRideCoverUri } from '@/constants/coverImages';
 import { Ride } from '@/types';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, getDaysUntil, isToday } from '@/utils/helpers';
 
@@ -17,7 +18,9 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   const colors = useThemeColors();
   const isLight = colors.background === '#FFFFFF';
   const styles = React.useMemo(() => createStyles(colors, isLight), [colors, isLight]);
+  const [imageFailed, setImageFailed] = React.useState(false);
   const router = useRouter();
+  const coverImage = !imageFailed && ride.coverImage ? ride.coverImage : getDefaultRideCoverUri();
   const daysUntil = getDaysUntil(ride.dateTime);
   const isRideToday = isToday(ride.dateTime);
   const startLabel = ride.startLocation?.name || ride.startLocation?.address || 'Start';
@@ -50,16 +53,21 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
     router.push(`/ride/${ride.id}`);
   };
 
+  React.useEffect(() => {
+    setImageFailed(false);
+  }, [ride.coverImage]);
+
   if (variant === 'compact') {
     return (
       <Pressable 
         style={({ pressed }) => [styles.compactContainer, pressed && styles.pressed]}
         onPress={handlePress}
       >
-        <Image 
-          source={{ uri: ride.coverImage }} 
+        <Image
+          source={{ uri: coverImage }}
           style={styles.compactImage}
           contentFit="cover"
+          onError={() => setImageFailed(true)}
         />
         <View style={styles.compactContent}>
           <Text style={styles.compactTitle} numberOfLines={1}>{ride.title}</Text>
@@ -86,10 +94,11 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
       onPress={handlePress}
     >
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: ride.coverImage }} 
+        <Image
+          source={{ uri: coverImage }}
           style={styles.image}
           contentFit="cover"
+          onError={() => setImageFailed(true)}
         />
         <LinearGradient
           colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.24)', 'rgba(0,0,0,0.92)']}

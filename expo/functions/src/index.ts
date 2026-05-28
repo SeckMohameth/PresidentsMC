@@ -20,7 +20,7 @@ const revenueCatWebhookSecret = defineSecret('REVENUECAT_WEBHOOK_SECRET');
 
 initializeApp();
 
-const adminDb = getFirestore();
+const adminDb = getFirestore(process.env.FIRESTORE_DATABASE_ID || 'default');
 const adminAuth = getAuth();
 const storage = getStorage();
 

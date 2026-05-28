@@ -34,7 +34,7 @@ import {
 } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 import { getDefaultRideCoverUri } from '@/constants/coverImages';
-import { isRemoteImageUri, uploadImageUri } from '@/utils/storageUpload';
+import { isPersistedImageUri, uploadImageUri } from '@/utils/storageUpload';
 
 export type InviteCodeSettings = {
   inviteCode: string;
@@ -63,7 +63,7 @@ function generateInviteCode(length = 8) {
 
 async function uploadImageIfNeeded(uri: string, path: string) {
   if (!uri) return uri;
-  if (isRemoteImageUri(uri)) return uri;
+  if (isPersistedImageUri(uri)) return uri;
   return uploadImageUri(uri, path);
 }
 
@@ -422,39 +422,21 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       const distanceAuto = routeDistance || (hasCoords
         ? calculateDistanceMiles(ride.startLocation, ride.endLocation)
         : ride.estimatedDistance);
-      const coverNeedsUpload =
-        !!ride.coverImage &&
-        !ride.coverImage.startsWith('https://images.unsplash.com/') &&
-        !ride.coverImage.startsWith('https://firebasestorage.googleapis.com/') &&
-        !ride.coverImage.includes('.firebasestorage.app/');
-      const initialCoverImage = coverNeedsUpload
-        ? getDefaultRideCoverUri()
-        : ride.coverImage || getDefaultRideCoverUri();
+      const selectedCoverImage = ride.coverImage || getDefaultRideCoverUri();
+      const finalCoverImage = await uploadImageIfNeeded(
+        selectedCoverImage,
+        `crews/${crewId}/rides/${docRef.id}/cover.jpg`
+      );
       await setDoc(docRef, stripUndefined({
         ...ride,
         estimatedDistance: Math.round((distanceAuto || 0) * 10) / 10 || ride.estimatedDistance,
         id: docRef.id,
-        coverImage: initialCoverImage,
+        coverImage: finalCoverImage,
         attendees: ride.createdBy ? [ride.createdBy] : [],
         checkedIn: [],
         photos: [],
         status: 'upcoming',
       }));
-
-      let finalCoverImage = initialCoverImage;
-      if (coverNeedsUpload) {
-        try {
-          finalCoverImage = await uploadImageIfNeeded(
-            ride.coverImage,
-            `crews/${crewId}/rides/${docRef.id}/cover.jpg`
-          );
-          await updateDoc(docRef, { coverImage: finalCoverImage });
-        } catch (error) {
-          if (__DEV__) {
-            console.log('[CrewProvider] Ride cover upload failed after ride save:', error);
-          }
-        }
-      }
 
       void trackAnalyticsEvent({
         eventName: 'ride_create_success',

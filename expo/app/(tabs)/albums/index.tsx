@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions, StyleProp, ImageStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,14 +40,14 @@ export default function AlbumsScreen() {
       title: album.title,
       date: album.createdAt,
       photoCount: album.photos.length,
-      imageUrl: album.photos[0]?.imageUrl || album.coverImage || '',
+      imageUrl: album.coverImage || album.photos[0]?.imageUrl || '',
     })),
     ...albumRides.map((ride) => ({
       id: ride.id,
       title: ride.title,
       date: ride.dateTime,
       photoCount: ride.photos.length,
-      imageUrl: ride.photos[0]?.imageUrl || ride.coverImage,
+      imageUrl: ride.coverImage || ride.photos[0]?.imageUrl || '',
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const showLockedAlbumCreate = !canManageAlbums && (isAdmin || isOfficer) && isBillingRequired && !isSubscriptionActive;
@@ -121,11 +121,7 @@ export default function AlbumsScreen() {
                 ]}
                 onPress={() => router.push(`/album/${album.id}`)}
               >
-                <Image 
-                  source={album.imageUrl ? { uri: album.imageUrl } : DEFAULT_ALBUM_IMAGE}
-                  style={styles.albumImage}
-                  contentFit="cover"
-                />
+                <AlbumCoverImage imageUrl={album.imageUrl} style={styles.albumImage} />
                 <LinearGradient
                   colors={['transparent', 'rgba(0,0,0,0.85)']}
                   style={styles.albumGradient}
@@ -149,6 +145,23 @@ export default function AlbumsScreen() {
         )}
       </ScrollView>
     </View>
+  );
+}
+
+function AlbumCoverImage({ imageUrl, style }: { imageUrl?: string | null; style: StyleProp<ImageStyle> }) {
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setFailed(false);
+  }, [imageUrl]);
+
+  return (
+    <Image
+      source={!failed && imageUrl ? { uri: imageUrl } : DEFAULT_ALBUM_IMAGE}
+      style={style}
+      contentFit="cover"
+      onError={() => setFailed(true)}
+    />
   );
 }
 
