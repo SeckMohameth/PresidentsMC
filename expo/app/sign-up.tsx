@@ -138,11 +138,11 @@ export default function SignUpScreen() {
 
             <View style={styles.form}>
               <View style={styles.inputContainer}>
-                <User size={20} color="rgba(255, 255, 255, 0.72)" />
+                <User size={20} color="rgba(255, 255, 255, 0.86)" />
                 <TextInput
                   style={styles.input}
                   placeholder="Full Name"
-                  placeholderTextColor="rgba(255, 255, 255, 0.62)"
+                  placeholderTextColor="rgba(255, 255, 255, 0.78)"
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -151,11 +151,11 @@ export default function SignUpScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Mail size={20} color="rgba(255, 255, 255, 0.72)" />
+                <Mail size={20} color="rgba(255, 255, 255, 0.86)" />
                 <TextInput
                   style={styles.input}
                   placeholder="Email"
-                  placeholderTextColor="rgba(255, 255, 255, 0.62)"
+                  placeholderTextColor="rgba(255, 255, 255, 0.78)"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -166,11 +166,11 @@ export default function SignUpScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Lock size={20} color="rgba(255, 255, 255, 0.72)" />
+                <Lock size={20} color="rgba(255, 255, 255, 0.86)" />
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor="rgba(255, 255, 255, 0.62)"
+                  placeholderTextColor="rgba(255, 255, 255, 0.78)"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -182,19 +182,19 @@ export default function SignUpScreen() {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {showPassword ? (
-                    <EyeOff size={20} color="rgba(255, 255, 255, 0.72)" />
+                    <EyeOff size={20} color="rgba(255, 255, 255, 0.86)" />
                   ) : (
-                    <Eye size={20} color="rgba(255, 255, 255, 0.72)" />
+                    <Eye size={20} color="rgba(255, 255, 255, 0.86)" />
                   )}
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputContainer}>
-                <Lock size={20} color="rgba(255, 255, 255, 0.72)" />
+                <Lock size={20} color="rgba(255, 255, 255, 0.86)" />
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm Password"
-                  placeholderTextColor="rgba(255, 255, 255, 0.62)"
+                  placeholderTextColor="rgba(255, 255, 255, 0.78)"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -206,9 +206,9 @@ export default function SignUpScreen() {
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   {showConfirmPassword ? (
-                    <EyeOff size={20} color="rgba(255, 255, 255, 0.72)" />
+                    <EyeOff size={20} color="rgba(255, 255, 255, 0.86)" />
                   ) : (
-                    <Eye size={20} color="rgba(255, 255, 255, 0.72)" />
+                    <Eye size={20} color="rgba(255, 255, 255, 0.86)" />
                   )}
                 </TouchableOpacity>
               </View>
@@ -273,7 +273,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   backgroundOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.68)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   safeArea: {
     flex: 1,
@@ -299,17 +299,26 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.primary,
     letterSpacing: 1,
     marginBottom: 24,
+    textShadowColor: 'rgba(0, 0, 0, 0.65)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   title: {
     fontSize: 28,
     fontWeight: '700' as const,
     color: '#FFFFFF',
     marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.72)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.76)',
+    color: 'rgba(255, 255, 255, 0.92)',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.72)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   form: {
     gap: 16,
@@ -317,12 +326,12 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(5, 5, 5, 0.74)',
+    backgroundColor: 'rgba(0, 0, 0, 0.86)',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.34)',
   },
   input: {
     flex: 1,
@@ -355,7 +364,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.76)',
+    color: 'rgba(255, 255, 255, 0.94)',
   },
   footerLink: {
     fontSize: 15,
@@ -376,7 +385,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   legalDivider: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.48)',
+    color: 'rgba(255, 255, 255, 0.72)',
   },
   adminSupport: {
     flexDirection: 'row',
@@ -388,12 +397,12 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   adminSupportText: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.52)',
+    color: 'rgba(255, 255, 255, 0.78)',
   },
   adminSupportLink: {
     fontSize: 11,
     fontWeight: '700' as const,
-    color: 'rgba(255, 255, 255, 0.78)',
+    color: '#FFFFFF',
     textDecorationLine: 'underline',
   },
 });
