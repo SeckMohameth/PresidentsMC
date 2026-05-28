@@ -33,7 +33,9 @@ function getRCToken() {
     android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
   });
 
-  return nativeKey ?? process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ?? REVENUECAT_FALLBACK_API_KEY;
+  // RevenueCat test-store keys crash release/TestFlight builds by design.
+  // Native builds must use the platform SDK key from RevenueCat.
+  return nativeKey?.startsWith('test_') ? null : nativeKey ?? null;
 }
 
 export function getCrewAdminStatus(customerInfo: CustomerInfo | null | undefined): CrewAdminStatus {
