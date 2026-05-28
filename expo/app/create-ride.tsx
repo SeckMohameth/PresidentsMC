@@ -378,6 +378,14 @@ export default function CreateRideScreen() {
           coverAttribution: coverAttribution,
         });
         router.back();
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[CreateRide] Ride update error:', error);
+        }
+        const message = error instanceof Error && error.message
+          ? error.message
+          : 'Unable to save this ride right now.';
+        Alert.alert('Ride Error', message);
       } finally {
         setIsSaving(false);
       }
