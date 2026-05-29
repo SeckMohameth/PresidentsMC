@@ -47,7 +47,9 @@ export default function SubscriptionScreen() {
     isLoading,
     isPurchasing,
     isRestoring,
-    presentPaywallIfNeeded,
+    monthlyPackage,
+    yearlyPackage,
+    purchasePackage,
     presentCustomerCenter,
     refreshCustomerInfo,
     restorePurchases,
@@ -145,15 +147,24 @@ export default function SubscriptionScreen() {
     void trackAnalyticsEvent({
       eventName: 'purchase_intent',
       route: '/subscription',
-      properties: { selectedPlan, mode: 'revenuecat_paywall' },
+      properties: { selectedPlan, mode: 'selected_package' },
     });
 
     try {
-      const didUnlock = await presentPaywallIfNeeded();
-      const customerInfo = await refreshCustomerInfo();
-      const nextStatus = getCrewAdminStatus(customerInfo);
+      const selectedPackage = selectedPlan === 'yearly' ? yearlyPackage : monthlyPackage;
+      if (!selectedPackage) {
+        Alert.alert(
+          'Store Setup Needed',
+          'The subscription products are not available from Apple yet. In RevenueCat, attach the Apple monthly/yearly products to the PresidentsMC Pro entitlement and current offering, then make sure App Store Connect subscription metadata is complete.'
+        );
+        return;
+      }
 
-      if (didUnlock || nextStatus !== 'inactive') {
+      const purchaseInfo = await purchasePackage(selectedPackage);
+      const customerInfo = await refreshCustomerInfo();
+      const nextStatus = getCrewAdminStatus(customerInfo ?? purchaseInfo);
+
+      if (nextStatus !== 'inactive') {
         if (nextStatus === 'active' || nextStatus === 'trialing') {
           await syncClubSubscription(nextStatus);
         }
