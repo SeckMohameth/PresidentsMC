@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -13,10 +12,16 @@ function logNotificationDebug(message: string, error?: unknown) {
   }
 }
 
-export function setupNotificationHandler() {
+function isAndroidExpoGo() {
+  return Platform.OS === 'android' && Constants.executionEnvironment === 'storeClient';
+}
+
+export async function setupNotificationHandler() {
   if (notificationHandlerReady) return;
+  if (isAndroidExpoGo()) return;
 
   try {
+    const Notifications = await import('expo-notifications');
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
@@ -36,14 +41,20 @@ export async function registerForPushNotificationsAsync(
   userId: string,
   options: { requestPermission?: boolean } = {}
 ) {
-  setupNotificationHandler();
-
   const shouldRequestPermission = options.requestPermission !== false;
 
   if (!Device.isDevice) {
     logNotificationDebug('[Notifications] Must use physical device for push notifications');
     return null;
   }
+
+  if (isAndroidExpoGo()) {
+    logNotificationDebug('[Notifications] Android remote push is unavailable in Expo Go. Use a development build.');
+    return null;
+  }
+
+  const Notifications = await import('expo-notifications');
+  await setupNotificationHandler();
 
   let { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') {

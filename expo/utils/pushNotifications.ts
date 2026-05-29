@@ -1,13 +1,20 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { setupNotificationHandler } from '@/utils/notifications';
 
 export async function getDevicePushToken() {
-  setupNotificationHandler();
-
   if (Platform.OS === 'web' || !Device.isDevice) return null;
+
+  if (Platform.OS === 'android' && Constants.executionEnvironment === 'storeClient') {
+    if (__DEV__) {
+      console.log('[PushNotifications] Android remote push is unavailable in Expo Go. Use a development build.');
+    }
+    return null;
+  }
+
+  const Notifications = await import('expo-notifications');
+  await setupNotificationHandler();
 
   const existing = await Notifications.getPermissionsAsync();
   if (existing.status !== 'granted') return null;

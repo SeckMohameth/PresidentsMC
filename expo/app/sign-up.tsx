@@ -369,7 +369,8 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   footerLink: {
     fontSize: 15,
     fontWeight: '600' as const,
-    color: colors.primary,
+    color: '#FFFFFF',
+    textDecorationLine: 'underline',
   },
   legalLinks: {
     flexDirection: 'row',
@@ -381,7 +382,8 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   legalLink: {
     fontSize: 13,
     fontWeight: '600' as const,
-    color: colors.primary,
+    color: '#FFFFFF',
+    textDecorationLine: 'underline',
   },
   legalDivider: {
     fontSize: 13,

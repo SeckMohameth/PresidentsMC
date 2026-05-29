@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AppColors, useThemeColors } from '@/constants/colors';
@@ -27,7 +27,15 @@ export default function NotificationsScreen() {
   useEffect(() => {
     let isActive = true;
 
-    Notifications.getPermissionsAsync()
+    if (Platform.OS === 'android' && Constants.executionEnvironment === 'storeClient') {
+      setHasPushPermission(false);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    import('expo-notifications')
+      .then((Notifications) => Notifications.getPermissionsAsync())
       .then(({ status }) => {
         if (isActive) setHasPushPermission(status === 'granted');
       })

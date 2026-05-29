@@ -134,7 +134,7 @@ export default function AlbumsScreen() {
                 </View>
                 {album.photoCount > 1 && (
                   <View style={styles.photoCountBadge}>
-                    <Images size={12} color={colors.text} />
+                    <Images size={12} color="#FFFFFF" />
                     <Text style={styles.photoCountText}>{album.photoCount}</Text>
                   </View>
                 )}
@@ -271,11 +271,14 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     right: 12,
   },
   albumTitle: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 4,
     lineHeight: 20,
+    textShadowColor: 'rgba(0,0,0,0.65)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   albumMeta: {
     color: 'rgba(255,255,255,0.7)',
@@ -294,7 +297,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderRadius: 12,
   },
   photoCountText: {
-    color: colors.text,
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
