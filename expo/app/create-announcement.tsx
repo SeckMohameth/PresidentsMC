@@ -272,7 +272,8 @@ export default function CreateAnnouncementScreen() {
                   contentFit="cover"
                 />
                 <Pressable style={styles.removeImageButton} onPress={removeImage}>
-                  <Trash2 size={18} color={colors.text} />
+                  <X size={18} color="#FFFFFF" />
+                  <Text style={styles.removeImageText}>Remove</Text>
                 </Pressable>
               </View>
             ) : (
@@ -532,11 +533,18 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    width: 36,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    borderRadius: 18,
+    paddingHorizontal: 12,
     height: 36,
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  removeImageText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

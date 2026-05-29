@@ -40,14 +40,14 @@ export default function AlbumsScreen() {
       title: album.title,
       date: album.createdAt,
       photoCount: album.photos.length,
-      imageUrl: album.coverImage || album.photos[0]?.imageUrl || '',
+      imageUrl: album.photos[0]?.imageUrl || album.coverImage || '',
     })),
     ...albumRides.map((ride) => ({
       id: ride.id,
       title: ride.title,
       date: ride.dateTime,
       photoCount: ride.photos.length,
-      imageUrl: ride.coverImage || ride.photos[0]?.imageUrl || '',
+      imageUrl: ride.photos[0]?.imageUrl || ride.coverImage || '',
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const showLockedAlbumCreate = !canManageAlbums && (isAdmin || isOfficer) && isBillingRequired && !isSubscriptionActive;

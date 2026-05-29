@@ -140,6 +140,7 @@ export default function MoreScreen() {
   const [supportModalVisible, setSupportModalVisible] = useState(false);
   const [crewInviteCode, setCrewInviteCode] = useState('');
   const [isInviteCodeLoading, setIsInviteCodeLoading] = useState(false);
+  const [profileAvatarFailed, setProfileAvatarFailed] = useState(false);
 
   const nextOwner = pickOwnershipCandidate(members, currentUser?.id);
 
@@ -246,6 +247,10 @@ export default function MoreScreen() {
       isActive = false;
     };
   }, [crew?.id, getInviteCode, isAdmin]);
+
+  useEffect(() => {
+    setProfileAvatarFailed(false);
+  }, [currentUser?.avatar]);
 
   const openEditProfile = () => {
     setEditName(currentUser?.name || '');
@@ -554,11 +559,12 @@ export default function MoreScreen() {
           onPress={() => currentUser?.id && router.push(`/member/${currentUser.id}`)}
         >
           <View style={styles.profileAvatarContainer}>
-            {currentUser?.avatar ? (
+            {currentUser?.avatar && !profileAvatarFailed ? (
               <Image
                 source={getAvatarSource(currentUser.avatar)}
                 style={styles.profileAvatar}
                 contentFit="cover"
+                onError={() => setProfileAvatarFailed(true)}
               />
             ) : (
               <View style={styles.profileAvatarPlaceholder}>
@@ -569,7 +575,7 @@ export default function MoreScreen() {
             )}
             {(isAdmin || canManageJoinRequests) && (
               <View style={styles.adminBadge}>
-                <Crown size={12} color={colors.text} />
+                <Crown size={12} color="#FFFFFF" />
               </View>
             )}
           </View>
@@ -1004,7 +1010,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     justifyContent: 'center',
   },
   profileInitials: {
-    color: colors.text,
+    color: colors.onPrimary,
     fontSize: 24,
     fontWeight: '700',
   },
@@ -1012,7 +1018,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: colors.primary,
+    backgroundColor: '#111111',
     borderRadius: 10,
     padding: 4,
     borderWidth: 2,

@@ -112,7 +112,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
         />
         {(ride.status === 'upcoming' || ride.status === 'completed' || ride.status === 'cancelled') && (
           <View style={[styles.statusBadge, { borderColor: statusTone }]}>
-            <Text style={[styles.statusText, { color: statusTone }]}>
+            <Text style={styles.statusText}>
               {statusLabel}
             </Text>
           </View>
@@ -209,7 +209,7 @@ const createStyles = (colors: AppColors, isLight: boolean) => StyleSheet.create(
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: 'rgba(10,10,10,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.78)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -219,6 +219,7 @@ const createStyles = (colors: AppColors, isLight: boolean) => StyleSheet.create(
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
   imageOverlay: {
     position: 'absolute',

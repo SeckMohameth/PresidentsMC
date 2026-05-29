@@ -652,7 +652,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     const callable = httpsCallable(functions, 'getCrewInviteCode');
     try {
       const result = await callable();
-      return (result.data as { inviteCode?: string }).inviteCode || '';
+      const code = (result.data as { inviteCode?: string }).inviteCode || '';
+      if (code) return code;
     } catch (error: any) {
       const errorCode = String(error?.code ?? '');
       const errorMessage = String(error?.message ?? '');
@@ -668,8 +669,19 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         return '';
       }
 
-      throw error;
+      if (!isMissingFunction && __DEV__) {
+        console.log('[CrewProvider] getCrewInviteCode callable failed, trying Firestore fallback:', error);
+      }
     }
+
+    const settingsRef = doc(db, 'crews', crewId, 'private', 'settings');
+    const snap = await getDoc(settingsRef);
+    if (snap.exists()) {
+      const data = snap.data() as { inviteCode?: string };
+      return data.inviteCode || '';
+    }
+
+    return '';
   }, [crewId, currentUser]);
 
   const getInviteSettings = useCallback(async (): Promise<InviteCodeSettings> => {

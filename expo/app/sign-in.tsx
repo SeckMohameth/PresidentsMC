@@ -282,7 +282,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   logo: {
     fontSize: 28,
     fontWeight: '800' as const,
-    color: colors.primary,
+    color: '#FFFFFF',
     letterSpacing: 1,
     marginBottom: 24,
     textShadowColor: 'rgba(0, 0, 0, 0.65)',
@@ -336,7 +336,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     textDecorationLine: 'underline',
   },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#D83A2E',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
