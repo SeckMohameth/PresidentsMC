@@ -74,10 +74,12 @@ export default function AdminSettingsScreen() {
     getInviteSettings,
     updateInviteSettings,
     isAdmin,
+    isOfficer,
     isBillingRequired,
     isSubscriptionActive,
     canManageJoinRequests,
   } = useCrew();
+  const canManageInviteCodes = isAdmin || isOfficer;
 
   const [name, setName] = useState(crew?.name || '');
   const [description, setDescription] = useState(crew?.description || '');
@@ -108,7 +110,12 @@ export default function AdminSettingsScreen() {
 
   useEffect(() => {
     let isActive = true;
-    if (!isAdmin) return;
+    if (!canManageInviteCodes) {
+      setInviteCode('');
+      setInviteExpiresAt(null);
+      setIsInviteLoading(false);
+      return;
+    }
 
     setIsInviteLoading(true);
     getInviteSettings()
@@ -132,7 +139,7 @@ export default function AdminSettingsScreen() {
     return () => {
       isActive = false;
     };
-  }, [getInviteSettings, isAdmin]);
+  }, [canManageInviteCodes, getInviteSettings]);
 
   const pickLogo = async () => {
     const hasAccess = await requestPhotoLibraryAccess(
@@ -397,7 +404,7 @@ export default function AdminSettingsScreen() {
           </View>
         )}
 
-        {isAdmin && (
+        {canManageInviteCodes && (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Invite Code</Text>
             <Text style={styles.helperText}>
@@ -449,17 +456,24 @@ export default function AdminSettingsScreen() {
 
             <View style={styles.inviteActions}>
               <Pressable
-                style={[styles.secondaryActionButton, isInviteSaving && styles.disabledAction]}
+                style={[
+                  styles.secondaryActionButton,
+                  (isInviteSaving || isInviteLoading) && styles.disabledAction,
+                ]}
                 onPress={() => saveInviteSettings({ rotate: true })}
-                disabled={isInviteSaving}
+                disabled={isInviteSaving || isInviteLoading}
               >
                 <RefreshCcw size={16} color={colors.text} />
                 <Text style={styles.secondaryActionText}>Rotate</Text>
               </Pressable>
               <Pressable
-                style={[styles.saveButton, styles.inviteSaveButton, isInviteSaving && styles.disabledAction]}
+                style={[
+                  styles.saveButton,
+                  styles.inviteSaveButton,
+                  (isInviteSaving || isInviteLoading || !inviteCode) && styles.disabledAction,
+                ]}
                 onPress={() => saveInviteSettings({ rotate: false })}
-                disabled={isInviteSaving}
+                disabled={isInviteSaving || isInviteLoading || !inviteCode}
               >
                 <Text style={styles.saveButtonText}>
                   {isInviteSaving ? 'Saving...' : 'Save Invite'}

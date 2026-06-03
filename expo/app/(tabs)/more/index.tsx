@@ -115,12 +115,13 @@ export default function MoreScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { currentUser, crew, isAdmin, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
+  const { currentUser, crew, isAdmin, isOfficer, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
   const { signOut, deleteAccount, updateProfile, user } = useAuth();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
   const pendingJoinRequests = joinRequests.filter((request) => request.status === 'pending');
+  const canManageInviteCodes = isAdmin || isOfficer;
   const visibleMemberCount = members.filter((member) => !member.isDeveloperSupport).length;
   const otherAdmins = members.filter(
     (member) => member.id !== currentUser?.id && member.role === 'admin' && !member.isDeveloperSupport
@@ -219,7 +220,7 @@ export default function MoreScreen() {
 
   useEffect(() => {
     let isActive = true;
-    if (!crew?.id || !isAdmin) {
+    if (!crew?.id || !canManageInviteCodes) {
       setCrewInviteCode('');
       setIsInviteCodeLoading(false);
       return;
@@ -246,7 +247,7 @@ export default function MoreScreen() {
     return () => {
       isActive = false;
     };
-  }, [crew?.id, getInviteCode, isAdmin]);
+  }, [canManageInviteCodes, crew?.id, getInviteCode]);
 
   useEffect(() => {
     setProfileAvatarFailed(false);
@@ -620,7 +621,7 @@ export default function MoreScreen() {
           </Pressable>
         )}
 
-        {isAdmin && (
+        {canManageInviteCodes && (
           <View style={styles.inviteCard}>
             <View style={styles.inviteHeader}>
               <Text style={styles.inviteTitle}>Invite Code</Text>
@@ -651,20 +652,24 @@ export default function MoreScreen() {
               showBadge
               badgeText={`${members.length}`}
             />
-            {isAdmin && (
+            {(isAdmin || isOfficer || canManageJoinRequests) && (
               <>
-                <MenuItem
-                  icon={<Crown size={20} color={colors.primary} />}
-                  label="Club Subscription"
-                  onPress={() => router.push('/subscription' as any)}
-                />
-                <MenuItem
-                  icon={<Shield size={20} color={colors.warning} />}
-                  label="Admin Settings"
-                  onPress={() => router.push('/admin-settings')}
-                  showBadge={pendingJoinRequests.length > 0}
-                  badgeText={`${pendingJoinRequests.length}`}
-                />
+                {(isAdmin || isOfficer) && (
+                  <MenuItem
+                    icon={<Crown size={20} color={colors.primary} />}
+                    label="Club Subscription"
+                    onPress={() => router.push('/subscription' as any)}
+                  />
+                )}
+                {(isAdmin || canManageJoinRequests) && (
+                  <MenuItem
+                    icon={<Shield size={20} color={colors.warning} />}
+                    label="Admin Settings"
+                    onPress={() => router.push('/admin-settings')}
+                    showBadge={pendingJoinRequests.length > 0}
+                    badgeText={`${pendingJoinRequests.length}`}
+                  />
+                )}
               </>
             )}
           </View>

@@ -686,7 +686,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const getInviteSettings = useCallback(async (): Promise<InviteCodeSettings> => {
     if (!crewId || !currentUser) throw new Error('No crew');
-    assertAdmin();
+    assertAdminOrOfficer();
     const callable = httpsCallable(functions, 'getCrewInviteCode');
     try {
       const result = await callable();
@@ -722,7 +722,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         throw callableError;
       }
     }
-  }, [crewId, currentUser, assertAdmin]);
+  }, [crewId, currentUser, assertAdminOrOfficer]);
 
   const updateInviteSettings = useCallback(async ({
     inviteCode,
@@ -732,7 +732,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     expiresAt?: string | null;
   }): Promise<InviteCodeSettings> => {
     if (!crewId) throw new Error('No crew');
-    assertAdmin();
+    assertAdminOrOfficer();
     const callable = httpsCallable(functions, 'setCrewInviteCode');
     try {
       const result = await callable({ inviteCode, expiresAt: expiresAt ?? null });
@@ -777,7 +777,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         throw callableError;
       }
     }
-  }, [crewId, assertAdmin, currentUser]);
+  }, [crewId, assertAdminOrOfficer, currentUser]);
 
   const removeMember = useCallback(async (memberId: string) => {
     if (!crewId) throw new Error('No crew');
@@ -996,6 +996,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const addPhoto = useCallback(async ({ rideId, imageUrl }: { rideId: string; imageUrl: string }) => {
     if (!crewId || !currentUser) return;
+    if (!hasPaidFeatureAccess) throw new Error('SUBSCRIPTION_INACTIVE');
 
     const photoId = `photo-${Date.now()}`;
     const uploadedUrl = await uploadImageIfNeeded(
@@ -1015,7 +1016,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     await updateDoc(doc(db, 'crews', crewId, 'rides', rideId), {
       photos: arrayUnion(newPhoto),
     });
-  }, [crewId, currentUser]);
+  }, [crewId, currentUser, hasPaidFeatureAccess]);
 
   const createAlbum = useCallback(async ({
     title,
@@ -1056,6 +1057,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
 
   const addAlbumPhoto = useCallback(async ({ albumId, imageUrl }: { albumId: string; imageUrl: string }) => {
     if (!crewId || !currentUser) throw new Error('No crew member');
+    if (!hasPaidFeatureAccess) throw new Error('SUBSCRIPTION_INACTIVE');
 
     const photoId = `photo-${Date.now()}`;
     const uploadedUrl = await uploadImageIfNeeded(
@@ -1076,7 +1078,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       photos: arrayUnion(newPhoto),
       updatedAt: new Date().toISOString(),
     });
-  }, [crewId, currentUser]);
+  }, [crewId, currentUser, hasPaidFeatureAccess]);
 
   const upcomingRides = useMemo(() =>
     rides

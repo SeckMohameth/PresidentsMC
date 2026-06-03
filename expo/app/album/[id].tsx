@@ -98,7 +98,13 @@ export default function AlbumScreen() {
       if (__DEV__) {
         console.log('[Album] Photo upload error:', error);
       }
-      Alert.alert('Upload Failed', 'Unable to add this photo right now. Please try another photo.');
+      const message = String((error as any)?.message ?? '');
+      Alert.alert(
+        'Upload Failed',
+        message.includes('SUBSCRIPTION_INACTIVE')
+          ? 'The club subscription must be active before members can add album photos.'
+          : 'Unable to add this photo right now. Please try another photo.'
+      );
     } finally {
       setIsAddingPhoto(false);
     }
