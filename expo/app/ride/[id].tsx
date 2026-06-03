@@ -66,7 +66,7 @@ export default function RideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { currentUser, joinRide, leaveRide, checkIn, cancelRide, reopenRide, isAdmin } = useCrew();
+  const { currentUser, joinRide, leaveRide, checkIn, cancelRide, reopenRide, canManageRides } = useCrew();
   const { ride, attendeeMembers } = useRide(id || '');
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -370,7 +370,7 @@ export default function RideDetailScreen() {
           >
             <ArrowLeft size={24} color="#FFFFFF" />
           </Pressable>
-          {isAdmin && (
+          {canManageRides && (
             <Pressable 
               style={[styles.editButton, { top: insets.top + 8 }]}
               onPress={() => router.push({ pathname: '/create-ride', params: { rideId: ride.id } })}
@@ -441,7 +441,7 @@ export default function RideDetailScreen() {
             </View>
           )}
 
-          {isAdmin && (
+          {canManageRides && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Admin</Text>
               <View style={styles.adminActions}>

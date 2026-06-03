@@ -40,6 +40,21 @@ function formatReverseAddress(item?: Location.LocationGeocodedAddress) {
   return [lineOne, lineTwo].filter(Boolean).join(', ') || 'Dropped pin';
 }
 
+function getRideSaveErrorMessage(error: unknown) {
+  const code = String((error as any)?.code ?? '');
+  const message = error instanceof Error && error.message ? error.message : String((error as any)?.message ?? '');
+
+  if (message.includes('SUBSCRIPTION_INACTIVE')) {
+    return 'The club subscription must be active before admins can update ride background images.';
+  }
+
+  if (code === 'storage/unauthorized' || message.includes('storage/unauthorized')) {
+    return 'You need admin or officer access and an active club subscription to update ride background images.';
+  }
+
+  return message || 'Unable to save this ride right now.';
+}
+
 export default function CreateRideScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -382,10 +397,7 @@ export default function CreateRideScreen() {
         if (__DEV__) {
           console.log('[CreateRide] Ride update error:', error);
         }
-        const message = error instanceof Error && error.message
-          ? error.message
-          : 'Unable to save this ride right now.';
-        Alert.alert('Ride Error', message);
+        Alert.alert('Ride Error', getRideSaveErrorMessage(error));
       } finally {
         setIsSaving(false);
       }

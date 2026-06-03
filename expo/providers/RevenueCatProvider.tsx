@@ -48,6 +48,27 @@ function isProCustomer(customerInfo: CustomerInfo | null | undefined) {
   return typeof customerInfo?.entitlements.active[REVENUECAT_ENTITLEMENT_ID] !== 'undefined';
 }
 
+function isMonthlyPackage(pkg: PurchasesPackage) {
+  return (
+    pkg.identifier === '$rc_monthly' ||
+    pkg.identifier === REVENUECAT_MONTHLY_PRODUCT_ID ||
+    pkg.product.identifier === REVENUECAT_MONTHLY_PRODUCT_ID
+  );
+}
+
+function isYearlyPackage(pkg: PurchasesPackage) {
+  return (
+    pkg.identifier === '$rc_annual' ||
+    pkg.identifier === REVENUECAT_YEARLY_PRODUCT_ID ||
+    pkg.product.identifier === REVENUECAT_YEARLY_PRODUCT_ID
+  );
+}
+
+function hasRequiredPackages(offering: { availablePackages?: PurchasesPackage[] } | null | undefined) {
+  const packages = offering?.availablePackages ?? [];
+  return packages.some(isMonthlyPackage) && packages.some(isYearlyPackage);
+}
+
 const apiKey = getRCToken();
 
 const revenueCatBootstrap: RevenueCatBootstrap = (() => {
@@ -146,23 +167,19 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
 
   const customerInfo = customerInfoQuery.data;
   const offerings = offeringsQuery.data;
-  const currentOffering = offerings?.current;
+  const availableOfferings = offerings?.all ? Object.values(offerings.all) : [];
+  const currentOffering = [
+    offerings?.current,
+    offerings?.all?.[REVENUECAT_ENTITLEMENT_ID],
+    offerings?.all?.default,
+    ...availableOfferings,
+  ].find(hasRequiredPackages) ?? offerings?.current ?? availableOfferings[0];
 
   const crewAdminStatus = getCrewAdminStatus(customerInfo);
   const isCrewAdmin = isProCustomer(customerInfo);
 
-  const monthlyPackage = currentOffering?.availablePackages.find(
-    (pkg) =>
-      pkg.identifier === '$rc_monthly' ||
-      pkg.identifier === REVENUECAT_MONTHLY_PRODUCT_ID ||
-      pkg.product.identifier === REVENUECAT_MONTHLY_PRODUCT_ID
-  );
-  const yearlyPackage = currentOffering?.availablePackages.find(
-    (pkg) =>
-      pkg.identifier === '$rc_annual' ||
-      pkg.identifier === REVENUECAT_YEARLY_PRODUCT_ID ||
-      pkg.product.identifier === REVENUECAT_YEARLY_PRODUCT_ID
-  );
+  const monthlyPackage = currentOffering?.availablePackages.find(isMonthlyPackage);
+  const yearlyPackage = currentOffering?.availablePackages.find(isYearlyPackage);
 
   useEffect(() => {
     if (!isConfigured) return;
@@ -228,19 +245,27 @@ export const [RevenueCatProvider, useRevenueCat] = createContextHook(() => {
   }, [currentOffering, isConfigured, refreshCustomerInfo]);
 
   const presentCustomerCenter = useCallback(async () => {
-    if (!isConfigured) return;
+    if (!isConfigured) return false;
 
-    await RevenueCatUI.presentCustomerCenter({
-      callbacks: {
-        onRestoreCompleted: ({ customerInfo: restoredCustomerInfo }) => {
-          queryClient.setQueryData(customerInfoQueryKey, restoredCustomerInfo);
+    try {
+      await RevenueCatUI.presentCustomerCenter({
+        callbacks: {
+          onRestoreCompleted: ({ customerInfo: restoredCustomerInfo }) => {
+            queryClient.setQueryData(customerInfoQueryKey, restoredCustomerInfo);
+          },
+          onPromotionalOfferSucceeded: ({ customerInfo: nextCustomerInfo }) => {
+            queryClient.setQueryData(customerInfoQueryKey, nextCustomerInfo);
+          },
         },
-        onPromotionalOfferSucceeded: ({ customerInfo: nextCustomerInfo }) => {
-          queryClient.setQueryData(customerInfoQueryKey, nextCustomerInfo);
-        },
-      },
-    });
-    await refreshCustomerInfo();
+      });
+      await refreshCustomerInfo();
+      return true;
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[RevenueCat] Customer Center unavailable:', error);
+      }
+      return false;
+    }
   }, [customerInfoQueryKey, isConfigured, queryClient, refreshCustomerInfo]);
 
   const loginUser = useCallback(

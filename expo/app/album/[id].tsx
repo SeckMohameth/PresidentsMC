@@ -23,6 +23,8 @@ export default function AlbumScreen() {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [libraryAssets, setLibraryAssets] = useState<MediaLibrary.Asset[]>([]);
+  const [loadedPhotoIds, setLoadedPhotoIds] = useState<Set<string>>(() => new Set());
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(() => new Set());
   const isTablet = width >= 768;
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -36,6 +38,24 @@ export default function AlbumScreen() {
   const date = ride?.dateTime || album?.createdAt || '';
   const photos = ride?.photos || album?.photos || [];
   const isRideAlbum = !!ride;
+
+  const markPhotoLoaded = (photoId: string) => {
+    setLoadedPhotoIds((current) => {
+      if (current.has(photoId)) return current;
+      const next = new Set(current);
+      next.add(photoId);
+      return next;
+    });
+  };
+
+  const markPhotoFailed = (photoId: string) => {
+    setFailedPhotoIds((current) => {
+      if (current.has(photoId)) return current;
+      const next = new Set(current);
+      next.add(photoId);
+      return next;
+    });
+  };
 
   if (!ride && !album) {
     return (
@@ -110,26 +130,46 @@ export default function AlbumScreen() {
     }
   };
 
-  const renderPhoto = ({ item, index }: { item: RidePhoto; index: number }) => (
-    <Pressable 
-      style={[
-        styles.photoItem, 
-        { 
-          width: photoSize,
-          height: photoSize,
-          marginRight: (index + 1) % columnCount === 0 ? 0 : gridGap,
-          marginBottom: gridGap,
-        }
-      ]}
-      onPress={() => setSelectedPhoto(item)}
-    >
-      <Image 
-        source={{ uri: item.imageUrl }}
-        style={styles.photoImage}
-        contentFit="cover"
-      />
-    </Pressable>
-  );
+  const renderPhoto = ({ item, index }: { item: RidePhoto; index: number }) => {
+    const isLoaded = loadedPhotoIds.has(item.id);
+    const didFail = failedPhotoIds.has(item.id);
+
+    return (
+      <Pressable
+        style={[
+          styles.photoItem,
+          {
+            width: photoSize,
+            height: photoSize,
+            marginRight: (index + 1) % columnCount === 0 ? 0 : gridGap,
+            marginBottom: gridGap,
+          }
+        ]}
+        onPress={() => setSelectedPhoto(item)}
+      >
+        {!isLoaded && !didFail && (
+          <View style={styles.photoLoadingOverlay}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        )}
+        {didFail && (
+          <View style={styles.photoErrorOverlay}>
+            <Camera size={20} color={colors.textTertiary} />
+          </View>
+        )}
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={[styles.photoImage, !isLoaded && styles.photoImageLoading]}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={item.id}
+          transition={140}
+          onLoad={() => markPhotoLoaded(item.id)}
+          onError={() => markPhotoFailed(item.id)}
+        />
+      </Pressable>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -184,6 +224,11 @@ export default function AlbumScreen() {
           ]}
           style={styles.gridList}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={columnCount * 4}
+          maxToRenderPerBatch={columnCount * 3}
+          updateCellsBatchingPeriod={60}
+          windowSize={7}
+          removeClippedSubviews
         />
       )}
 
@@ -321,12 +366,27 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.surface,
   },
+  photoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  photoErrorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+  },
   gridList: {
     width: '100%',
   },
   photoImage: {
     width: '100%',
     height: '100%',
+  },
+  photoImageLoading: {
+    opacity: 0,
   },
   emptyState: {
     flex: 1,

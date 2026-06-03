@@ -135,7 +135,13 @@ export default function SubscriptionScreen() {
       return;
     }
     if (canManageOwnSubscription) {
-      await presentCustomerCenter();
+      const didOpenCustomerCenter = await presentCustomerCenter();
+      if (!didOpenCustomerCenter) {
+        Alert.alert(
+          'Manage Subscription',
+          'Your subscription is active. Subscription management is unavailable in this build right now. Use your App Store account subscription settings to manage billing.'
+        );
+      }
       return;
     }
     if (!isEnabled) {
@@ -150,23 +156,42 @@ export default function SubscriptionScreen() {
       properties: { selectedPlan, mode: 'selected_package' },
     });
 
-    try {
-      const selectedPackage = selectedPlan === 'yearly' ? yearlyPackage : monthlyPackage;
-      if (!selectedPackage) {
-        Alert.alert(
-          'Store Setup Needed',
-          'The subscription products are not available from Apple yet. In RevenueCat, attach the Apple monthly/yearly products to the PresidentsMC Pro entitlement and current offering, then make sure App Store Connect subscription metadata is complete.'
-        );
-        return;
-      }
+    const selectedPackage = selectedPlan === 'yearly' ? yearlyPackage : monthlyPackage;
+    if (!selectedPackage) {
+      Alert.alert(
+        'Store Setup Needed',
+        'The subscription products are not available from Apple yet. In RevenueCat, attach the Apple monthly/yearly products to the PresidentsMC Pro entitlement and current offering, then make sure App Store Connect subscription metadata is complete.'
+      );
+      setIsPresentingPaywall(false);
+      return;
+    }
 
+    try {
       const purchaseInfo = await purchasePackage(selectedPackage);
-      const customerInfo = await refreshCustomerInfo();
+      let customerInfo = purchaseInfo;
+      try {
+        customerInfo = (await refreshCustomerInfo()) ?? purchaseInfo;
+      } catch (refreshError) {
+        if (__DEV__) {
+          console.log('[Subscription] Customer info refresh after purchase failed:', refreshError);
+        }
+      }
       const nextStatus = getCrewAdminStatus(customerInfo ?? purchaseInfo);
 
       if (nextStatus !== 'inactive') {
         if (nextStatus === 'active' || nextStatus === 'trialing') {
-          await syncClubSubscription(nextStatus);
+          try {
+            await syncClubSubscription(nextStatus);
+          } catch (syncError) {
+            if (__DEV__) {
+              console.log('[Subscription] Club subscription sync after purchase failed:', syncError);
+            }
+            Alert.alert(
+              'Subscription Active',
+              'Your purchase completed, but the club access update is still syncing. Pull to refresh or reopen the app in a moment.'
+            );
+            return;
+          }
         }
         void trackAnalyticsEvent({
           eventName: 'purchase_success',
@@ -176,6 +201,11 @@ export default function SubscriptionScreen() {
         Alert.alert('Subscription Active', 'PresidentsMC Pro is active for this account.');
         return;
       }
+
+      Alert.alert(
+        'Purchase Processing',
+        'Your purchase completed, but RevenueCat has not reported the active subscription yet. Tap Restore Purchases or reopen the app in a moment.'
+      );
     } catch (error: any) {
       if (error?.userCancelled) return;
       void trackAnalyticsEvent({
@@ -186,6 +216,16 @@ export default function SubscriptionScreen() {
       Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
     } finally {
       setIsPresentingPaywall(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    const didOpenCustomerCenter = await presentCustomerCenter();
+    if (!didOpenCustomerCenter) {
+      Alert.alert(
+        'Manage Subscription',
+        'Subscription management is unavailable in this build right now. Use your App Store account subscription settings to manage billing.'
+      );
     }
   };
 
@@ -398,7 +438,7 @@ export default function SubscriptionScreen() {
 
           <TouchableOpacity
             style={styles.secondaryButton}
-            onPress={() => void presentCustomerCenter()}
+            onPress={() => void handleManageSubscription()}
             disabled={!isEnabled || !canManageOwnSubscription}
           >
             <Text style={styles.secondaryButtonText}>Manage Subscription</Text>
