@@ -8,6 +8,7 @@ import { Announcement } from '@/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatRelativeTime, getInitials } from '@/utils/helpers';
+import { getCoverImageSource } from '@/constants/coverImages';
 
 interface AnnouncementCardProps {
   announcement: Announcement;
@@ -107,7 +108,7 @@ export default function AnnouncementCard({ announcement, resolvedAuthorAvatar, o
         <View style={styles.imageContainer}>
           <Pressable onPress={() => setIsImageOpen(true)}>
             <Image 
-              source={{ uri: announcement.imageUrl }}
+              source={getCoverImageSource(announcement.imageUrl)}
               style={styles.announcementImage}
               contentFit="cover"
             />
@@ -138,7 +139,7 @@ export default function AnnouncementCard({ announcement, resolvedAuthorAvatar, o
             <X size={22} color={colors.text} />
           </Pressable>
           <View style={[styles.modalContent, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}>
-            <Image source={{ uri: announcement.imageUrl }} style={styles.modalImage} contentFit="contain" />
+            <Image source={getCoverImageSource(announcement.imageUrl)} style={styles.modalImage} contentFit="contain" />
           </View>
         </View>
       </Modal>

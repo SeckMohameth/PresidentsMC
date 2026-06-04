@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, Images, Lock, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, useThemeColors } from '@/constants/colors';
+import { getCoverImageSource } from '@/constants/coverImages';
 import { useCrew } from '@/providers/CrewProvider';
 import { formatDate, isToday } from '@/utils/helpers';
 
@@ -157,7 +158,7 @@ function AlbumCoverImage({ imageUrl, style }: { imageUrl?: string | null; style:
 
   return (
     <Image
-      source={!failed && imageUrl ? { uri: imageUrl } : DEFAULT_ALBUM_IMAGE}
+      source={!failed && imageUrl ? getCoverImageSource(imageUrl) : DEFAULT_ALBUM_IMAGE}
       style={style}
       contentFit="cover"
       onError={() => setFailed(true)}

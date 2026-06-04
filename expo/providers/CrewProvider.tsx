@@ -33,7 +33,7 @@ import {
   CrewAlbum,
 } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
-import { getDefaultRideCoverUri } from '@/constants/coverImages';
+import { getDefaultRideCoverUri, normalizeCoverImageReference } from '@/constants/coverImages';
 import { isPersistedImageUri, uploadImageUri } from '@/utils/storageUpload';
 
 export type InviteCodeSettings = {
@@ -62,9 +62,10 @@ function generateInviteCode(length = 8) {
 }
 
 async function uploadImageIfNeeded(uri: string, path: string) {
-  if (!uri) return uri;
-  if (isPersistedImageUri(uri)) return uri;
-  return uploadImageUri(uri, path);
+  const normalizedUri = normalizeCoverImageReference(uri);
+  if (!normalizedUri) return normalizedUri;
+  if (isPersistedImageUri(normalizedUri)) return normalizedUri;
+  return uploadImageUri(normalizedUri, path);
 }
 
 async function deleteStoragePath(path: string) {
@@ -1018,6 +1019,19 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     });
   }, [crewId, currentUser, hasPaidFeatureAccess]);
 
+  const deleteRidePhoto = useCallback(async ({ rideId, photo }: { rideId: string; photo: RidePhoto }) => {
+    if (!crewId) throw new Error('No crew');
+    assertCanManageRides();
+    const ride = rides.find((item) => item.id === rideId);
+    if (!ride) throw new Error('Ride not found');
+    const nextPhotos = ride.photos.filter((item) => item.id !== photo.id);
+
+    await updateDoc(doc(db, 'crews', crewId, 'rides', rideId), {
+      photos: nextPhotos,
+    });
+    await deleteStoragePath(`crews/${crewId}/rides/${rideId}/photos/${photo.id}.jpg`);
+  }, [assertCanManageRides, crewId, rides]);
+
   const createAlbum = useCallback(async ({
     title,
     description,
@@ -1079,6 +1093,20 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       updatedAt: new Date().toISOString(),
     });
   }, [crewId, currentUser, hasPaidFeatureAccess]);
+
+  const deleteAlbumPhoto = useCallback(async ({ albumId, photo }: { albumId: string; photo: RidePhoto }) => {
+    if (!crewId) throw new Error('No crew');
+    if (!canManageAlbums) throw new Error('NOT_AUTHORIZED');
+    const album = albums.find((item) => item.id === albumId);
+    if (!album) throw new Error('Album not found');
+    const nextPhotos = album.photos.filter((item) => item.id !== photo.id);
+
+    await updateDoc(doc(db, 'crews', crewId, 'albums', albumId), {
+      photos: nextPhotos,
+      updatedAt: new Date().toISOString(),
+    });
+    await deleteStoragePath(`crews/${crewId}/albums/${albumId}/photos/${photo.id}.jpg`);
+  }, [albums, canManageAlbums, crewId]);
 
   const upcomingRides = useMemo(() =>
     rides
@@ -1219,8 +1247,10 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     getInviteSettings,
     updateInviteSettings,
     addPhoto,
+    deleteRidePhoto,
     createAlbum,
     addAlbumPhoto,
+    deleteAlbumPhoto,
     removeMember,
     setMemberRole,
     setMemberLeadership,

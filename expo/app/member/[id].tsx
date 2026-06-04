@@ -10,7 +10,7 @@ import { useCrew } from '@/providers/CrewProvider';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatMiles, getInitials } from '@/utils/helpers';
 import { BikeProfile } from '@/types';
-import { getDefaultRideCoverUri } from '@/constants/coverImages';
+import { getCoverImageSource, getDefaultRideCoverUri } from '@/constants/coverImages';
 
 function normalizeBikes(memberBike?: string, bikes?: BikeProfile[]) {
   if (bikes?.length) return bikes;
@@ -77,13 +77,16 @@ export default function MemberProfileScreen() {
   const bikes = normalizeBikes(member.bike, member.bikes);
   const primaryBike = bikes.find((bike) => bike.isPrimary) || bikes[0];
   const heroImage = primaryBike?.photoUrl || member.avatar || getDefaultRideCoverUri();
+  const heroImageSource = primaryBike?.photoUrl || member.avatar
+    ? getAvatarSource(heroImage)
+    : getCoverImageSource(heroImage);
   const memberSince = formatMemberSince(member.joinedCrewAt || member.joinedAt);
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 34 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
-          <Image source={heroImage ? getAvatarSource(heroImage) : undefined} style={styles.heroImage} contentFit="cover" />
+          <Image source={heroImageSource} style={styles.heroImage} contentFit="cover" />
           <LinearGradient
             colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.92)']}
             locations={[0, 0.48, 1]}

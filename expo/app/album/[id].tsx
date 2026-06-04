@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
+import { PinchGestureHandler, State } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, Camera, Plus } from 'lucide-react-native';
+import { ArrowLeft, X, Camera, Plus, Trash2 } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
@@ -15,11 +16,21 @@ export default function AlbumScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const router = useRouter();
-  const { addPhoto, addAlbumPhoto, getAlbumById } = useCrew();
+  const {
+    addPhoto,
+    addAlbumPhoto,
+    deleteRidePhoto,
+    deleteAlbumPhoto,
+    getAlbumById,
+    canManageRides,
+    canManageAlbums,
+  } = useCrew();
   const { ride } = useRide(id || '');
   const album = getAlbumById(id || '');
-  const [selectedPhoto, setSelectedPhoto] = useState<RidePhoto | null>(null);
+  const galleryRef = useRef<FlatList<RidePhoto>>(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [libraryAssets, setLibraryAssets] = useState<MediaLibrary.Asset[]>([]);
@@ -38,6 +49,8 @@ export default function AlbumScreen() {
   const date = ride?.dateTime || album?.createdAt || '';
   const photos = ride?.photos || album?.photos || [];
   const isRideAlbum = !!ride;
+  const canDeletePhotos = isRideAlbum ? canManageRides : canManageAlbums;
+  const selectedPhoto = selectedPhotoIndex === null ? null : photos[selectedPhotoIndex] ?? null;
 
   const markPhotoLoaded = (photoId: string) => {
     setLoadedPhotoIds((current) => {
@@ -130,6 +143,53 @@ export default function AlbumScreen() {
     }
   };
 
+  const openGallery = (index: number) => {
+    setSelectedPhotoIndex(index);
+    requestAnimationFrame(() => {
+      galleryRef.current?.scrollToIndex({ index, animated: false });
+    });
+  };
+
+  const closeGallery = () => {
+    setSelectedPhotoIndex(null);
+  };
+
+  const handleDeleteSelectedPhoto = () => {
+    if (!selectedPhoto || selectedPhotoIndex === null || isDeletingPhoto) return;
+
+    Alert.alert('Delete Photo', 'Remove this photo from the album?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setIsDeletingPhoto(true);
+          try {
+            if (isRideAlbum && ride) {
+              await deleteRidePhoto({ rideId: ride.id, photo: selectedPhoto });
+            } else if (album) {
+              await deleteAlbumPhoto({ albumId: album.id, photo: selectedPhoto });
+            }
+
+            const nextLength = photos.length - 1;
+            if (nextLength <= 0) {
+              closeGallery();
+            } else {
+              setSelectedPhotoIndex(Math.min(selectedPhotoIndex, nextLength - 1));
+            }
+          } catch (error) {
+            if (__DEV__) {
+              console.log('[Album] Photo delete error:', error);
+            }
+            Alert.alert('Delete Failed', 'Unable to delete this photo right now.');
+          } finally {
+            setIsDeletingPhoto(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const renderPhoto = ({ item, index }: { item: RidePhoto; index: number }) => {
     const isLoaded = loadedPhotoIds.has(item.id);
     const didFail = failedPhotoIds.has(item.id);
@@ -145,7 +205,7 @@ export default function AlbumScreen() {
             marginBottom: gridGap,
           }
         ]}
-        onPress={() => setSelectedPhoto(item)}
+        onPress={() => openGallery(index)}
       >
         {!isLoaded && !didFail && (
           <View style={styles.photoLoadingOverlay}>
@@ -275,36 +335,117 @@ export default function AlbumScreen() {
       </Modal>
 
       <Modal
-        visible={!!selectedPhoto}
+        visible={selectedPhotoIndex !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setSelectedPhoto(null)}
+        onRequestClose={closeGallery}
       >
         <View style={styles.modalContainer}>
           <Pressable 
             style={[styles.modalClose, { top: insets.top + 16 }]}
-            onPress={() => setSelectedPhoto(null)}
+            onPress={closeGallery}
           >
             <X size={24} color={colors.text} />
           </Pressable>
+          {canDeletePhotos && selectedPhoto ? (
+            <Pressable
+              style={[styles.modalDelete, { top: insets.top + 16 }]}
+              onPress={handleDeleteSelectedPhoto}
+              disabled={isDeletingPhoto}
+            >
+              {isDeletingPhoto ? (
+                <ActivityIndicator size="small" color={colors.error} />
+              ) : (
+                <Trash2 size={22} color={colors.error} />
+              )}
+            </Pressable>
+          ) : null}
+          <FlatList
+            ref={galleryRef}
+            data={photos}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={selectedPhotoIndex ?? 0}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            onMomentumScrollEnd={(event) => {
+              const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+              setSelectedPhotoIndex(nextIndex);
+            }}
+            renderItem={({ item }) => (
+              <ZoomableGalleryPhoto photo={item} width={width} />
+            )}
+          />
           {selectedPhoto && (
-            <>
-              <Image 
-                source={{ uri: selectedPhoto.imageUrl }}
-                style={styles.modalImage}
-                contentFit="contain"
-              />
-              <View style={[styles.modalInfo, { paddingBottom: insets.bottom + 20 }]}>
-                <Text style={styles.modalAuthor}>{selectedPhoto.uploadedByName}</Text>
-                <Text style={styles.modalDate}>{formatRelativeTime(selectedPhoto.uploadedAt)}</Text>
-              </View>
-            </>
+            <View style={[styles.modalInfo, { paddingBottom: insets.bottom + 20 }]}>
+              <Text style={styles.modalCounter}>
+                {selectedPhotoIndex === null ? 0 : selectedPhotoIndex + 1} / {photos.length}
+              </Text>
+              <Text style={styles.modalAuthor}>{selectedPhoto.uploadedByName}</Text>
+              <Text style={styles.modalDate}>{formatRelativeTime(selectedPhoto.uploadedAt)}</Text>
+            </View>
           )}
         </View>
       </Modal>
     </View>
   );
 }
+
+function ZoomableGalleryPhoto({ photo, width }: { photo: RidePhoto; width: number }) {
+  const baseScale = useRef(new Animated.Value(1)).current;
+  const pinchScale = useRef(new Animated.Value(1)).current;
+  const lastScale = useRef(1);
+  const composedScale = Animated.multiply(baseScale, pinchScale);
+
+  const onPinchGestureEvent = Animated.event(
+    [{ nativeEvent: { scale: pinchScale } }],
+    { useNativeDriver: true }
+  );
+
+  const onPinchStateChange = (event: any) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      lastScale.current = Math.min(Math.max(lastScale.current * event.nativeEvent.scale, 1), 4);
+      baseScale.setValue(lastScale.current);
+      pinchScale.setValue(1);
+    }
+  };
+
+  return (
+    <View style={[galleryStyles.page, { width }]}>
+      <PinchGestureHandler
+        onGestureEvent={onPinchGestureEvent}
+        onHandlerStateChange={onPinchStateChange}
+      >
+        <Animated.View style={galleryStyles.zoomContainer}>
+          <Animated.Image
+            source={{ uri: photo.imageUrl }}
+            style={[galleryStyles.image, { transform: [{ scale: composedScale }] }]}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      </PinchGestureHandler>
+    </View>
+  );
+}
+
+const galleryStyles = StyleSheet.create({
+  page: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomContainer: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+});
 
 const createStyles = (colors: AppColors) => StyleSheet.create({
   container: {
@@ -506,6 +647,17 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
+  modalDelete: {
+    position: 'absolute',
+    left: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
   modalImage: {
     width: '100%',
     height: '70%',
@@ -517,6 +669,12 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     right: 0,
     padding: 20,
     alignItems: 'center',
+  },
+  modalCounter: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   modalAuthor: {
     color: colors.text,

@@ -71,6 +71,10 @@ type CrewMemberDoc = {
   milesTraveled?: number;
 };
 
+type MemberPermissionKey = NonNullable<CrewMemberDoc['permissions']> extends infer Permissions
+  ? keyof Permissions
+  : never;
+
 type UserDoc = {
   id: string;
   email?: string;
@@ -582,6 +586,17 @@ function requireLeadership(member: CrewMemberDoc) {
   }
 }
 
+function hasLeadershipOrPermission(member: CrewMemberDoc, permission: MemberPermissionKey) {
+  const role = member.role;
+  return role === 'admin' || role === 'officer' || member.permissions?.[permission] === true;
+}
+
+function requireLeadershipOrPermission(member: CrewMemberDoc, permission: MemberPermissionKey) {
+  if (!hasLeadershipOrPermission(member, permission)) {
+    throw new HttpsError('permission-denied', 'NOT_AUTHORIZED');
+  }
+}
+
 function requireActiveLeadership(member: CrewMemberDoc, crew: CrewDoc) {
   requireLeadership(member);
   if (!isActiveSubscription(crew.subscriptionStatus)) {
@@ -1068,7 +1083,7 @@ export const approveJoinRequest = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireLeadership(context.member);
+  requireLeadershipOrPermission(context.member, 'manageJoinRequests');
 
   const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
   const joinRequestSnap = await joinRequestRef.get();
@@ -1151,7 +1166,7 @@ export const denyJoinRequest = onCall(async (request) => {
   }
 
   const context = await getActingMemberContext(userId);
-  requireLeadership(context.member);
+  requireLeadershipOrPermission(context.member, 'manageJoinRequests');
 
   await context.crewRef.collection('joinRequests').doc(requestId).set(
     {

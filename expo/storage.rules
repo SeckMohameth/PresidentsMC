@@ -32,6 +32,23 @@ service firebase.storage {
         && ['admin', 'officer'].hasAny([crewMemberDoc(crewId, request.auth.uid).data.role]);
     }
 
+    function hasCrewPermission(crewId, permission) {
+      return isCrewMember(crewId)
+        && crewMemberDoc(crewId, request.auth.uid).data.permissions[permission] == true;
+    }
+
+    function canManageAnnouncements(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAnnouncements');
+    }
+
+    function canManageRides(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageRides');
+    }
+
+    function canManageAlbums(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAlbums');
+    }
+
     function hasActiveSubscription(crewId) {
       let ownerId = crewDoc(crewId).data.subscriptionOwnerId;
       return ownerId is string
@@ -51,12 +68,12 @@ service firebase.storage {
 
     match /crews/{crewId}/announcements/{fileName} {
       allow read: if isCrewMember(crewId);
-      allow write: if isCrewLeader(crewId);
+      allow write: if canManageAnnouncements(crewId);
     }
 
     match /crews/{crewId}/rides/{rideId}/cover.jpg {
       allow read: if isCrewMember(crewId);
-      allow write: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+      allow write: if canManageRides(crewId) && hasActiveSubscription(crewId);
     }
 
     match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
@@ -66,7 +83,7 @@ service firebase.storage {
 
     match /crews/{crewId}/albums/{albumId}/cover.jpg {
       allow read: if isCrewMember(crewId);
-      allow write: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
+      allow write: if canManageAlbums(crewId) && hasActiveSubscription(crewId);
     }
 
     match /crews/{crewId}/albums/{albumId}/photos/{fileName} {

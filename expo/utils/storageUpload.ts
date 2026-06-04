@@ -14,7 +14,8 @@ export function isPersistedImageUri(uri?: string | null) {
   return (
     uri.startsWith('https://firebasestorage.googleapis.com/') ||
     uri.includes('.firebasestorage.app/') ||
-    uri.startsWith('https://images.unsplash.com/')
+    uri.startsWith('https://images.unsplash.com/') ||
+    uri.startsWith('preset://')
   );
 }
 

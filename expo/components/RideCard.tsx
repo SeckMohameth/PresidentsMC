@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { MapPin, Clock, Users, ChevronRight, Gauge, Navigation } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, useThemeColors } from '@/constants/colors';
-import { getDefaultRideCoverUri } from '@/constants/coverImages';
+import { getCoverImageSource, getDefaultRideCoverUri } from '@/constants/coverImages';
 import { Ride } from '@/types';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, getDaysUntil, isToday } from '@/utils/helpers';
 
@@ -64,7 +64,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
         onPress={handlePress}
       >
         <Image
-          source={{ uri: coverImage }}
+          source={getCoverImageSource(coverImage)}
           style={styles.compactImage}
           contentFit="cover"
           onError={() => setImageFailed(true)}
@@ -95,7 +95,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
     >
       <View style={styles.imageContainer}>
         <Image
-          source={{ uri: coverImage }}
+          source={getCoverImageSource(coverImage)}
           style={styles.image}
           contentFit="cover"
           onError={() => setImageFailed(true)}

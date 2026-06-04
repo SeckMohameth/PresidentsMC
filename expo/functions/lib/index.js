@@ -395,6 +395,15 @@ function requireLeadership(member) {
         throw new https_1.HttpsError('permission-denied', 'NOT_AUTHORIZED');
     }
 }
+function hasLeadershipOrPermission(member, permission) {
+    const role = member.role;
+    return role === 'admin' || role === 'officer' || member.permissions?.[permission] === true;
+}
+function requireLeadershipOrPermission(member, permission) {
+    if (!hasLeadershipOrPermission(member, permission)) {
+        throw new https_1.HttpsError('permission-denied', 'NOT_AUTHORIZED');
+    }
+}
 function requireActiveLeadership(member, crew) {
     requireLeadership(member);
     if (!isActiveSubscription(crew.subscriptionStatus)) {
@@ -779,7 +788,7 @@ exports.approveJoinRequest = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'REQUEST_ID_REQUIRED');
     }
     const context = await getActingMemberContext(userId);
-    requireLeadership(context.member);
+    requireLeadershipOrPermission(context.member, 'manageJoinRequests');
     const joinRequestRef = context.crewRef.collection('joinRequests').doc(requestId);
     const joinRequestSnap = await joinRequestRef.get();
     if (!joinRequestSnap.exists) {
@@ -839,7 +848,7 @@ exports.denyJoinRequest = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError('invalid-argument', 'REQUEST_ID_REQUIRED');
     }
     const context = await getActingMemberContext(userId);
-    requireLeadership(context.member);
+    requireLeadershipOrPermission(context.member, 'manageJoinRequests');
     await context.crewRef.collection('joinRequests').doc(requestId).set({
         status: 'denied',
         decidedAt: new Date().toISOString(),

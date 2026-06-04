@@ -35,6 +35,27 @@ service cloud.firestore {
         && ['admin', 'officer'].hasAny([get(memberPath(crewId, request.auth.uid)).data.role]);
     }
 
+    function hasCrewPermission(crewId, permission) {
+      return isCrewMember(crewId)
+        && get(memberPath(crewId, request.auth.uid)).data.permissions[permission] == true;
+    }
+
+    function canManageAnnouncements(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAnnouncements');
+    }
+
+    function canManageRides(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageRides');
+    }
+
+    function canManageAlbums(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAlbums');
+    }
+
+    function canManageJoinRequests(crewId) {
+      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageJoinRequests');
+    }
+
     function hasActiveSubscription(crewId) {
       let ownerId = crewDoc(crewId).data.subscriptionOwnerId;
       return ownerId is string
@@ -154,13 +175,13 @@ service cloud.firestore {
 
       match /announcements/{announcementId} {
         allow read: if isCrewMember(crewId);
-        allow create, update, delete: if isCrewLeader(crewId);
+        allow create, update, delete: if canManageAnnouncements(crewId);
       }
 
       match /rides/{rideId} {
         allow read: if isCrewMember(crewId);
-        allow create, delete: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
-        allow update: if (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+        allow create, delete: if canManageRides(crewId) && hasActiveSubscription(crewId);
+        allow update: if (canManageRides(crewId) && hasActiveSubscription(crewId))
           || (isCrewMember(crewId) && hasActiveSubscription(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'attendees',
@@ -171,8 +192,8 @@ service cloud.firestore {
 
       match /albums/{albumId} {
         allow read: if isCrewMember(crewId);
-        allow create, delete: if isCrewLeader(crewId) && hasActiveSubscription(crewId);
-        allow update: if (isCrewLeader(crewId) && hasActiveSubscription(crewId))
+        allow create, delete: if canManageAlbums(crewId) && hasActiveSubscription(crewId);
+        allow update: if (canManageAlbums(crewId) && hasActiveSubscription(crewId))
           || (isCrewMember(crewId) && hasActiveSubscription(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'photos',
@@ -181,7 +202,7 @@ service cloud.firestore {
       }
 
       match /joinRequests/{requestId} {
-        allow read: if (signedIn() && requestId == request.auth.uid) || isCrewLeader(crewId);
+        allow read: if (signedIn() && requestId == request.auth.uid) || canManageJoinRequests(crewId);
         allow create: if signedIn()
           && request.resource.data.id == request.auth.uid
           && request.resource.data.userId == request.auth.uid

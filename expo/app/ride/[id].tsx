@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
+import { getCoverImageSource } from '@/constants/coverImages';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, isToday, MapsApp } from '@/utils/helpers';
 import { functions } from '@/utils/firebase';
@@ -354,8 +355,8 @@ export default function RideDetailScreen() {
         bounces={false}
       >
         <View style={styles.heroContainer}>
-          <Image 
-            source={{ uri: ride.coverImage }}
+          <Image
+            source={getCoverImageSource(ride.coverImage)}
             style={styles.heroImage}
             contentFit="cover"
           />

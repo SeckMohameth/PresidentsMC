@@ -9,7 +9,35 @@ import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import { ImageAttribution } from '@/types';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
-import { COVER_IMAGE_PRESETS, getCoverPresetUri } from '@/constants/coverImages';
+import {
+  COVER_IMAGE_PRESETS,
+  getCoverImageSource,
+  getCoverPresetReference,
+  normalizeCoverImageReference,
+} from '@/constants/coverImages';
+
+function getAnnouncementSaveErrorMessage(error: unknown, action: 'post' | 'save') {
+  const code = String((error as any)?.code ?? '');
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : String((error as any)?.message ?? '');
+  const devDetails = __DEV__ && message ? `\n\nDev details${code ? ` (${code})` : ''}: ${message}` : '';
+
+  if (code === 'storage/unauthorized' || message.includes('storage/unauthorized')) {
+    return `Your account must be an admin or officer in this club to upload announcement images. If you were just promoted, sign out and back in, then make sure Firebase Storage rules have been deployed.${devDetails}`;
+  }
+
+  if (
+    message.includes('Unable to read selected image') ||
+    message.includes('FileSystem') ||
+    message.includes('MediaLibrary')
+  ) {
+    return `Unable to read the selected image. Expo Go has limited media-library access on Android, so test image uploads in a development build or choose another image.${devDetails}`;
+  }
+
+  return `Unable to ${action} this announcement right now.${devDetails}`;
+}
 
 export default function CreateAnnouncementScreen() {
   const insets = useSafeAreaInsets();
@@ -82,8 +110,8 @@ export default function CreateAnnouncementScreen() {
     }
   };
 
-  const selectPresetImage = (presetUri: string) => {
-    setImageUri(presetUri);
+  const selectPresetImage = (presetReference: string) => {
+    setImageUri(presetReference);
     setImageAttribution(undefined);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -115,7 +143,7 @@ export default function CreateAnnouncementScreen() {
           content: content.trim(),
           link: normalizeLink(link),
           isPinned,
-          imageUrl: imageUri ?? null,
+          imageUrl: imageUri ? normalizeCoverImageReference(imageUri) : null,
           imageAttribution: imageUri ? imageAttribution : null,
         });
         router.back();
@@ -123,7 +151,7 @@ export default function CreateAnnouncementScreen() {
         const message =
           error?.message === 'SUBSCRIPTION_INACTIVE'
             ? 'Subscription inactive. Renew to update announcements.'
-            : 'Unable to save this announcement right now.';
+            : getAnnouncementSaveErrorMessage(error, 'save');
         Alert.alert('Error', message);
       } finally {
         setIsSaving(false);
@@ -148,7 +176,7 @@ export default function CreateAnnouncementScreen() {
         content: content.trim(),
         link: normalizeLink(link),
         isPinned,
-        imageUrl: imageUri || undefined,
+        imageUrl: imageUri ? normalizeCoverImageReference(imageUri) : undefined,
         imageAttribution,
       });
 
@@ -157,7 +185,7 @@ export default function CreateAnnouncementScreen() {
       const message =
         error?.message === 'SUBSCRIPTION_INACTIVE'
           ? 'Subscription inactive. Renew to post announcements.'
-          : 'Unable to post this announcement right now.';
+          : getAnnouncementSaveErrorMessage(error, 'post');
       Alert.alert('Error', message);
     } finally {
       setIsCreating(false);
@@ -267,7 +295,7 @@ export default function CreateAnnouncementScreen() {
             {imageUri ? (
               <View style={styles.imagePreviewContainer}>
                 <Image 
-                  source={{ uri: imageUri }}
+                  source={getCoverImageSource(imageUri)}
                   style={styles.imagePreview}
                   contentFit="cover"
                 />
@@ -288,13 +316,13 @@ export default function CreateAnnouncementScreen() {
               contentContainerStyle={styles.imagePresetList}
             >
               {COVER_IMAGE_PRESETS.map((preset) => {
-                const presetUri = getCoverPresetUri(preset);
-                const selected = imageUri === presetUri;
+                const presetReference = getCoverPresetReference(preset);
+                const selected = imageUri === presetReference;
                 return (
                   <Pressable
                     key={preset.id}
                     style={[styles.imagePreset, selected && styles.imagePresetSelected]}
-                    onPress={() => selectPresetImage(presetUri)}
+                    onPress={() => selectPresetImage(presetReference)}
                   >
                     <Image source={preset.source} style={styles.imagePresetThumb} contentFit="cover" />
                     <Text style={styles.imagePresetLabel} numberOfLines={1}>

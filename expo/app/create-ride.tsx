@@ -16,7 +16,13 @@ import { ImageAttribution, RouteCoordinate } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
 import { functions } from '@/utils/firebase';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
-import { COVER_IMAGE_PRESETS, getCoverPresetUri, getDefaultRideCoverUri } from '@/constants/coverImages';
+import {
+  COVER_IMAGE_PRESETS,
+  getCoverImageSource,
+  getCoverPresetReference,
+  getDefaultRideCoverUri,
+  normalizeCoverImageReference,
+} from '@/constants/coverImages';
 
 type PaceType = 'casual' | 'moderate' | 'spirited';
 type MapTarget = 'start' | 'end';
@@ -273,8 +279,8 @@ export default function CreateRideScreen() {
     }
   };
 
-  const selectPresetCover = (presetUri: string) => {
-    setCoverImage(presetUri);
+  const selectPresetCover = (presetReference: string) => {
+    setCoverImage(presetReference);
     setCoverAttribution(undefined);
   };
 
@@ -362,7 +368,7 @@ export default function CreateRideScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
 
-    const coverValue = coverImage || DEFAULT_COVER_IMAGE;
+    const coverValue = normalizeCoverImageReference(coverImage || DEFAULT_COVER_IMAGE);
     if (isEditMode && rideId) {
       setIsSaving(true);
       try {
@@ -571,7 +577,7 @@ export default function CreateRideScreen() {
             </View>
             {coverImage ? (
               <View style={styles.coverPreview}>
-                <Image source={{ uri: coverImage }} style={styles.coverImage} contentFit="cover" />
+                <Image source={getCoverImageSource(coverImage)} style={styles.coverImage} contentFit="cover" />
                 <Pressable style={styles.coverRemove} onPress={() => setCoverImage('')}>
                   <X size={16} color={colors.text} />
                 </Pressable>
@@ -593,13 +599,13 @@ export default function CreateRideScreen() {
               contentContainerStyle={styles.coverPresetList}
             >
               {COVER_IMAGE_PRESETS.map((preset) => {
-                const presetUri = getCoverPresetUri(preset);
-                const selected = coverImage === presetUri || (!coverImage && preset.id === 'jan-kopriva-aby36io-q48');
+                const presetReference = getCoverPresetReference(preset);
+                const selected = coverImage === presetReference || (!coverImage && preset.id === 'jan-kopriva-aby36io-q48');
                 return (
                   <Pressable
                     key={preset.id}
                     style={[styles.coverPreset, selected && styles.coverPresetSelected]}
-                    onPress={() => selectPresetCover(presetUri)}
+                    onPress={() => selectPresetCover(presetReference)}
                   >
                     <Image source={preset.source} style={styles.coverPresetImage} contentFit="cover" />
                     <Text style={styles.coverPresetLabel} numberOfLines={1}>

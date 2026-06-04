@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, Users, Bell, Route, Gauge, Images, ChevronRight } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { Art } from '@/constants/art';
+import { getCoverImageSource } from '@/constants/coverImages';
 import { useCrew } from '@/providers/CrewProvider';
 import AnnouncementCard from '@/components/AnnouncementCard';
 import RideCard from '@/components/RideCard';
@@ -15,7 +16,7 @@ import { getAvatarSource } from '@/utils/avatar';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { crew, currentUser, announcements, upcomingRides, canManageAnnouncements, isAdmin, isLoading, toggleAnnouncementLike, getMemberById } = useCrew();
+  const { crew, currentUser, announcements, upcomingRides, canManageAnnouncements, isLoading, toggleAnnouncementLike, getMemberById } = useCrew();
   const [refreshing, setRefreshing] = React.useState(false);
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -54,7 +55,7 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.hero}>
-          <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" />
+          <Image source={getCoverImageSource(heroImage)} style={styles.heroImage} contentFit="cover" />
           <LinearGradient
             colors={['rgba(0,0,0,0.38)', 'rgba(0,0,0,0.58)', colors.background]}
             locations={[0, 0.55, 1]}
@@ -163,7 +164,7 @@ export default function HomeScreen() {
                 announcement={announcement}
                 resolvedAuthorAvatar={author?.avatar}
                 onToggleLike={() => toggleAnnouncementLike(announcement.id)}
-                onEdit={isAdmin ? () => router.push({ pathname: '/create-announcement', params: { announcementId: announcement.id } }) : undefined}
+                onEdit={canManageAnnouncements ? () => router.push({ pathname: '/create-announcement', params: { announcementId: announcement.id } }) : undefined}
               />
               );
             })
