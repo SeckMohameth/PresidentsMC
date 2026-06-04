@@ -60,6 +60,7 @@ export default function CreateAnnouncementScreen() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageContentType, setImageContentType] = useState<string | null>(null);
   const [imageAttribution, setImageAttribution] = useState<ImageAttribution | undefined>();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -73,6 +74,7 @@ export default function CreateAnnouncementScreen() {
     setLink(announcement.link || '');
     setIsPinned(announcement.isPinned);
     setImageUri(announcement.imageUrl || null);
+    setImageContentType(null);
     setImageAttribution(announcement.imageAttribution);
   }, [announcement, isEditMode]);
 
@@ -94,7 +96,9 @@ export default function CreateAnnouncementScreen() {
       const result = await pickSingleImage({ quality: 0.8 });
 
       if (!result.canceled && result.assets[0]) {
-        setImageUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        setImageUri(asset.uri);
+        setImageContentType(asset.mimeType ?? null);
         setImageAttribution(undefined);
         if (Platform.OS !== 'web') {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -110,6 +114,7 @@ export default function CreateAnnouncementScreen() {
 
   const removeImage = () => {
     setImageUri(null);
+    setImageContentType(null);
     setImageAttribution(undefined);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -118,6 +123,7 @@ export default function CreateAnnouncementScreen() {
 
   const selectPresetImage = (presetReference: string) => {
     setImageUri(presetReference);
+    setImageContentType(null);
     setImageAttribution(undefined);
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -150,13 +156,21 @@ export default function CreateAnnouncementScreen() {
           link: normalizeLink(link),
           isPinned,
           imageUrl: imageUri ? normalizeCoverImageReference(imageUri) : null,
+          imageContentType,
           imageAttribution: imageUri ? imageAttribution : null,
         });
         router.back();
-      } catch (error: any) {
-        const message =
-          error?.message === 'SUBSCRIPTION_INACTIVE'
-            ? 'Subscription inactive. Renew to update announcements.'
+    } catch (error: any) {
+      if (__DEV__) {
+        console.log('[CreateAnnouncement] Save failed:', {
+          code: error?.code,
+          message: error?.message,
+          error,
+        });
+      }
+      const message =
+        error?.message === 'SUBSCRIPTION_INACTIVE'
+          ? 'Subscription inactive. Renew to update announcements.'
             : getAnnouncementSaveErrorMessage(error, 'save');
         Alert.alert('Error', message);
       } finally {
@@ -183,11 +197,19 @@ export default function CreateAnnouncementScreen() {
         link: normalizeLink(link),
         isPinned,
         imageUrl: imageUri ? normalizeCoverImageReference(imageUri) : undefined,
+        imageContentType,
         imageAttribution,
       });
 
       router.back();
     } catch (error: any) {
+      if (__DEV__) {
+        console.log('[CreateAnnouncement] Post failed:', {
+          code: error?.code,
+          message: error?.message,
+          error,
+        });
+      }
       const message =
         error?.message === 'SUBSCRIPTION_INACTIVE'
           ? 'Subscription inactive. Renew to post announcements.'

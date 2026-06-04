@@ -76,6 +76,7 @@ export default function FeatureOnboardingScreen() {
   const [index, setIndex] = useState(0);
   const [nickname, setNickname] = useState(user?.name || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
+  const [avatarContentType, setAvatarContentType] = useState<string | null>(null);
   const [bikeName, setBikeName] = useState(user?.bike || user?.bikes?.[0]?.name || '');
   const [bikeDetails, setBikeDetails] = useState(user?.bikes?.[0]?.details || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -91,7 +92,9 @@ export default function FeatureOnboardingScreen() {
     try {
       const result = await pickSingleImage({ quality: 0.8 });
       if (!result.canceled && result.assets[0]) {
-        setAvatar(result.assets[0].uri);
+        const asset = result.assets[0];
+        setAvatar(asset.uri);
+        setAvatarContentType(asset.mimeType ?? null);
       }
     } catch (error) {
       if (__DEV__) {
@@ -106,7 +109,7 @@ export default function FeatureOnboardingScreen() {
       return avatar;
     }
 
-    return uploadImageUri(avatar, `users/${user.id}/avatars/avatar-${Date.now()}.jpg`);
+    return uploadImageUri(avatar, `users/${user.id}/avatars/avatar-${Date.now()}.jpg`, avatarContentType);
   };
 
   const complete = async () => {

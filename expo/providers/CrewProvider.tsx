@@ -61,11 +61,11 @@ function generateInviteCode(length = 8) {
   return code;
 }
 
-async function uploadImageIfNeeded(uri: string, path: string) {
+async function uploadImageIfNeeded(uri: string, path: string, contentType?: string | null) {
   const normalizedUri = normalizeCoverImageReference(uri);
   if (!normalizedUri) return normalizedUri;
   if (isPersistedImageUri(normalizedUri)) return normalizedUri;
-  return uploadImageUri(normalizedUri, path);
+  return uploadImageUri(normalizedUri, path, contentType);
 }
 
 async function deleteStoragePath(path: string) {
@@ -301,15 +301,18 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     };
   }, [crewId, user?.id]);
 
-  const createAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'createdAt'>) => {
+  const createAnnouncement = useCallback(async (announcement: Omit<Announcement, 'id' | 'createdAt'> & {
+    imageContentType?: string | null;
+  }) => {
     if (!crewId) throw new Error('No crew');
     assertCanManageAnnouncements();
     const announcementsRef = collection(db, 'crews', crewId, 'announcements');
     const docRef = doc(announcementsRef);
     const initialImageUrl = announcement.imageUrl;
+    const { imageContentType, ...announcementDocData } = announcement;
 
     await setDoc(docRef, stripUndefined({
-      ...announcement,
+      ...announcementDocData,
       id: docRef.id,
       imageUrl: null,
       likedBy: announcement.likedBy || [],
@@ -321,7 +324,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       try {
         imageUrl = await uploadImageIfNeeded(
           imageUrl,
-          `crews/${crewId}/announcements/${docRef.id}/image.jpg`
+          `crews/${crewId}/announcements/${docRef.id}.jpg`,
+          imageContentType
         );
         await updateDoc(docRef, stripUndefined({
           imageUrl: imageUrl || null,
@@ -350,6 +354,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     announcementId: string,
     updates: Partial<Pick<Announcement, 'title' | 'content' | 'isPinned' | 'link'>> & {
       imageUrl?: string | null;
+      imageContentType?: string | null;
       imageAttribution?: Announcement['imageAttribution'] | null;
     }
   ) => {
@@ -361,12 +366,14 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (imageUrl) {
       imageUrl = await uploadImageIfNeeded(
         imageUrl,
-        `crews/${crewId}/announcements/${announcementId}/image.jpg`
+        `crews/${crewId}/announcements/${announcementId}.jpg`,
+        updates.imageContentType
       );
     }
 
     await updateDoc(announcementRef, stripUndefined({
       ...updates,
+      imageContentType: undefined,
       imageUrl: imageUrl ?? updates.imageUrl,
     }));
 

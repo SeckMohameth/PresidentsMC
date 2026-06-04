@@ -1,7 +1,5 @@
-import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system/legacy';
-import { deleteObject, getDownloadURL, ref, uploadBytes, uploadString } from 'firebase/storage';
-import { storage } from '@/utils/firebase';
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { app, auth, storage } from '@/utils/firebase';
 
 const IMAGE_READ_TIMEOUT_MS = 30_000;
 const IMAGE_UPLOAD_TIMEOUT_MS = 60_000;
@@ -39,33 +37,50 @@ export function isFirebaseStorageUri(uri?: string | null) {
   );
 }
 
+async function logUploadDiagnostics(
+  path: string,
+  uri: string,
+  blob: Blob,
+  contentType: string
+) {
+  if (!__DEV__) return;
+  const uid = auth.currentUser?.uid ?? null;
+  let tokenStatus = 'no-current-user';
+  if (auth.currentUser) {
+    try {
+      // Force-refresh ensures we surface a live token error rather than a stale cached one.
+      await auth.currentUser.getIdTokenResult(true);
+      tokenStatus = 'ok';
+    } catch (error: any) {
+      tokenStatus = `failed:${String(error?.code ?? error?.message ?? 'unknown')}`;
+    }
+  }
+  console.log('[storageUpload] upload diagnostics', {
+    path,
+    uriScheme: uri.split(':')[0] || 'unknown',
+    blobSize: blob.size,
+    blobType: blob.type || '(empty)',
+    contentType,
+    authUid: uid,
+    idToken: tokenStatus, // never logs the token itself
+    appName: app.name,
+    storageBucket: app.options.storageBucket ?? '(none)',
+  });
+}
+
 export async function uploadImageUri(uri: string, path: string, explicitContentType?: string | null) {
   if (!uri) return uri;
   if (isPersistedImageUri(uri)) return uri;
 
+  const blob = await withTimeout(uriToBlob(uri), IMAGE_READ_TIMEOUT_MS, 'Unable to read selected image.');
   const storageRef = ref(storage, path);
-  if (Platform.OS === 'web') {
-    const blob = await withTimeout(uriToBlob(uri), IMAGE_READ_TIMEOUT_MS, 'Unable to read selected image.');
-    const contentType = getImageContentType(explicitContentType || blob.type, path);
-    await withTimeout(
-      uploadBytes(storageRef, blob, { contentType }),
-      IMAGE_UPLOAD_TIMEOUT_MS,
-      'Image upload timed out. Please try a smaller photo or check your connection.'
-    );
-  } else {
-    const base64 = await withTimeout(
-      FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 }),
-      IMAGE_READ_TIMEOUT_MS,
-      'Unable to read selected image.'
-    );
-    const contentType = getImageContentType(explicitContentType || undefined, path);
-    await withTimeout(
-      uploadString(storageRef, base64, 'base64', { contentType }),
-      IMAGE_UPLOAD_TIMEOUT_MS,
-      'Image upload timed out. Please try a smaller photo or check your connection.'
-    );
-  }
-
+  const contentType = getImageContentType(explicitContentType || blob.type, path);
+  await logUploadDiagnostics(path, uri, blob, contentType);
+  await withTimeout(
+    uploadBytes(storageRef, blob, { contentType }),
+    IMAGE_UPLOAD_TIMEOUT_MS,
+    'Image upload timed out. Please try a smaller photo or check your connection.'
+  );
   return withTimeout(
     getDownloadURL(storageRef),
     IMAGE_READ_TIMEOUT_MS,
@@ -75,13 +90,28 @@ export async function uploadImageUri(uri: string, path: string, explicitContentT
 
 export async function deleteFirebaseStorageUri(uri?: string | null) {
   if (!isFirebaseStorageUri(uri)) return;
+  const storagePath = getFirebaseStoragePathFromUri(uri ?? '');
+  if (!storagePath) return;
   try {
-    await deleteObject(ref(storage, uri));
+    await deleteObject(ref(storage, storagePath));
   } catch (error: any) {
     const code = String(error?.code ?? '');
     if (code !== 'storage/object-not-found') {
       throw error;
     }
+  }
+}
+
+function getFirebaseStoragePathFromUri(uri: string) {
+  try {
+    const url = new URL(uri);
+    const encodedPath = url.pathname.includes('/o/')
+      ? url.pathname.split('/o/')[1]
+      : url.pathname.replace(/^\/+/, '');
+    if (!encodedPath) return null;
+    return decodeURIComponent(encodedPath);
+  } catch {
+    return null;
   }
 }
 

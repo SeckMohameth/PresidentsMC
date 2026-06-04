@@ -27,7 +27,7 @@ import { useRevenueCat } from '@/providers/RevenueCatProvider';
 import { auth, db, functions } from '@/utils/firebase';
 import { getDevicePushToken } from '@/utils/pushNotifications';
 import SafeAsyncStorage from '@/utils/safeAsyncStorage';
-import { uploadImageUri } from '@/utils/storageUpload';
+import { deleteFirebaseStorageUri, uploadImageUri } from '@/utils/storageUpload';
 import { BikeProfile, UserPreferences } from '@/types';
 import { DEFAULT_AVATAR } from '@/utils/avatar';
 import {
@@ -593,9 +593,19 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const updateUserProfile = useCallback(async (updates: { name?: string; avatar?: string; bike?: string; bikes?: BikeProfile[] }) => {
     if (!profile?.id) throw new Error('Not authenticated');
     const uid = profile.id;
+    const previousAvatar = profile.avatar;
     await updateDoc(doc(db, 'users', uid), updates);
     if (profile.crewId) {
       await updateDoc(doc(db, 'crews', profile.crewId, 'members', uid), updates);
+    }
+    if (updates.avatar && previousAvatar && updates.avatar !== previousAvatar) {
+      try {
+        await deleteFirebaseStorageUri(previousAvatar);
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[AuthProvider] Previous avatar cleanup skipped:', error);
+        }
+      }
     }
   }, [profile]);
 

@@ -135,6 +135,7 @@ export default function MoreScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
+  const [editAvatarContentType, setEditAvatarContentType] = useState<string | null>(null);
   const [editBike, setEditBike] = useState('');
   const [editBikes, setEditBikes] = useState<BikeProfile[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -256,6 +257,7 @@ export default function MoreScreen() {
   const openEditProfile = () => {
     setEditName(currentUser?.name || '');
     setEditAvatar(currentUser?.avatar || '');
+    setEditAvatarContentType(null);
     setEditBike(currentUser?.bike || '');
     setEditBikes(
       currentUser?.bikes?.length
@@ -316,7 +318,9 @@ export default function MoreScreen() {
     try {
       const result = await pickSingleImage({ quality: 0.8 });
       if (!result.canceled && result.assets[0]) {
-        setEditAvatar(result.assets[0].uri);
+        const asset = result.assets[0];
+        setEditAvatar(asset.uri);
+        setEditAvatarContentType(asset.mimeType ?? null);
       }
     } catch (error) {
       if (__DEV__) {
@@ -354,7 +358,11 @@ export default function MoreScreen() {
     try {
       let avatarUrl = editAvatar;
       if (avatarUrl && !avatarUrl.startsWith('http') && !isDefaultAvatar(avatarUrl) && user?.id) {
-        avatarUrl = await uploadImageUri(avatarUrl, `users/${user.id}/avatars/avatar-${Date.now()}.jpg`);
+        avatarUrl = await uploadImageUri(
+          avatarUrl,
+          `users/${user.id}/avatars/avatar-${Date.now()}.jpg`,
+          editAvatarContentType
+        );
       }
       const normalizedBikes = editBikes
         .map((bike, index) => ({

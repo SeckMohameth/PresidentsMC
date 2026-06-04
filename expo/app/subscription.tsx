@@ -125,12 +125,14 @@ export default function SubscriptionScreen() {
     return false;
   };
 
-  const showManageSubscriptionFallback = async () => {
+  const showManageSubscriptionFallback = async (showHelp = true) => {
     const didOpenSettings = await openStoreSubscriptionSettings();
-    if (!didOpenSettings) {
+    if (!didOpenSettings && showHelp) {
       Alert.alert(
         'Manage Subscription',
-        'Open your App Store or Google Play account subscription settings to manage billing.'
+        Platform.OS === 'ios'
+          ? 'Open your App Store account subscription settings to manage billing. For sandbox testing, use Settings > Developer > Sandbox Apple Account > Manage > Account Settings.'
+          : 'Open your Google Play account subscription settings to manage billing.'
       );
     }
   };
@@ -257,6 +259,10 @@ export default function SubscriptionScreen() {
     if (!didOpenCustomerCenter) {
       await showManageSubscriptionFallback();
     }
+  };
+
+  const handleOpenSubscriptionSettings = async () => {
+    await showManageSubscriptionFallback(false);
   };
 
   const handleRestore = async () => {
@@ -496,6 +502,15 @@ export default function SubscriptionScreen() {
             <Text style={styles.secondaryButtonText}>Manage Subscription</Text>
           </TouchableOpacity>
 
+          {Platform.OS === 'ios' && canManageAccountSubscription && (
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => void handleOpenSubscriptionSettings()}
+            >
+              <Text style={styles.secondaryButtonText}>Open App Store Settings</Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={styles.termsText}>
             Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period.
             You will be charged {selectedPlan === 'yearly' ? `${getYearlyPrice()}/year` : `${getMonthlyPrice()}/month`} to your Apple or Google account.
@@ -509,6 +524,11 @@ export default function SubscriptionScreen() {
             </Text>
             .
           </Text>
+          {Platform.OS === 'ios' && (
+            <Text style={styles.sandboxText}>
+              Sandbox testing: manage or reset test subscriptions in Settings {'>'} Developer {'>'} Sandbox Apple Account {'>'} Manage {'>'} Account Settings. You do not need to delete the app account.
+            </Text>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -828,6 +848,13 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     marginTop: 8,
+  },
+  sandboxText: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 12,
   },
   termsLink: {
     color: colors.primary,

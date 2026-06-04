@@ -24,9 +24,11 @@ export async function requestPhotoLibraryAccess(permissionMessage: string) {
   return true;
 }
 
-export async function pickSingleImage(_options?: Pick<ImagePicker.ImagePickerOptions, 'quality'>): Promise<PickedImageResult> {
+export async function pickSingleImage(options?: Pick<ImagePicker.ImagePickerOptions, 'quality'>): Promise<PickedImageResult> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
+    allowsMultipleSelection: false,
+    quality: options?.quality ?? 0.85,
   });
   return normalizeImagePickerResult(result);
 }
