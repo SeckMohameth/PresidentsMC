@@ -1,4 +1,6 @@
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import { deleteObject, getDownloadURL, ref, uploadBytes, uploadString } from 'firebase/storage';
 import { storage } from '@/utils/firebase';
 
 const IMAGE_READ_TIMEOUT_MS = 30_000;
@@ -29,23 +31,58 @@ export function getImageContentType(blobType?: string, path?: string) {
   return 'image/jpeg';
 }
 
-export async function uploadImageUri(uri: string, path: string) {
+export function isFirebaseStorageUri(uri?: string | null) {
+  if (!uri) return false;
+  return (
+    uri.startsWith('https://firebasestorage.googleapis.com/') ||
+    uri.includes('.firebasestorage.app/')
+  );
+}
+
+export async function uploadImageUri(uri: string, path: string, explicitContentType?: string | null) {
   if (!uri) return uri;
   if (isPersistedImageUri(uri)) return uri;
 
-  const blob = await withTimeout(uriToBlob(uri), IMAGE_READ_TIMEOUT_MS, 'Unable to read selected image.');
   const storageRef = ref(storage, path);
-  const contentType = getImageContentType(blob.type, path);
-  await withTimeout(
-    uploadBytes(storageRef, blob, { contentType }),
-    IMAGE_UPLOAD_TIMEOUT_MS,
-    'Image upload timed out. Please try a smaller photo or check your connection.'
-  );
+  if (Platform.OS === 'web') {
+    const blob = await withTimeout(uriToBlob(uri), IMAGE_READ_TIMEOUT_MS, 'Unable to read selected image.');
+    const contentType = getImageContentType(explicitContentType || blob.type, path);
+    await withTimeout(
+      uploadBytes(storageRef, blob, { contentType }),
+      IMAGE_UPLOAD_TIMEOUT_MS,
+      'Image upload timed out. Please try a smaller photo or check your connection.'
+    );
+  } else {
+    const base64 = await withTimeout(
+      FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 }),
+      IMAGE_READ_TIMEOUT_MS,
+      'Unable to read selected image.'
+    );
+    const contentType = getImageContentType(explicitContentType || undefined, path);
+    await withTimeout(
+      uploadString(storageRef, base64, 'base64', { contentType }),
+      IMAGE_UPLOAD_TIMEOUT_MS,
+      'Image upload timed out. Please try a smaller photo or check your connection.'
+    );
+  }
+
   return withTimeout(
     getDownloadURL(storageRef),
     IMAGE_READ_TIMEOUT_MS,
     'Unable to confirm uploaded image.'
   );
+}
+
+export async function deleteFirebaseStorageUri(uri?: string | null) {
+  if (!isFirebaseStorageUri(uri)) return;
+  try {
+    await deleteObject(ref(storage, uri));
+  } catch (error: any) {
+    const code = String(error?.code ?? '');
+    if (code !== 'storage/object-not-found') {
+      throw error;
+    }
+  }
 }
 
 function uriToBlob(uri: string) {

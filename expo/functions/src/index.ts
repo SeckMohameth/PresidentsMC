@@ -302,6 +302,7 @@ async function deleteUserPushTokens(userId: string) {
 
 async function anonymizeUserGeneratedContent(userId: string) {
   const rideSnapshotsPromise = adminDb.collectionGroup('rides').get();
+  const albumSnapshotsPromise = adminDb.collectionGroup('albums').get();
   const announcementSnapshotsPromise = adminDb
     .collectionGroup('announcements')
     .where('authorId', '==', userId)
@@ -311,8 +312,9 @@ async function anonymizeUserGeneratedContent(userId: string) {
     .where('userId', '==', userId)
     .get();
 
-  const [rideSnapshots, announcementSnapshots, joinRequestSnapshots] = await Promise.all([
+  const [rideSnapshots, albumSnapshots, announcementSnapshots, joinRequestSnapshots] = await Promise.all([
     rideSnapshotsPromise,
+    albumSnapshotsPromise,
     announcementSnapshotsPromise,
     joinRequestSnapshotsPromise,
   ]);
@@ -363,6 +365,34 @@ async function anonymizeUserGeneratedContent(userId: string) {
 
     if (Object.keys(rideUpdate).length > 0) {
       await queueUpdate(docSnap.ref, rideUpdate);
+    }
+  }
+
+  for (const docSnap of albumSnapshots.docs) {
+    const album = docSnap.data() as Record<string, any>;
+    const photos = Array.isArray(album.photos) ? album.photos : [];
+    const nextPhotos = photos.map((photo) =>
+      photo?.uploadedBy === userId
+        ? {
+            ...photo,
+            uploadedBy: null,
+            uploadedByName: FORMER_MEMBER_NAME,
+          }
+        : photo
+    );
+
+    const albumUpdate: Record<string, unknown> = {};
+    if (album.createdBy === userId) {
+      albumUpdate.createdBy = null;
+      albumUpdate.createdByName = FORMER_MEMBER_NAME;
+    }
+
+    if (JSON.stringify(nextPhotos) !== JSON.stringify(photos)) {
+      albumUpdate.photos = nextPhotos;
+    }
+
+    if (Object.keys(albumUpdate).length > 0) {
+      await queueUpdate(docSnap.ref, albumUpdate);
     }
   }
 

@@ -48,7 +48,7 @@ function getInviteExpirationLabel(expiresAt: string | null) {
 function getDevErrorMessage(error: any) {
   if (!__DEV__) return '';
   const code = error?.code ? ` (${String(error.code)})` : '';
-  const message = error?.message ? String(error.message) : 'Unknown Firebase error';
+  const message = error?.message ? String(error.message) : 'Unknown error';
   return `\n\nDev details${code}: ${message}`;
 }
 

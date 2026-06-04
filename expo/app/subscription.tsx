@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -90,14 +91,47 @@ export default function SubscriptionScreen() {
   const getYearlyPrice = () => FALLBACK_YEARLY_PRICE;
   const getYearlyMonthlyPrice = () => FALLBACK_YEARLY_MONTHLY_PRICE;
   const isDeveloperSupport = currentUser?.isDeveloperSupport === true;
+  const hasAccountSubscription = crewAdminStatus === 'active' || crewAdminStatus === 'trialing';
   const isSubscriptionCoveredByClub = isSubscriptionActive && crew?.subscriptionOwnerId !== currentUser?.id;
   const canManageOwnSubscription = !isDeveloperSupport && isSubscriptionActive && crew?.subscriptionOwnerId === currentUser?.id;
+  const canManageAccountSubscription = hasAccountSubscription;
 
   const openExternalLink = async (url: string) => {
     try {
       await Linking.openURL(url);
     } catch {
       Alert.alert('Unable to open link', 'Please try again.');
+    }
+  };
+
+  const openStoreSubscriptionSettings = async () => {
+    const urls =
+      Platform.OS === 'ios'
+        ? ['itms-apps://apps.apple.com/account/subscriptions', 'https://apps.apple.com/account/subscriptions']
+        : Platform.OS === 'android'
+          ? ['https://play.google.com/store/account/subscriptions']
+          : ['https://apps.apple.com/account/subscriptions'];
+
+    for (const url of urls) {
+      try {
+        const canOpen = await Linking.canOpenURL(url);
+        if (!canOpen && url.startsWith('itms-apps://')) continue;
+        await Linking.openURL(url);
+        return true;
+      } catch {
+        // Try the next platform fallback.
+      }
+    }
+    return false;
+  };
+
+  const showManageSubscriptionFallback = async () => {
+    const didOpenSettings = await openStoreSubscriptionSettings();
+    if (!didOpenSettings) {
+      Alert.alert(
+        'Manage Subscription',
+        'Open your App Store or Google Play account subscription settings to manage billing.'
+      );
     }
   };
 
@@ -123,25 +157,24 @@ export default function SubscriptionScreen() {
       Alert.alert('Admins Only', 'Only club admins can manage the club subscription.');
       return;
     }
-    if (isDeveloperSupport) {
-      Alert.alert(
-        'Developer Support',
-        'This support account can test the app, but it cannot own the club subscription.'
-      );
+    if (canManageAccountSubscription) {
+      if (!isDeveloperSupport && !isSubscriptionActive && (crewAdminStatus === 'active' || crewAdminStatus === 'trialing')) {
+        try {
+          await syncClubSubscription(crewAdminStatus);
+        } catch (syncError) {
+          if (__DEV__) {
+            console.log('[Subscription] Club subscription sync before manage failed:', syncError);
+          }
+        }
+      }
+      const didOpenCustomerCenter = await presentCustomerCenter();
+      if (!didOpenCustomerCenter) {
+        await showManageSubscriptionFallback();
+      }
       return;
     }
     if (isSubscriptionCoveredByClub) {
       Alert.alert('Club Covered', 'Another admin already covers this club subscription.');
-      return;
-    }
-    if (canManageOwnSubscription) {
-      const didOpenCustomerCenter = await presentCustomerCenter();
-      if (!didOpenCustomerCenter) {
-        Alert.alert(
-          'Manage Subscription',
-          'Your subscription is active. Subscription management is unavailable in this build right now. Use your App Store account subscription settings to manage billing.'
-        );
-      }
       return;
     }
     if (!isEnabled) {
@@ -222,10 +255,7 @@ export default function SubscriptionScreen() {
   const handleManageSubscription = async () => {
     const didOpenCustomerCenter = await presentCustomerCenter();
     if (!didOpenCustomerCenter) {
-      Alert.alert(
-        'Manage Subscription',
-        'Subscription management is unavailable in this build right now. Use your App Store account subscription settings to manage billing.'
-      );
+      await showManageSubscriptionFallback();
     }
   };
 
@@ -248,15 +278,17 @@ export default function SubscriptionScreen() {
   };
 
   const isBusy = isPurchasing || isPresentingPaywall || isLoading;
+  const hasDeveloperOnlySubscription = isDeveloperSupport && hasAccountSubscription && !isSubscriptionActive;
+  const hasUnsyncedAccountSubscription = !isDeveloperSupport && hasAccountSubscription && !isSubscriptionActive;
   const statusLabel =
     isSubscriptionCoveredByClub
       ? 'Covered by another admin'
       : isSubscriptionActive
         ? 'Club subscription active'
-        : crewAdminStatus === 'trialing'
-          ? 'Trial active'
-          : crewAdminStatus === 'active'
-            ? 'Subscription active'
+        : hasDeveloperOnlySubscription
+          ? 'Developer subscription cannot unlock club'
+          : hasUnsyncedAccountSubscription
+            ? 'Account subscription active - club sync needed'
             : 'Subscription inactive';
 
   if (!(isAdmin || isOfficer)) {
@@ -325,9 +357,25 @@ export default function SubscriptionScreen() {
           </Animated.View>
 
           <View style={styles.statusBadge}>
-            <Check size={16} color={isSubscriptionActive || crewAdminStatus !== 'inactive' ? colors.success : colors.textTertiary} />
+            <Check size={16} color={isSubscriptionActive ? colors.success : colors.textTertiary} />
             <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
+          {hasDeveloperOnlySubscription && (
+            <View style={styles.coveredNotice}>
+              <Text style={styles.coveredNoticeTitle}>Developer account cannot activate the club</Text>
+              <Text style={styles.coveredNoticeText}>
+                This account can test the app and billing, but a regular admin or officer must own the club subscription.
+              </Text>
+            </View>
+          )}
+          {hasUnsyncedAccountSubscription && (
+            <View style={styles.coveredNotice}>
+              <Text style={styles.coveredNoticeTitle}>Club access is not synced yet</Text>
+              <Text style={styles.coveredNoticeText}>
+                Your account has an active subscription, but the club record has not been updated. Tap Restore Purchases to sync access.
+              </Text>
+            </View>
+          )}
           {isSubscriptionCoveredByClub && (
             <View style={styles.coveredNotice}>
               <Text style={styles.coveredNoticeTitle}>No purchase needed</Text>
@@ -419,11 +467,15 @@ export default function SubscriptionScreen() {
               <Text style={styles.subscribeButtonText}>
                 {canManageOwnSubscription
                   ? 'Manage Subscription'
-                  : isSubscriptionCoveredByClub
-                    ? 'Club Covered'
-                    : selectedPlan === 'yearly'
-                      ? 'Subscribe Yearly'
-                      : 'Subscribe Monthly'}
+                  : canManageAccountSubscription
+                    ? isDeveloperSupport
+                      ? 'Manage Test Subscription'
+                      : 'Manage Subscription'
+                    : isSubscriptionCoveredByClub
+                      ? 'Club Covered'
+                      : selectedPlan === 'yearly'
+                        ? 'Subscribe Yearly'
+                        : 'Subscribe Monthly'}
               </Text>
             )}
           </TouchableOpacity>
@@ -439,7 +491,7 @@ export default function SubscriptionScreen() {
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={() => void handleManageSubscription()}
-            disabled={!isEnabled || !canManageOwnSubscription}
+            disabled={!isEnabled || !canManageAccountSubscription}
           >
             <Text style={styles.secondaryButtonText}>Manage Subscription</Text>
           </TouchableOpacity>

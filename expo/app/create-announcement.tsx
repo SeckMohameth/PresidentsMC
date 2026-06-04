@@ -24,8 +24,14 @@ function getAnnouncementSaveErrorMessage(error: unknown, action: 'post' | 'save'
       : String((error as any)?.message ?? '');
   const devDetails = __DEV__ && message ? `\n\nDev details${code ? ` (${code})` : ''}: ${message}` : '';
 
-  if (code === 'storage/unauthorized' || message.includes('storage/unauthorized')) {
-    return `Your account must be an admin or officer in this club to upload announcement images. If you were just promoted, sign out and back in, then make sure Firebase Storage rules have been deployed.${devDetails}`;
+  if (
+    code === 'storage/unauthorized' ||
+    code === 'permission-denied' ||
+    message.includes('storage/unauthorized') ||
+    message.includes('permission-denied') ||
+    message.includes('NOT_AUTHORIZED')
+  ) {
+    return `Your account does not have permission to ${action} announcements yet. If you were just promoted, close and reopen the app, then try again.${devDetails}`;
   }
 
   if (
@@ -354,7 +360,7 @@ export default function CreateAnnouncementScreen() {
 
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>
-              This announcement will be visible to all crew members. Only admins and officers can post announcements.
+              This announcement will be visible to all crew members. Only authorized club leaders can post announcements.
             </Text>
           </View>
         </ScrollView>

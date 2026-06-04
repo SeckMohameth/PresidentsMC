@@ -306,22 +306,32 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     assertCanManageAnnouncements();
     const announcementsRef = collection(db, 'crews', crewId, 'announcements');
     const docRef = doc(announcementsRef);
-
-    let imageUrl = announcement.imageUrl;
-    if (imageUrl) {
-      imageUrl = await uploadImageIfNeeded(
-        imageUrl,
-        `crews/${crewId}/announcements/${docRef.id}.jpg`
-      );
-    }
+    const initialImageUrl = announcement.imageUrl;
 
     await setDoc(docRef, stripUndefined({
       ...announcement,
       id: docRef.id,
-      imageUrl: imageUrl || null,
+      imageUrl: null,
       likedBy: announcement.likedBy || [],
       createdAt: new Date().toISOString(),
     }));
+
+    let imageUrl = initialImageUrl;
+    if (imageUrl) {
+      try {
+        imageUrl = await uploadImageIfNeeded(
+          imageUrl,
+          `crews/${crewId}/announcements/${docRef.id}/image.jpg`
+        );
+        await updateDoc(docRef, stripUndefined({
+          imageUrl: imageUrl || null,
+          imageAttribution: announcement.imageAttribution ?? null,
+        }));
+      } catch (error) {
+        await deleteDoc(docRef).catch(() => undefined);
+        throw error;
+      }
+    }
 
     void trackAnalyticsEvent({
       eventName: 'announcement_create_success',
@@ -351,7 +361,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (imageUrl) {
       imageUrl = await uploadImageIfNeeded(
         imageUrl,
-        `crews/${crewId}/announcements/${announcementId}.jpg`
+        `crews/${crewId}/announcements/${announcementId}/image.jpg`
       );
     }
 
@@ -377,6 +387,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     if (!crewId) throw new Error('No crew');
     assertCanManageAnnouncements();
     await deleteStoragePath(`crews/${crewId}/announcements/${announcementId}.jpg`);
+    await deleteStoragePath(`crews/${crewId}/announcements/${announcementId}/image.jpg`);
     await deleteDoc(doc(db, 'crews', crewId, 'announcements', announcementId));
 
     void trackAnalyticsEvent({
@@ -1198,11 +1209,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     [announcements]
   );
   const getMemberById = useCallback((id: string) => {
-    const visibleMember = members.find((member) => member.id === id);
-    if (visibleMember) return visibleMember;
+    const crewMember = allMembers.find((member) => member.id === id);
+    if (crewMember) return crewMember;
     if (currentUser?.id === id) return currentUser;
     return undefined;
-  }, [currentUser, members]);
+  }, [allMembers, currentUser]);
   const getAlbumById = useCallback((id: string) => albums.find((album) => album.id === id), [albums]);
 
   return {

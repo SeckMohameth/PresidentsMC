@@ -33,6 +33,9 @@ export default function AlbumScreen() {
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
+  const [isLoadingMoreLibrary, setIsLoadingMoreLibrary] = useState(false);
+  const [libraryEndCursor, setLibraryEndCursor] = useState<string | undefined>();
+  const [libraryHasNextPage, setLibraryHasNextPage] = useState(false);
   const [libraryAssets, setLibraryAssets] = useState<MediaLibrary.Asset[]>([]);
   const [loadedPhotoIds, setLoadedPhotoIds] = useState<Set<string>>(() => new Set());
   const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(() => new Set());
@@ -78,6 +81,39 @@ export default function AlbumScreen() {
     );
   }
 
+  const loadLibraryAssets = async ({ after, reset }: { after?: string; reset?: boolean } = {}) => {
+    if (reset) {
+      setIsLoadingLibrary(true);
+    } else {
+      if (isLoadingMoreLibrary || !libraryHasNextPage) return;
+      setIsLoadingMoreLibrary(true);
+    }
+    try {
+      const result = await MediaLibrary.getAssetsAsync({
+        first: 90,
+        after,
+        mediaType: 'photo',
+        sortBy: [['creationTime', false]],
+      });
+
+      setLibraryAssets((current) => {
+        if (reset) return result.assets;
+        const seen = new Set(current.map((asset) => asset.id));
+        return [...current, ...result.assets.filter((asset) => !seen.has(asset.id))];
+      });
+      setLibraryEndCursor(result.endCursor);
+      setLibraryHasNextPage(result.hasNextPage);
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[Album] Photo library error:', error);
+      }
+      Alert.alert('Photo Error', 'Unable to open your photo library right now.');
+    } finally {
+      setIsLoadingLibrary(false);
+      setIsLoadingMoreLibrary(false);
+    }
+  };
+
   const handleAddPhoto = async () => {
     if (isAddingPhoto || isLoadingLibrary) return;
 
@@ -89,22 +125,19 @@ export default function AlbumScreen() {
         return;
       }
 
-      const result = await MediaLibrary.getAssetsAsync({
-        first: 90,
-        mediaType: 'photo',
-        sortBy: [['creationTime', false]],
-      });
-
-      setLibraryAssets(result.assets);
+      setLibraryAssets([]);
+      setLibraryEndCursor(undefined);
+      setLibraryHasNextPage(false);
       setIsLibraryOpen(true);
-    } catch (error) {
-      if (__DEV__) {
-        console.log('[Album] Photo library error:', error);
-      }
-      Alert.alert('Photo Error', 'Unable to open your photo library right now.');
+      await loadLibraryAssets({ reset: true });
     } finally {
       setIsLoadingLibrary(false);
     }
+  };
+
+  const loadMoreLibraryAssets = () => {
+    if (!libraryEndCursor) return;
+    loadLibraryAssets({ after: libraryEndCursor });
   };
 
   const handleSelectLibraryAsset = async (asset: MediaLibrary.Asset) => {
@@ -310,6 +343,8 @@ export default function AlbumScreen() {
             keyExtractor={(item) => item.id}
             numColumns={3}
             contentContainerStyle={styles.libraryGrid}
+            onEndReached={loadMoreLibraryAssets}
+            onEndReachedThreshold={0.7}
             renderItem={({ item }) => (
               <Pressable
                 style={styles.libraryAsset}
@@ -323,6 +358,13 @@ export default function AlbumScreen() {
               <View style={styles.libraryEmpty}>
                 <Text style={styles.emptyDescription}>No photos found.</Text>
               </View>
+            }
+            ListFooterComponent={
+              isLoadingMoreLibrary ? (
+                <View style={styles.libraryFooter}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : null
             }
           />
           {isAddingPhoto ? (
@@ -616,6 +658,11 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   },
   libraryEmpty: {
     minHeight: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  libraryFooter: {
+    paddingVertical: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

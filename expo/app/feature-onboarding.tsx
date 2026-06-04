@@ -65,7 +65,7 @@ const slides: FeatureSlide[] = [
     title: 'Built for one club, not the whole internet.',
     body: 'Members request access first. Admins approve who gets in and can manage roles as the club grows.',
     icon: Shield,
-    bullets: ['Invite and approval flow', 'Admin, officer, member roles', 'Private Firestore and Storage rules'],
+    bullets: ['Invite and approval flow', 'Admin, officer, member roles', 'Private club access controls'],
   },
 ];
 

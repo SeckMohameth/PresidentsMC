@@ -66,6 +66,28 @@ async function seedData() {
         hasOnboarded: true,
         lastActiveAt: now,
       }),
+      setDoc(doc(db, 'users', 'dev'), {
+        id: 'dev',
+        email: 'dev@example.com',
+        name: 'Developer Support',
+        avatar: '',
+        role: 'admin',
+        crewId: 'crewDev',
+        preferences: { pushEnabled: true },
+        hasOnboarded: true,
+        lastActiveAt: now,
+      }),
+      setDoc(doc(db, 'users', 'mirrorAdmin'), {
+        id: 'mirrorAdmin',
+        email: 'mirror-admin@example.com',
+        name: 'Mirror Admin',
+        avatar: '',
+        role: 'admin',
+        crewId: 'crewA',
+        preferences: { pushEnabled: true },
+        hasOnboarded: true,
+        lastActiveAt: now,
+      }),
       setDoc(doc(db, 'crews', 'crewA'), {
         id: 'crewA',
         name: 'Alpha Crew',
@@ -104,6 +126,25 @@ async function seedData() {
         purgeAt: null,
         createdAt: now,
       }),
+      setDoc(doc(db, 'crews', 'crewDev'), {
+        id: 'crewDev',
+        name: 'Developer Crew',
+        description: 'Inactive crew for support testing',
+        nameLower: 'developer crew',
+        ownerId: 'dev',
+        subscriptionOwnerId: null,
+        subscriptionStatus: 'inactive',
+        status: 'active',
+        isDiscoverable: false,
+        requiresApproval: true,
+        memberCount: 1,
+        totalRides: 0,
+        totalMiles: 0,
+        totalPhotos: 0,
+        archivedAt: null,
+        purgeAt: null,
+        createdAt: now,
+      }),
       setDoc(doc(db, 'crews', 'crewA', 'members', 'alice'), {
         id: 'alice',
         email: 'alice@example.com',
@@ -128,12 +169,29 @@ async function seedData() {
         role: 'member',
         joinedCrewAt: now,
       }),
+      setDoc(doc(db, 'crews', 'crewA', 'members', 'mirrorAdmin'), {
+        id: 'mirrorAdmin',
+        email: 'mirror-admin@example.com',
+        name: 'Mirror Admin',
+        avatar: '',
+        role: 'member',
+        joinedCrewAt: now,
+      }),
       setDoc(doc(db, 'crews', 'crewPrivate', 'members', 'alice'), {
         id: 'alice',
         email: 'alice@example.com',
         name: 'Alice',
         avatar: '',
         role: 'admin',
+        joinedCrewAt: now,
+      }),
+      setDoc(doc(db, 'crews', 'crewDev', 'members', 'dev'), {
+        id: 'dev',
+        email: 'dev@example.com',
+        name: 'Developer Support',
+        avatar: '',
+        role: 'admin',
+        isDeveloperSupport: true,
         joinedCrewAt: now,
       }),
       setDoc(doc(db, 'crews', 'crewA', 'private', 'settings'), {
@@ -163,6 +221,19 @@ async function seedData() {
         checkedIn: [],
         status: 'upcoming',
         photos: [],
+      }),
+      setDoc(doc(db, 'crews', 'crewA', 'announcements', 'annExisting'), {
+        id: 'annExisting',
+        crewId: 'crewA',
+        authorId: 'alice',
+        authorName: 'Alice',
+        authorAvatar: '',
+        authorRole: 'admin',
+        title: 'Existing',
+        content: 'Existing announcement.',
+        isPinned: false,
+        imageUrl: null,
+        createdAt: now,
       }),
       uploadString(ref(storage, 'users/alice/avatar.jpg'), 'avatar'),
     ]);
@@ -215,6 +286,8 @@ test('discoverable crews are visible, private crews are not', async () => {
 test('leaders can write announcements, members cannot', async () => {
   const aliceDb = testEnv.authenticatedContext('alice').firestore();
   const caraDb = testEnv.authenticatedContext('cara').firestore();
+  const devDb = testEnv.authenticatedContext('dev').firestore();
+  const mirrorAdminDb = testEnv.authenticatedContext('mirrorAdmin').firestore();
 
   await assertSucceeds(
     setDoc(doc(aliceDb, 'crews', 'crewA', 'announcements', 'ann1'), {
@@ -226,6 +299,36 @@ test('leaders can write announcements, members cannot', async () => {
       authorRole: 'admin',
       title: 'Heads up',
       content: 'Bring fuel.',
+      isPinned: false,
+      createdAt: now,
+    })
+  );
+
+  await assertSucceeds(
+    setDoc(doc(devDb, 'crews', 'crewDev', 'announcements', 'ann-dev'), {
+      id: 'ann-dev',
+      crewId: 'crewDev',
+      authorId: 'dev',
+      authorName: 'Developer Support',
+      authorAvatar: '',
+      authorRole: 'admin',
+      title: 'Support test',
+      content: 'Testing announcement access.',
+      isPinned: false,
+      createdAt: now,
+    })
+  );
+
+  await assertSucceeds(
+    setDoc(doc(mirrorAdminDb, 'crews', 'crewA', 'announcements', 'ann-mirror'), {
+      id: 'ann-mirror',
+      crewId: 'crewA',
+      authorId: 'mirrorAdmin',
+      authorName: 'Mirror Admin',
+      authorAvatar: '',
+      authorRole: 'admin',
+      title: 'Mirror admin',
+      content: 'User role can recover stale member role.',
       isPinned: false,
       createdAt: now,
     })
@@ -268,6 +371,50 @@ test('members can update ride attendance but not protected ride fields', async (
     })
   );
   await assertFails(updateDoc(rideRef, { title: 'Hijacked title' }));
+});
+
+test('developer support can test paid features without activating subscription', async () => {
+  const devDb = testEnv.authenticatedContext('dev').firestore();
+  const devStorage = testEnv.authenticatedContext('dev').storage();
+
+  await assertSucceeds(
+    setDoc(doc(devDb, 'crews', 'crewDev', 'rides', 'devRide'), {
+      id: 'devRide',
+      crewId: 'crewDev',
+      title: 'Support Ride',
+      description: 'Testing paid access without subscription ownership.',
+      dateTime: now,
+      estimatedDuration: '1h',
+      estimatedDistance: 12,
+      pace: 'moderate',
+      notes: '',
+      coverImage: '',
+      createdBy: 'dev',
+      createdByName: 'Developer Support',
+      attendees: [],
+      checkedIn: [],
+      status: 'upcoming',
+      photos: [],
+    })
+  );
+  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/rides/devRide/cover.jpg'), 'cover'));
+  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/rides/devRide/photos/photo1.jpg'), 'photo'));
+  await assertSucceeds(
+    setDoc(doc(devDb, 'crews', 'crewDev', 'albums', 'devAlbum'), {
+      id: 'devAlbum',
+      crewId: 'crewDev',
+      title: 'Support Album',
+      description: '',
+      coverImage: '',
+      createdBy: 'dev',
+      createdByName: 'Developer Support',
+      createdAt: now,
+      updatedAt: now,
+      photos: [],
+    })
+  );
+  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/cover.jpg'), 'cover'));
+  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/photos/photo1.jpg'), 'photo'));
 });
 
 test('join requests are requester-created and leader-readable', async () => {
@@ -317,11 +464,17 @@ test('storage rules enforce self-only avatars and crew role-based uploads', asyn
   const aliceStorage = testEnv.authenticatedContext('alice').storage();
   const caraStorage = testEnv.authenticatedContext('cara').storage();
   const dylanStorage = testEnv.authenticatedContext('dylan').storage();
+  const mirrorAdminStorage = testEnv.authenticatedContext('mirrorAdmin').storage();
 
   await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatar.jpg'), 'fresh-avatar'));
   await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatar.jpg'), 'nope'));
   await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatars/avatar-123.jpg'), 'fresh-avatar'));
   await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatars/avatar-123.jpg'), 'nope'));
+  await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/announcements/old-path.jpg'), 'announcement'));
+  await assertFails(uploadString(ref(dylanStorage, 'crews/crewA/announcements/old-path.jpg'), 'announcement'));
+  await assertSucceeds(uploadString(ref(mirrorAdminStorage, 'crews/crewA/announcements/mirror-path.jpg'), 'announcement'));
+  await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/announcements/annExisting/image.jpg'), 'announcement'));
+  await assertFails(uploadString(ref(caraStorage, 'crews/crewA/announcements/annExisting/image.jpg'), 'announcement'));
   await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover'));
   await assertFails(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover'));
   await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/photos/photo1.jpg'), 'photo'));

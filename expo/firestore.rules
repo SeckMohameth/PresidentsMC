@@ -18,6 +18,10 @@ service cloud.firestore {
       return /databases/$(database)/documents/crews/$(crewId)/members/$(userId);
     }
 
+    function userPath(userId) {
+      return /databases/$(database)/documents/users/$(userId);
+    }
+
     function crewDoc(crewId) {
       return get(crewPath(crewId));
     }
@@ -26,13 +30,33 @@ service cloud.firestore {
       return signedIn() && exists(memberPath(crewId, request.auth.uid));
     }
 
+    function isCrewUser(crewId) {
+      return signedIn()
+        && exists(userPath(request.auth.uid))
+        && get(userPath(request.auth.uid)).data.crewId == crewId;
+    }
+
+    function isCrewParticipant(crewId) {
+      return isCrewMember(crewId) || isCrewUser(crewId);
+    }
+
     function isCrewOwner(crewId) {
-      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
+      return isCrewParticipant(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
     }
 
     function isCrewLeader(crewId) {
+      return (
+        isCrewMember(crewId)
+        && ['admin', 'officer'].hasAny([get(memberPath(crewId, request.auth.uid)).data.role])
+      ) || (
+        isCrewUser(crewId)
+        && ['admin', 'officer'].hasAny([get(userPath(request.auth.uid)).data.role])
+      );
+    }
+
+    function isDeveloperSupport(crewId) {
       return isCrewMember(crewId)
-        && ['admin', 'officer'].hasAny([get(memberPath(crewId, request.auth.uid)).data.role]);
+        && get(memberPath(crewId, request.auth.uid)).data.isDeveloperSupport == true;
     }
 
     function hasCrewPermission(crewId, permission) {
@@ -41,19 +65,19 @@ service cloud.firestore {
     }
 
     function canManageAnnouncements(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAnnouncements');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAnnouncements');
     }
 
     function canManageRides(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageRides');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageRides');
     }
 
     function canManageAlbums(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAlbums');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAlbums');
     }
 
     function canManageJoinRequests(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageJoinRequests');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageJoinRequests');
     }
 
     function hasActiveSubscription(crewId) {
@@ -62,6 +86,10 @@ service cloud.firestore {
         && ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus])
         && exists(memberPath(crewId, ownerId))
         && get(memberPath(crewId, ownerId)).data.isDeveloperSupport != true;
+    }
+
+    function hasPaidFeatureAccess(crewId) {
+      return isDeveloperSupport(crewId) || hasActiveSubscription(crewId);
     }
 
     function isSubscriptionActivation(crewId) {
@@ -111,7 +139,7 @@ service cloud.firestore {
     }
 
     match /crews/{crewId} {
-      allow read: if isCrewMember(crewId)
+      allow read: if isCrewParticipant(crewId)
         || (resource.data.isDiscoverable == true && resource.data.status == 'active');
       allow create: if signedIn()
         && request.resource.data.id == crewId
@@ -138,7 +166,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /members/{memberId} {
-        allow read: if isCrewMember(crewId);
+        allow read: if isCrewParticipant(crewId);
         allow create: if isSelf(memberId)
           && crewDoc(crewId).data.ownerId == request.auth.uid
           && request.resource.data.id == request.auth.uid
@@ -174,15 +202,15 @@ service cloud.firestore {
       }
 
       match /announcements/{announcementId} {
-        allow read: if isCrewMember(crewId);
+        allow read: if isCrewParticipant(crewId);
         allow create, update, delete: if canManageAnnouncements(crewId);
       }
 
       match /rides/{rideId} {
-        allow read: if isCrewMember(crewId);
-        allow create, delete: if canManageRides(crewId) && hasActiveSubscription(crewId);
-        allow update: if (canManageRides(crewId) && hasActiveSubscription(crewId))
-          || (isCrewMember(crewId) && hasActiveSubscription(crewId)
+        allow read: if isCrewParticipant(crewId);
+        allow create, delete: if canManageRides(crewId) && hasPaidFeatureAccess(crewId);
+        allow update: if (canManageRides(crewId) && hasPaidFeatureAccess(crewId))
+          || (isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'attendees',
               'checkedIn',
@@ -191,10 +219,10 @@ service cloud.firestore {
       }
 
       match /albums/{albumId} {
-        allow read: if isCrewMember(crewId);
-        allow create, delete: if canManageAlbums(crewId) && hasActiveSubscription(crewId);
-        allow update: if (canManageAlbums(crewId) && hasActiveSubscription(crewId))
-          || (isCrewMember(crewId) && hasActiveSubscription(crewId)
+        allow read: if isCrewParticipant(crewId);
+        allow create, delete: if canManageAlbums(crewId) && hasPaidFeatureAccess(crewId);
+        allow update: if (canManageAlbums(crewId) && hasPaidFeatureAccess(crewId))
+          || (isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'photos',
               'updatedAt'

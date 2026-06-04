@@ -68,6 +68,8 @@ export default function AnnouncementCard({ announcement, resolvedAuthorAvatar, o
               source={getAvatarSource(authorAvatar)}
               style={styles.avatar}
               contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={authorAvatar}
             />
           ) : (
             <View style={styles.avatarPlaceholder}>

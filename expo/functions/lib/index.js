@@ -171,6 +171,7 @@ async function deleteUserPushTokens(userId) {
 }
 async function anonymizeUserGeneratedContent(userId) {
     const rideSnapshotsPromise = adminDb.collectionGroup('rides').get();
+    const albumSnapshotsPromise = adminDb.collectionGroup('albums').get();
     const announcementSnapshotsPromise = adminDb
         .collectionGroup('announcements')
         .where('authorId', '==', userId)
@@ -179,8 +180,9 @@ async function anonymizeUserGeneratedContent(userId) {
         .collectionGroup('joinRequests')
         .where('userId', '==', userId)
         .get();
-    const [rideSnapshots, announcementSnapshots, joinRequestSnapshots] = await Promise.all([
+    const [rideSnapshots, albumSnapshots, announcementSnapshots, joinRequestSnapshots] = await Promise.all([
         rideSnapshotsPromise,
+        albumSnapshotsPromise,
         announcementSnapshotsPromise,
         joinRequestSnapshotsPromise,
     ]);
@@ -222,6 +224,28 @@ async function anonymizeUserGeneratedContent(userId) {
         }
         if (Object.keys(rideUpdate).length > 0) {
             await queueUpdate(docSnap.ref, rideUpdate);
+        }
+    }
+    for (const docSnap of albumSnapshots.docs) {
+        const album = docSnap.data();
+        const photos = Array.isArray(album.photos) ? album.photos : [];
+        const nextPhotos = photos.map((photo) => photo?.uploadedBy === userId
+            ? {
+                ...photo,
+                uploadedBy: null,
+                uploadedByName: FORMER_MEMBER_NAME,
+            }
+            : photo);
+        const albumUpdate = {};
+        if (album.createdBy === userId) {
+            albumUpdate.createdBy = null;
+            albumUpdate.createdByName = FORMER_MEMBER_NAME;
+        }
+        if (JSON.stringify(nextPhotos) !== JSON.stringify(photos)) {
+            albumUpdate.photos = nextPhotos;
+        }
+        if (Object.keys(albumUpdate).length > 0) {
+            await queueUpdate(docSnap.ref, albumUpdate);
         }
     }
     for (const docSnap of joinRequestSnapshots.docs) {

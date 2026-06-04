@@ -11,25 +11,49 @@ service firebase.storage {
     }
 
     function crewDoc(crewId) {
-      return firestore.get(/databases/(default)/documents/crews/$(crewId));
+      return firestore.get(/databases/default/documents/crews/$(crewId));
     }
 
     function crewMemberDoc(crewId, userId) {
-      return firestore.get(/databases/(default)/documents/crews/$(crewId)/members/$(userId));
+      return firestore.get(/databases/default/documents/crews/$(crewId)/members/$(userId));
+    }
+
+    function userDoc(userId) {
+      return firestore.get(/databases/default/documents/users/$(userId));
     }
 
     function isCrewMember(crewId) {
       return signedIn()
-        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(request.auth.uid));
+        && firestore.exists(/databases/default/documents/crews/$(crewId)/members/$(request.auth.uid));
+    }
+
+    function isCrewUser(crewId) {
+      return signedIn()
+        && firestore.exists(/databases/default/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).data.crewId == crewId;
+    }
+
+    function isCrewParticipant(crewId) {
+      return isCrewMember(crewId) || isCrewUser(crewId);
     }
 
     function isCrewOwner(crewId) {
-      return isCrewMember(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
+      return isCrewParticipant(crewId) && crewDoc(crewId).data.ownerId == request.auth.uid;
     }
 
     function isCrewLeader(crewId) {
+      return (
+        isCrewMember(crewId)
+        && ['admin', 'officer'].hasAny([crewMemberDoc(crewId, request.auth.uid).data.role])
+      ) || (
+        isCrewUser(crewId)
+        && ['admin', 'officer'].hasAny([userDoc(request.auth.uid).data.role])
+      );
+    }
+
+    function isDeveloperSupport(crewId) {
       return isCrewMember(crewId)
-        && ['admin', 'officer'].hasAny([crewMemberDoc(crewId, request.auth.uid).data.role]);
+        && crewMemberDoc(crewId, request.auth.uid).data.isDeveloperSupport == true;
     }
 
     function hasCrewPermission(crewId, permission) {
@@ -38,23 +62,40 @@ service firebase.storage {
     }
 
     function canManageAnnouncements(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAnnouncements');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAnnouncements');
     }
 
     function canManageRides(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageRides');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageRides');
     }
 
     function canManageAlbums(crewId) {
-      return isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAlbums');
+      return isDeveloperSupport(crewId) || isCrewLeader(crewId) || hasCrewPermission(crewId, 'manageAlbums');
     }
 
     function hasActiveSubscription(crewId) {
       let ownerId = crewDoc(crewId).data.subscriptionOwnerId;
       return ownerId is string
         && ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus])
-        && firestore.exists(/databases/(default)/documents/crews/$(crewId)/members/$(ownerId))
+        && firestore.exists(/databases/default/documents/crews/$(crewId)/members/$(ownerId))
         && crewMemberDoc(crewId, ownerId).data.isDeveloperSupport != true;
+    }
+
+    function hasPaidFeatureAccess(crewId) {
+      return isDeveloperSupport(crewId) || hasActiveSubscription(crewId);
+    }
+
+    function announcementDoc(crewId, announcementId) {
+      return firestore.get(/databases/default/documents/crews/$(crewId)/announcements/$(announcementId));
+    }
+
+    function canWriteAnnouncementImage(crewId, announcementId) {
+      return canManageAnnouncements(crewId)
+        || (
+          isCrewMember(crewId)
+          && firestore.exists(/databases/default/documents/crews/$(crewId)/announcements/$(announcementId))
+          && announcementDoc(crewId, announcementId).data.authorId == request.auth.uid
+        );
     }
 
     match /users/{userId}/avatar.jpg {
@@ -66,33 +107,38 @@ service firebase.storage {
     }
 
     match /crews/{crewId}/logo.jpg {
-      allow read: if isCrewMember(crewId);
+      allow read: if isCrewParticipant(crewId);
       allow write: if isCrewOwner(crewId) && crewDoc(crewId).data.status == 'active';
     }
 
     match /crews/{crewId}/announcements/{fileName} {
-      allow read: if isCrewMember(crewId);
-      allow write: if canManageAnnouncements(crewId);
+      allow read: if isCrewParticipant(crewId);
+      allow write: if isCrewParticipant(crewId);
+    }
+
+    match /crews/{crewId}/announcements/{announcementId}/{fileName} {
+      allow read: if isCrewParticipant(crewId);
+      allow write: if canWriteAnnouncementImage(crewId, announcementId);
     }
 
     match /crews/{crewId}/rides/{rideId}/cover.jpg {
-      allow read: if isCrewMember(crewId);
-      allow write: if canManageRides(crewId) && hasActiveSubscription(crewId);
+      allow read: if isCrewParticipant(crewId);
+      allow write: if canManageRides(crewId) && hasPaidFeatureAccess(crewId);
     }
 
     match /crews/{crewId}/rides/{rideId}/photos/{fileName} {
-      allow read: if isCrewMember(crewId);
-      allow write: if isCrewMember(crewId) && hasActiveSubscription(crewId);
+      allow read: if isCrewParticipant(crewId);
+      allow write: if isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId);
     }
 
     match /crews/{crewId}/albums/{albumId}/cover.jpg {
-      allow read: if isCrewMember(crewId);
-      allow write: if canManageAlbums(crewId) && hasActiveSubscription(crewId);
+      allow read: if isCrewParticipant(crewId);
+      allow write: if canManageAlbums(crewId) && hasPaidFeatureAccess(crewId);
     }
 
     match /crews/{crewId}/albums/{albumId}/photos/{fileName} {
-      allow read: if isCrewMember(crewId);
-      allow write: if isCrewMember(crewId) && hasActiveSubscription(crewId);
+      allow read: if isCrewParticipant(crewId);
+      allow write: if isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId);
     }
 
     match /{allPaths=**} {
