@@ -106,7 +106,7 @@ export default function FeatureOnboardingScreen() {
       return avatar;
     }
 
-    return uploadImageUri(avatar, `users/${user.id}/avatar.jpg`);
+    return uploadImageUri(avatar, `users/${user.id}/avatars/avatar-${Date.now()}.jpg`);
   };
 
   const complete = async () => {

@@ -320,6 +320,8 @@ test('storage rules enforce self-only avatars and crew role-based uploads', asyn
 
   await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatar.jpg'), 'fresh-avatar'));
   await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatar.jpg'), 'nope'));
+  await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatars/avatar-123.jpg'), 'fresh-avatar'));
+  await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatars/avatar-123.jpg'), 'nope'));
   await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover'));
   await assertFails(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover'));
   await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/photos/photo1.jpg'), 'photo'));

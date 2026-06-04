@@ -61,6 +61,10 @@ service firebase.storage {
       allow read, write: if isSelf(userId);
     }
 
+    match /users/{userId}/avatars/{fileName} {
+      allow read, write: if isSelf(userId);
+    }
+
     match /crews/{crewId}/logo.jpg {
       allow read: if isCrewMember(crewId);
       allow write: if isCrewOwner(crewId) && crewDoc(crewId).data.status == 'active';

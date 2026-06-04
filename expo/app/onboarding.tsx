@@ -23,7 +23,7 @@ export default function OnboardingScreen() {
     Animated.timing(logoOpacity, { toValue: 1, duration: 520, useNativeDriver: true }).start();
     Animated.timing(contentOpacity, { toValue: 1, duration: 620, delay: 120, useNativeDriver: true }).start();
     Animated.timing(buttonOpacity, { toValue: 1, duration: 620, delay: 260, useNativeDriver: true }).start();
-  }, []);
+  }, [buttonOpacity, contentOpacity, logoOpacity]);
 
   const getStarted = async () => {
     if (Platform.OS !== 'web') {

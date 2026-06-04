@@ -354,7 +354,7 @@ export default function MoreScreen() {
     try {
       let avatarUrl = editAvatar;
       if (avatarUrl && !avatarUrl.startsWith('http') && !isDefaultAvatar(avatarUrl) && user?.id) {
-        avatarUrl = await uploadImageUri(avatarUrl, `users/${user.id}/avatar.jpg`);
+        avatarUrl = await uploadImageUri(avatarUrl, `users/${user.id}/avatars/avatar-${Date.now()}.jpg`);
       }
       const normalizedBikes = editBikes
         .map((bike, index) => ({
