@@ -40,6 +40,8 @@ export type AnalyticsEventName =
   | 'announcement_delete_success'
   | 'announcement_like'
   | 'announcement_unlike'
+  | 'album_update_success'
+  | 'album_delete_success'
   | 'paywall_view'
   | 'purchase_intent'
   | 'purchase_success'

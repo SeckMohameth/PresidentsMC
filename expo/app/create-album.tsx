@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, ImagePlus, X } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
+import { getCoverImageSource } from '@/constants/coverImages';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 
 export default function CreateAlbumScreen() {
@@ -23,11 +24,21 @@ export default function CreateAlbumScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { createAlbum } = useCrew();
+  const { albumId } = useLocalSearchParams<{ albumId?: string }>();
+  const { createAlbum, updateAlbum, getAlbumById } = useCrew();
+  const isEditMode = Boolean(albumId);
+  const album = albumId ? getAlbumById(albumId) : undefined;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [coverImage, setCoverImage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isEditMode || !album) return;
+    setTitle(album.title ?? '');
+    setDescription(album.description ?? '');
+    setCoverImage(album.coverImage ?? '');
+  }, [album, isEditMode]);
 
   const pickCoverImage = async () => {
     const hasAccess = await requestPhotoLibraryAccess(
@@ -57,17 +68,22 @@ export default function CreateAlbumScreen() {
 
     setIsSaving(true);
     try {
-      const albumId = await createAlbum({
-        title,
-        description,
-        coverImage,
-      });
-      router.replace(`/album/${albumId}`);
+      if (isEditMode && albumId) {
+        await updateAlbum(albumId, { title, description });
+        router.back();
+      } else {
+        const newAlbumId = await createAlbum({
+          title,
+          description,
+          coverImage,
+        });
+        router.replace(`/album/${newAlbumId}`);
+      }
     } catch (error: any) {
       const message =
         error?.message === 'NOT_AUTHORIZED'
-          ? 'You do not have permission to create albums.'
-          : 'Unable to create this album right now.';
+          ? `You do not have permission to ${isEditMode ? 'edit' : 'create'} albums.`
+          : `Unable to ${isEditMode ? 'save' : 'create'} this album right now.`;
       Alert.alert('Error', message);
     } finally {
       setIsSaving(false);
@@ -80,13 +96,13 @@ export default function CreateAlbumScreen() {
         <Pressable style={styles.closeButton} onPress={() => router.back()}>
           <X size={24} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>New Album</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? 'Edit Album' : 'New Album'}</Text>
         <Pressable
           style={[styles.saveButton, (!title.trim() || isSaving) && styles.saveButtonDisabled]}
           onPress={saveAlbum}
           disabled={!title.trim() || isSaving}
         >
-          <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Create'}</Text>
+          <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : isEditMode ? 'Save' : 'Create'}</Text>
         </Pressable>
       </View>
 
@@ -95,21 +111,34 @@ export default function CreateAlbumScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Pressable style={styles.coverPicker} onPress={pickCoverImage}>
-            {coverImage ? (
-              <>
-                <Image source={{ uri: coverImage }} style={styles.coverImage} contentFit="cover" />
-                <View style={styles.coverOverlay}>
-                  <ImagePlus size={22} color="#FFFFFF" />
+          {isEditMode ? (
+            <View style={styles.coverPicker}>
+              {coverImage ? (
+                <Image source={getCoverImageSource(coverImage)} style={styles.coverImage} contentFit="cover" />
+              ) : (
+                <View style={styles.coverPlaceholder}>
+                  <Camera size={32} color={colors.textTertiary} />
+                  <Text style={styles.coverPlaceholderText}>No cover</Text>
                 </View>
-              </>
-            ) : (
-              <View style={styles.coverPlaceholder}>
-                <Camera size={32} color={colors.textTertiary} />
-                <Text style={styles.coverPlaceholderText}>Album cover</Text>
-              </View>
-            )}
-          </Pressable>
+              )}
+            </View>
+          ) : (
+            <Pressable style={styles.coverPicker} onPress={pickCoverImage}>
+              {coverImage ? (
+                <>
+                  <Image source={{ uri: coverImage }} style={styles.coverImage} contentFit="cover" />
+                  <View style={styles.coverOverlay}>
+                    <ImagePlus size={22} color="#FFFFFF" />
+                  </View>
+                </>
+              ) : (
+                <View style={styles.coverPlaceholder}>
+                  <Camera size={32} color={colors.textTertiary} />
+                  <Text style={styles.coverPlaceholderText}>Album cover</Text>
+                </View>
+              )}
+            </Pressable>
+          )}
 
           <Text style={styles.label}>Title</Text>
           <TextInput

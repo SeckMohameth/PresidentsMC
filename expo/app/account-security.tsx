@@ -62,7 +62,10 @@ export default function AccountSecurityScreen() {
     setIsSendingReset(true);
     try {
       await resetPassword(email);
-      Alert.alert('Email Sent', `Password reset email sent to ${email}.`);
+      Alert.alert(
+        'Email Sent',
+        `Password reset email sent to ${email}. If you do not see it in your inbox, check your junk or spam folder.`
+      );
     } catch (error) {
       Alert.alert('Error', mapAuthError(error));
     } finally {

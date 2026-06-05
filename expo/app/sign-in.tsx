@@ -22,7 +22,7 @@ import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useAuth } from '@/providers/AuthProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
 
-const authBackgroundImage = require('../assets/images/auth.jpg');
+const authBackgroundImage = require('../assets/images/auth-login.jpg');
 const ADMIN_SUPPORT_EMAIL = 'mohameth@mostudios.io';
 const ADMIN_SUPPORT_URL = 'https://www.mostudios.io/support';
 
@@ -110,7 +110,7 @@ export default function SignInScreen() {
               await resetPassword(trimmedEmail);
               Alert.alert(
                 'Email Sent',
-                'Check your inbox for a password reset link. It may take a few minutes to arrive.',
+                'Check your inbox for a password reset link. It may take a few minutes to arrive, and you may need to check your junk or spam folder.',
               );
             } catch (error: any) {
               if (__DEV__) {
@@ -232,7 +232,7 @@ export default function SignInScreen() {
             </View>
 
             <View style={styles.adminSupport}>
-              <Text style={styles.adminSupportText}>Club admin?</Text>
+              <Text style={styles.adminSupportText}>Running a club? Reach the developer anytime —</Text>
               <TouchableOpacity onPress={() => void openExternalLink(`mailto:${ADMIN_SUPPORT_EMAIL}`)}>
                 <Text style={styles.adminSupportLink}>{ADMIN_SUPPORT_EMAIL}</Text>
               </TouchableOpacity>

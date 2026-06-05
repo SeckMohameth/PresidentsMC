@@ -1126,6 +1126,52 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     await deleteStoragePath(`crews/${crewId}/albums/${albumId}/photos/${photo.id}.jpg`);
   }, [albums, canManageAlbums, crewId]);
 
+  const updateAlbum = useCallback(async (
+    albumId: string,
+    updates: { title?: string; description?: string }
+  ) => {
+    if (!crewId) throw new Error('No crew');
+    if (!canManageAlbums) throw new Error('NOT_AUTHORIZED');
+
+    await updateDoc(doc(db, 'crews', crewId, 'albums', albumId), stripUndefined({
+      title: updates.title?.trim(),
+      description: updates.description?.trim() ?? undefined,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    void trackAnalyticsEvent({
+      eventName: 'album_update_success',
+      actorUserId: currentUser?.id ?? null,
+      crewId,
+      route: `/album/${albumId}`,
+      properties: { albumId },
+    });
+  }, [canManageAlbums, crewId, currentUser?.id]);
+
+  const deleteAlbum = useCallback(async (albumId: string) => {
+    if (!crewId) throw new Error('No crew');
+    if (!canManageAlbums) throw new Error('NOT_AUTHORIZED');
+    const album = albums.find((item) => item.id === albumId);
+
+    // Remove every stored photo and the cover before deleting the album document
+    // so we don't leave orphaned files in Storage.
+    await Promise.all([
+      deleteStoragePath(`crews/${crewId}/albums/${albumId}/cover.jpg`),
+      ...(album?.photos || []).map((photo) =>
+        deleteStoragePath(`crews/${crewId}/albums/${albumId}/photos/${photo.id}.jpg`)
+      ),
+    ]);
+    await deleteDoc(doc(db, 'crews', crewId, 'albums', albumId));
+
+    void trackAnalyticsEvent({
+      eventName: 'album_delete_success',
+      actorUserId: currentUser?.id ?? null,
+      crewId,
+      route: '/(tabs)',
+      properties: { albumId, photoCount: album?.photos?.length ?? 0 },
+    });
+  }, [albums, canManageAlbums, crewId, currentUser?.id]);
+
   const upcomingRides = useMemo(() =>
     rides
       .filter((ride) => ride.status === 'upcoming')
@@ -1267,6 +1313,8 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
     addPhoto,
     deleteRidePhoto,
     createAlbum,
+    updateAlbum,
+    deleteAlbum,
     addAlbumPhoto,
     deleteAlbumPhoto,
     removeMember,

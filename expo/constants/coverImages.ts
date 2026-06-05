@@ -56,6 +56,36 @@ export const COVER_IMAGE_PRESETS: CoverImagePreset[] = [
     fileName: 'meetup.jpg',
     source: require('../assets/images/custom-images/optimized/meetup.jpg'),
   },
+  {
+    id: 'almani-axtykemjih4',
+    label: 'Deluxe',
+    fileName: 'deluxe.jpg',
+    source: require('../assets/images/custom-images/optimized/deluxe.jpg'),
+  },
+  {
+    id: 'gijs-coolen-crmcbeinxtg',
+    label: 'Rider POV',
+    fileName: 'rider-pov.jpg',
+    source: require('../assets/images/custom-images/optimized/rider-pov.jpg'),
+  },
+  {
+    id: 'harley-davidson-1hzcjjdtc9g',
+    label: 'Sunset',
+    fileName: 'sunset.jpg',
+    source: require('../assets/images/custom-images/optimized/sunset.jpg'),
+  },
+  {
+    id: 'harley-davidson-qd6gvrdfpaa',
+    label: 'Pack',
+    fileName: 'pack.jpg',
+    source: require('../assets/images/custom-images/optimized/pack.jpg'),
+  },
+  {
+    id: 'jan-kopriva-c2cw2tssvrc',
+    label: 'Ducati',
+    fileName: 'ducati.jpg',
+    source: require('../assets/images/custom-images/optimized/ducati.jpg'),
+  },
 ];
 
 export const DEFAULT_RIDE_COVER_PRESET_ID = 'jan-kopriva-aby36io-q48';

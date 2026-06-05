@@ -5,7 +5,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, Camera, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, X, Camera, Plus, Trash2, Pencil } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
@@ -21,6 +21,7 @@ export default function AlbumScreen() {
     addAlbumPhoto,
     deleteRidePhoto,
     deleteAlbumPhoto,
+    deleteAlbum,
     getAlbumById,
     canManageRides,
     canManageAlbums,
@@ -31,6 +32,7 @@ export default function AlbumScreen() {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [isDeletingAlbum, setIsDeletingAlbum] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [isLoadingMoreLibrary, setIsLoadingMoreLibrary] = useState(false);
@@ -223,6 +225,51 @@ export default function AlbumScreen() {
     ]);
   };
 
+  // Edit/delete apply only to crew albums (ride albums are managed from the ride).
+  const canManageThisAlbum = !isRideAlbum && !!album && canManageAlbums;
+
+  const handleEditAlbum = () => {
+    if (!album) return;
+    router.push(`/create-album?albumId=${album.id}`);
+  };
+
+  const handleDeleteAlbum = () => {
+    if (!album || isDeletingAlbum) return;
+    const photoCount = album.photos?.length ?? 0;
+    Alert.alert(
+      'Delete Album',
+      photoCount > 0
+        ? `This permanently deletes "${album.title}" and all ${photoCount} photo${photoCount === 1 ? '' : 's'} in it. This cannot be undone.`
+        : `This permanently deletes "${album.title}". This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Album',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeletingAlbum(true);
+            try {
+              await deleteAlbum(album.id);
+              router.back();
+            } catch (error) {
+              if (__DEV__) {
+                console.log('[Album] Album delete error:', error);
+              }
+              const message = String((error as any)?.message ?? '');
+              Alert.alert(
+                'Delete Failed',
+                message.includes('NOT_AUTHORIZED')
+                  ? 'You do not have permission to delete this album.'
+                  : 'Unable to delete this album right now.'
+              );
+              setIsDeletingAlbum(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderPhoto = ({ item, index }: { item: RidePhoto; index: number }) => {
     const isLoaded = loadedPhotoIds.has(item.id);
     const didFail = failedPhotoIds.has(item.id);
@@ -274,13 +321,25 @@ export default function AlbumScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
           <Text style={styles.headerSubtitle}>{formatDate(date)} • {photos.length} photos</Text>
         </View>
-        <Pressable
-          style={[styles.addButton, (isAddingPhoto || isLoadingLibrary) && styles.disabledButton]}
-          onPress={handleAddPhoto}
-          disabled={isAddingPhoto || isLoadingLibrary}
-        >
-          {isLoadingLibrary ? <ActivityIndicator color={colors.onPrimary} /> : <Plus size={20} color={colors.onPrimary} />}
-        </Pressable>
+        <View style={styles.headerActions}>
+          {canManageThisAlbum && (
+            <>
+              <Pressable style={styles.iconButton} onPress={handleEditAlbum} disabled={isDeletingAlbum}>
+                <Pencil size={20} color={colors.text} />
+              </Pressable>
+              <Pressable style={styles.iconButton} onPress={handleDeleteAlbum} disabled={isDeletingAlbum}>
+                {isDeletingAlbum ? <ActivityIndicator color={colors.error} /> : <Trash2 size={20} color={colors.error} />}
+              </Pressable>
+            </>
+          )}
+          <Pressable
+            style={[styles.addButton, (isAddingPhoto || isLoadingLibrary) && styles.disabledButton]}
+            onPress={handleAddPhoto}
+            disabled={isAddingPhoto || isLoadingLibrary}
+          >
+            {isLoadingLibrary ? <ActivityIndicator color={colors.onPrimary} /> : <Plus size={20} color={colors.onPrimary} />}
+          </Pressable>
+        </View>
       </View>
 
       {photos.length === 0 ? (
@@ -519,6 +578,17 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   headerInfo: {
     flex: 1,
     marginHorizontal: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     color: colors.text,

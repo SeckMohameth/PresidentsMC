@@ -115,7 +115,7 @@ export default function MoreScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { currentUser, crew, isAdmin, isOfficer, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode } = useCrew();
+  const { currentUser, crew, isAdmin, isOfficer, canManageJoinRequests, members, joinRequests, leaveCrew, getInviteCode, isSubscriptionActive } = useCrew();
   const { signOut, deleteAccount, updateProfile, user } = useAuth();
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -131,6 +131,14 @@ export default function MoreScreen() {
     (isOwner || currentUser.role === 'admin') &&
     visibleMemberCount > 1 &&
     otherAdmins.length === 0;
+  // The leaving user pays for the club. Leaving/deleting resets the club's access
+  // in Firestore but does NOT cancel the underlying App Store / Google Play
+  // subscription — they must do that themselves or they keep getting billed.
+  const isSubscriptionOwner =
+    !!currentUser?.id && !!crew?.subscriptionOwnerId && crew.subscriptionOwnerId === currentUser.id;
+  const shouldRemindCancelSubscription = isSubscriptionOwner && isSubscriptionActive;
+  const cancelSubscriptionWarning =
+    " You pay for this club's subscription. Leaving or deleting your account will not cancel your App Store or Google Play subscription — cancel it in your store settings so you are not charged again.";
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -218,6 +226,13 @@ export default function MoreScreen() {
       message: `${base} Ownership will transfer to ${nextOwner?.name || 'the longest-serving member'}.`,
     };
   })();
+
+  // Remind the paying admin to cancel their store subscription, but only on flows
+  // they can actually proceed with (the "promote an admin first" flows are blocked).
+  if (shouldRemindCancelSubscription && !needsAdminBeforeExit) {
+    leavePreview.message += cancelSubscriptionWarning;
+    deletePreview.message += cancelSubscriptionWarning;
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -423,6 +438,31 @@ export default function MoreScreen() {
     }
   };
 
+  const openStoreSubscriptionSettings = async () => {
+    const url =
+      Platform.OS === 'android'
+        ? 'https://play.google.com/store/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions';
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Unable to open store settings', 'Open your App Store or Google Play subscription settings to cancel billing.');
+    }
+  };
+
+  // Shown after a paying admin leaves/deletes: their club access is gone, but the
+  // store subscription keeps billing until they cancel it themselves.
+  const promptCancelSubscription = () => {
+    Alert.alert(
+      'Cancel Your Subscription',
+      'You no longer cover a club, but your App Store or Google Play subscription is still active. Cancel it in your store settings so you are not charged again.',
+      [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Open Store Settings', onPress: () => void openStoreSubscriptionSettings() },
+      ]
+    );
+  };
+
   const handleLeaveCrew = () => {
     if (needsAdminBeforeExit) {
       Alert.alert(leavePreview.title, leavePreview.message);
@@ -447,7 +487,14 @@ export default function MoreScreen() {
               : result.ownershipTransferred
                 ? `Ownership transferred to ${result.nextOwnerName || 'the next owner'}.`
                 : `You left ${result.crewName || 'the crew'}.`;
-            Alert.alert('Club Updated', successMessage);
+            Alert.alert('Club Updated', successMessage, [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (result.shouldManageSubscription) promptCancelSubscription();
+                },
+              },
+            ]);
           } catch (error: any) {
             void trackAnalyticsEvent({
               eventName: 'crew_leave_failed',
@@ -520,7 +567,9 @@ export default function MoreScreen() {
               });
               Alert.alert(
                 'Account Deleted',
-                'Your account was deleted. Photos and authored club content were kept and anonymized.'
+                result.shouldManageSubscription
+                  ? 'Your account was deleted. Photos and authored club content were kept and anonymized. Your App Store or Google Play subscription is still active — cancel it in your store settings so you are not charged again.'
+                  : 'Your account was deleted. Photos and authored club content were kept and anonymized.'
               );
             } catch (error: any) {
               void trackAnalyticsEvent({

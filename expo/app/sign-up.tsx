@@ -246,7 +246,7 @@ export default function SignUpScreen() {
             </View>
 
             <View style={styles.adminSupport}>
-              <Text style={styles.adminSupportText}>Club admin?</Text>
+              <Text style={styles.adminSupportText}>Running a club? Reach the developer anytime —</Text>
               <TouchableOpacity onPress={() => void openExternalLink(`mailto:${ADMIN_SUPPORT_EMAIL}`)}>
                 <Text style={styles.adminSupportLink}>{ADMIN_SUPPORT_EMAIL}</Text>
               </TouchableOpacity>
