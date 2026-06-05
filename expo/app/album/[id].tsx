@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Modal, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, X, Camera, Plus, Trash2, Pencil } from 'lucide-react-native';
+import { ArrowLeft, X, Camera, Plus, Trash2, Pencil, Download } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
@@ -33,6 +34,7 @@ export default function AlbumScreen() {
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [isDeletingAlbum, setIsDeletingAlbum] = useState(false);
+  const [isSavingPhoto, setIsSavingPhoto] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [isLoadingMoreLibrary, setIsLoadingMoreLibrary] = useState(false);
@@ -270,6 +272,36 @@ export default function AlbumScreen() {
     );
   };
 
+  const handleSaveSelectedPhoto = async () => {
+    if (!selectedPhoto?.imageUrl || isSavingPhoto) return;
+    if (Platform.OS === 'web') {
+      Alert.alert('Not available', 'Saving to your photo library is only available in the app.');
+      return;
+    }
+    try {
+      setIsSavingPhoto(true);
+      // Write-only ("add to library") permission — matches savePhotosPermission.
+      const permission = await MediaLibrary.requestPermissionsAsync(true);
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Allow photo library access to save photos.');
+        return;
+      }
+      // Download the remote image to a temp file, save it, then clean up.
+      const target = `${FileSystem.cacheDirectory}presidentsmc-${selectedPhoto.id}.jpg`;
+      const { uri } = await FileSystem.downloadAsync(selectedPhoto.imageUrl, target);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+      Alert.alert('Saved', 'Photo saved to your library.');
+    } catch (error) {
+      if (__DEV__) {
+        console.log('[Album] Save photo error:', error);
+      }
+      Alert.alert('Save Failed', 'Unable to save this photo right now.');
+    } finally {
+      setIsSavingPhoto(false);
+    }
+  };
+
   const renderPhoto = ({ item, index }: { item: RidePhoto; index: number }) => {
     const isLoaded = loadedPhotoIds.has(item.id);
     const didFail = failedPhotoIds.has(item.id);
@@ -448,6 +480,19 @@ export default function AlbumScreen() {
           >
             <X size={24} color={colors.text} />
           </Pressable>
+          {selectedPhoto ? (
+            <Pressable
+              style={[styles.modalSave, { top: insets.top + 16 }]}
+              onPress={handleSaveSelectedPhoto}
+              disabled={isSavingPhoto}
+            >
+              {isSavingPhoto ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <Download size={22} color={colors.text} />
+              )}
+            </Pressable>
+          ) : null}
           {canDeletePhotos && selectedPhoto ? (
             <Pressable
               style={[styles.modalDelete, { top: insets.top + 16 }]}
@@ -766,9 +811,20 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  modalDelete: {
+  modalSave: {
     position: 'absolute',
     left: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  modalDelete: {
+    position: 'absolute',
+    left: 72,
     width: 44,
     height: 44,
     borderRadius: 22,
