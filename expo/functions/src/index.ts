@@ -15,8 +15,18 @@ import {
 } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { defineSecret } from 'firebase-functions/params';
+import { timingSafeEqual } from 'crypto';
 
 const revenueCatWebhookSecret = defineSecret('REVENUECAT_WEBHOOK_SECRET');
+
+// Constant-time string comparison to avoid leaking the webhook secret via timing.
+function secretsMatch(provided: string, expected: string) {
+  if (!provided || !expected) return false;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 initializeApp();
 
@@ -801,6 +811,11 @@ function normalizeAnalyticsEvent(input: AnalyticsEventInput, fallbackUserId: str
 }
 
 export const recordAnalyticsEvents = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+  const uid = request.auth.uid;
+
   const rawEvents = Array.isArray(request.data?.events)
     ? request.data.events
     : request.data?.event
@@ -811,9 +826,11 @@ export const recordAnalyticsEvents = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'EVENTS_REQUIRED');
   }
 
-  const events = rawEvents.slice(0, 25).map((event: AnalyticsEventInput) =>
-    normalizeAnalyticsEvent(event, request.auth?.uid ?? null)
-  );
+  // Force the actor to the authenticated caller so events can't be spoofed.
+  const events = rawEvents.slice(0, 25).map((event: AnalyticsEventInput) => ({
+    ...normalizeAnalyticsEvent(event, uid),
+    actorUserId: uid,
+  }));
 
   const batch = adminDb.batch();
   const dailyCounts = new Map<
@@ -821,14 +838,20 @@ export const recordAnalyticsEvents = onCall(async (request) => {
     { totalEvents: number; eventCounts: Record<string, number>; appVersion: string | null }
   >();
 
+  const serverDayKey = new Date().toISOString().slice(0, 10);
+
   for (const event of events) {
-    const eventRef = adminDb.collection('analyticsEvents').doc(event.id);
+    // Use a server-generated document ID so a client cannot overwrite or collide
+    // with existing analytics documents. The client-provided id is kept as a field.
+    const eventRef = adminDb.collection('analyticsEvents').doc();
     batch.set(eventRef, {
       ...event,
+      clientEventId: event.id,
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const dayKey = event.clientTimestamp.slice(0, 10) || new Date().toISOString().slice(0, 10);
+    // Derive the daily bucket server-side so forged timestamps can't poison counters.
+    const dayKey = serverDayKey;
     const current =
       dailyCounts.get(dayKey) ?? {
       totalEvents: 0,
@@ -1386,18 +1409,32 @@ export const revenueCatWebhook = onRequest(
     const signatureHeader = String(request.headers['x-revenuecat-signature'] ?? '');
     const expectedSecret = revenueCatWebhookSecret.value();
 
+    // Refuse to run if the secret is not configured — otherwise an empty secret
+    // would let an empty/absent header authorize anyone.
+    if (!expectedSecret) {
+      console.error('[revenueCatWebhook] REVENUECAT_WEBHOOK_SECRET is not configured.');
+      response.status(500).json({ error: 'Webhook secret not configured' });
+      return;
+    }
+
     const authorized =
-      authHeader === `Bearer ${expectedSecret}` ||
-      authHeader === expectedSecret ||
-      signatureHeader === expectedSecret;
+      secretsMatch(authHeader, `Bearer ${expectedSecret}`) ||
+      secretsMatch(authHeader, expectedSecret) ||
+      secretsMatch(signatureHeader, expectedSecret);
 
     if (!authorized) {
       response.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
-    const payload =
-      typeof request.body === 'string' ? JSON.parse(request.body || '{}') : request.body ?? {};
+    let payload: unknown;
+    try {
+      payload =
+        typeof request.body === 'string' ? JSON.parse(request.body || '{}') : request.body ?? {};
+    } catch {
+      response.status(400).json({ error: 'Invalid JSON body' });
+      return;
+    }
     const parsed = parseRevenueCatPayload(payload);
     if (!parsed.appUserId) {
       response.status(400).json({ error: 'Missing app user id' });
@@ -1431,20 +1468,29 @@ export const revenueCatWebhook = onRequest(
       member?.isDeveloperSupport !== true &&
       (member?.role === 'admin' || member?.role === 'officer');
 
+    const crewSnap = await crewRef.get();
+    const crew = crewSnap.exists ? (crewSnap.data() as CrewDoc) : null;
+    const isCurrentSubscriptionOwner = crew?.subscriptionOwnerId === parsed.appUserId;
+    const isDowngrade = parsed.status === 'inactive' || parsed.status === 'past_due';
+
+    // Always honor a downgrade (cancellation / expiration / billing issue) for
+    // whoever currently owns the club subscription — even if they were since
+    // demoted or removed — so a club can never stay "active" without a real
+    // paying subscriber. This closes a revenue-leak gap.
+    if (isCurrentSubscriptionOwner && isDowngrade) {
+      await crewRef.set(
+        {
+          subscriptionStatus: parsed.status,
+          subscriptionOwnerId: parsed.status === 'inactive' ? null : parsed.appUserId,
+        },
+        { merge: true }
+      );
+      response.status(200).json({ ok: true, downgraded: true });
+      return;
+    }
+
+    // Only a current, billable admin/officer can ACTIVATE the club subscription.
     if (!canOwnSubscription) {
-      if (member?.isDeveloperSupport === true) {
-        const crewSnap = await crewRef.get();
-        const crew = crewSnap.exists ? (crewSnap.data() as CrewDoc) : null;
-        if (crew?.subscriptionOwnerId === parsed.appUserId) {
-          await crewRef.set(
-            {
-              subscriptionStatus: 'inactive' as SubscriptionStatus,
-              subscriptionOwnerId: null,
-            },
-            { merge: true }
-          );
-        }
-      }
       response.status(200).json({ ok: true, ignored: true });
       return;
     }
@@ -1507,7 +1553,7 @@ export const purgeArchivedCrews = onSchedule('every day 03:00', async () => {
 });
 
 export const onCrewRideWritten = onDocumentWritten(
-  'crews/{crewId}/rides/{rideId}',
+  { document: 'crews/{crewId}/rides/{rideId}', database: 'default' },
   async (event) => {
     const crewId = event.params.crewId as string;
     await refreshCrewAggregates(crewId);
@@ -1515,7 +1561,7 @@ export const onCrewRideWritten = onDocumentWritten(
 );
 
 export const onCrewMemberWritten = onDocumentWritten(
-  'crews/{crewId}/members/{memberId}',
+  { document: 'crews/{crewId}/members/{memberId}', database: 'default' },
   async (event) => {
     const crewId = event.params.crewId as string;
     await refreshCrewAggregates(crewId);
@@ -1523,7 +1569,7 @@ export const onCrewMemberWritten = onDocumentWritten(
 );
 
 export const onJoinRequestCreated = onDocumentCreated(
-  'crews/{crewId}/joinRequests/{requestId}',
+  { document: 'crews/{crewId}/joinRequests/{requestId}', database: 'default' },
   async (event) => {
     const crewId = event.params.crewId as string;
     const data = event.data?.data() as JoinRequestDoc | undefined;
@@ -1561,7 +1607,7 @@ export const onJoinRequestCreated = onDocumentCreated(
 );
 
 export const onJoinRequestUpdated = onDocumentUpdated(
-  'crews/{crewId}/joinRequests/{requestId}',
+  { document: 'crews/{crewId}/joinRequests/{requestId}', database: 'default' },
   async (event) => {
     const before = event.data?.before.data() as JoinRequestDoc | undefined;
     const after = event.data?.after.data() as JoinRequestDoc | undefined;

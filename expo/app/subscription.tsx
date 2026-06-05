@@ -35,7 +35,6 @@ const features = [
 const FALLBACK_MONTHLY_PRICE = '$3.99';
 const FALLBACK_YEARLY_PRICE = '$34.99';
 const FALLBACK_YEARLY_MONTHLY_PRICE = '$2.92';
-const FALLBACK_YEARLY_SAVINGS = '$12.89';
 const paywallHeroImage = require('../assets/images/custom-images/optimized/harley.jpg');
 
 export default function SubscriptionScreen() {
@@ -87,9 +86,26 @@ export default function SubscriptionScreen() {
     });
   }, [fadeAnim, scaleAnim, slideAnim]);
 
-  const getMonthlyPrice = () => FALLBACK_MONTHLY_PRICE;
-  const getYearlyPrice = () => FALLBACK_YEARLY_PRICE;
-  const getYearlyMonthlyPrice = () => FALLBACK_YEARLY_MONTHLY_PRICE;
+  // Always prefer the live store price so what we show matches what Apple/Google
+  // actually charge (App Store Guideline 3.1.2). Fall back to the constants only
+  // while the offering is still loading.
+  const getMonthlyPrice = () => monthlyPackage?.product?.priceString ?? FALLBACK_MONTHLY_PRICE;
+  const getYearlyPrice = () => yearlyPackage?.product?.priceString ?? FALLBACK_YEARLY_PRICE;
+  const getYearlyMonthlyPrice = () => {
+    if (yearlyPackage?.product?.price) {
+      return `$${(yearlyPackage.product.price / 12).toFixed(2)}`;
+    }
+    return FALLBACK_YEARLY_MONTHLY_PRICE;
+  };
+  // Currency-agnostic savings derived from live prices; falls back to 27%.
+  const getYearlySavingsPercent = () => {
+    const monthly = monthlyPackage?.product?.price;
+    const yearly = yearlyPackage?.product?.price;
+    if (monthly && yearly && monthly > 0) {
+      return Math.max(0, Math.round((1 - yearly / (monthly * 12)) * 100));
+    }
+    return 27;
+  };
   const isDeveloperSupport = currentUser?.isDeveloperSupport === true;
   const hasAccountSubscription = crewAdminStatus === 'active' || crewAdminStatus === 'trialing';
   const isSubscriptionCoveredByClub = isSubscriptionActive && crew?.subscriptionOwnerId !== currentUser?.id;
@@ -394,7 +410,7 @@ export default function SubscriptionScreen() {
           <View style={styles.trialBanner}>
             <Text style={styles.trialText}>Monthly {getMonthlyPrice()} · Yearly {getYearlyPrice()}</Text>
             <Text style={styles.trialSubtext}>
-              Save 27% with yearly, about {getYearlyMonthlyPrice()}/month.
+              Save {getYearlySavingsPercent()}% with yearly, about {getYearlyMonthlyPrice()}/month.
             </Text>
           </View>
 
@@ -429,7 +445,7 @@ export default function SubscriptionScreen() {
               <View style={styles.planHeader}>
                 <View>
                   <Text style={styles.planName}>Yearly</Text>
-                  <Text style={styles.planSavings}>Save 27% · Save {FALLBACK_YEARLY_SAVINGS}/year</Text>
+                  <Text style={styles.planSavings}>Save {getYearlySavingsPercent()}% with annual billing</Text>
                 </View>
                 <View style={[styles.radioOuter, selectedPlan === 'yearly' && styles.radioOuterSelected]}>
                   {selectedPlan === 'yearly' && <View style={styles.radioInner} />}

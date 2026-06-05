@@ -89,7 +89,13 @@ service cloud.firestore {
     }
 
     function hasPaidFeatureAccess(crewId) {
-      return isDeveloperSupport(crewId) || hasActiveSubscription(crewId);
+      // Mirror the client (CrewProvider): a club only needs an active subscription
+      // when billingRequired == true. If billing isn't required (field false or
+      // unset), paid features are open. This keeps client and rules in lockstep so
+      // the app never lets a write through that the rules then deny.
+      return isDeveloperSupport(crewId)
+        || crewDoc(crewId).data.billingRequired != true
+        || hasActiveSubscription(crewId);
     }
 
     function isSubscriptionActivation(crewId) {
@@ -124,6 +130,8 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'name',
           'avatar',
+          'bike',
+          'bikes',
           'preferences',
           'hasOnboarded',
           'lastActiveAt',
@@ -175,7 +183,9 @@ service cloud.firestore {
           && isCrewMember(crewId)
           && request.resource.data.diff(resource.data).changedKeys().hasOnly([
             'name',
-            'avatar'
+            'avatar',
+            'bike',
+            'bikes'
           ]);
         allow delete: if false;
       }

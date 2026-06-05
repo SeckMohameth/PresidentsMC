@@ -28,6 +28,17 @@ const INVITE_EXPIRATION_OPTIONS = [
 ] as const;
 
 type InviteExpirationOption = (typeof INVITE_EXPIRATION_OPTIONS)[number]['value'];
+const ROLE_ORDER: CrewMember['role'][] = ['admin', 'officer', 'member'];
+const ROLE_LABELS: Record<CrewMember['role'], string> = {
+  admin: 'Admins',
+  officer: 'Officers',
+  member: 'Members',
+};
+const ROLE_ACTION_LABELS: Record<CrewMember['role'], string> = {
+  admin: 'Admin',
+  officer: 'Officer',
+  member: 'Member',
+};
 
 function expiresAtForOption(option: InviteExpirationOption) {
   if (option === 'never') return null;
@@ -106,6 +117,19 @@ export default function AdminSettingsScreen() {
   const pendingRequests = useMemo(
     () => joinRequests.filter((request) => request.status === 'pending'),
     [joinRequests]
+  );
+  const visibleMembers = useMemo(
+    () => members.filter((member) => !member.isDeveloperSupport),
+    [members]
+  );
+  const memberGroups = useMemo(
+    () =>
+      ROLE_ORDER.map((role) => ({
+        role,
+        label: ROLE_LABELS[role],
+        members: visibleMembers.filter((member) => member.role === role),
+      })),
+    [visibleMembers]
   );
 
   useEffect(() => {
@@ -525,37 +549,90 @@ export default function AdminSettingsScreen() {
         )}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Members</Text>
-          {members.map((member) => (
-            <View key={member.id} style={styles.memberRow}>
-              <View style={styles.requestInfo}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberMeta}>{member.role}</Text>
-              </View>
-              {isAdmin && member.id !== crew?.ownerId && member.id !== currentUser?.id ? (
-                <View style={styles.memberActions}>
-                  {(['admin', 'officer', 'member'] as const).map((role) => {
-                    const selected = member.role === role;
+          <View style={styles.sectionHeaderRow}>
+            <View>
+              <Text style={styles.sectionTitle}>Members</Text>
+              <Text style={styles.helperText}>Review roles and manage access by group.</Text>
+            </View>
+            <View style={styles.sectionCountBadge}>
+              <Text style={styles.sectionCountText}>{visibleMembers.length}</Text>
+            </View>
+          </View>
+
+          {memberGroups.map((group) => {
+            if (group.members.length === 0) return null;
+            return (
+              <View key={group.role} style={styles.memberGroup}>
+                <View style={styles.memberGroupHeader}>
+                  <Text style={styles.memberGroupTitle}>{group.label}</Text>
+                  <Text style={styles.memberGroupCount}>{group.members.length}</Text>
+                </View>
+                <View style={styles.memberList}>
+                  {group.members.map((member) => {
+                    const isOwner = member.id === crew?.ownerId;
+                    const isSelf = member.id === currentUser?.id;
+                    const canEditMember = isAdmin && !isOwner && !isSelf;
                     return (
-                      <Pressable
-                        key={role}
-                        style={[styles.roleButton, selected && styles.roleButtonSelected]}
-                        onPress={() => updateMemberRole(member, role)}
-                        disabled={selected}
-                      >
-                        <Text style={[styles.roleButtonText, selected && styles.roleButtonTextSelected]}>
-                          {role === 'admin' ? 'Admin' : role === 'officer' ? 'Officer' : 'Member'}
-                        </Text>
-                      </Pressable>
+                      <View key={member.id} style={styles.memberRow}>
+                        <View style={styles.memberIdentity}>
+                          <View style={styles.memberNameRow}>
+                            <Text style={styles.memberName} numberOfLines={1}>
+                              {member.name}
+                            </Text>
+                            {isOwner && (
+                              <View style={[styles.memberBadge, styles.ownerBadge]}>
+                                <Text style={styles.memberBadgeText}>Owner</Text>
+                              </View>
+                            )}
+                            {isSelf && (
+                              <View style={styles.memberBadge}>
+                                <Text style={styles.memberBadgeText}>You</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.memberMeta}>
+                            {member.leadershipTitle || ROLE_ACTION_LABELS[member.role]}
+                          </Text>
+                        </View>
+
+                        {canEditMember ? (
+                          <View style={styles.memberActions}>
+                            <View style={styles.roleButtonRow}>
+                              {ROLE_ORDER.map((role) => {
+                                const selected = member.role === role;
+                                return (
+                                  <Pressable
+                                    key={role}
+                                    style={[styles.roleButton, selected && styles.roleButtonSelected]}
+                                    onPress={() => updateMemberRole(member, role)}
+                                    disabled={selected}
+                                  >
+                                    <Text style={[styles.roleButtonText, selected && styles.roleButtonTextSelected]}>
+                                      {ROLE_ACTION_LABELS[role]}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                            <Pressable
+                              style={[styles.iconButton, styles.removeMemberButton]}
+                              onPress={() => handleRemove(member)}
+                            >
+                              <UserMinus size={16} color={colors.error} />
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <Text style={styles.lockedMemberText}>
+                            {isOwner ? 'Owner locked' : isSelf ? 'Current account' : ''}
+                          </Text>
+                        )}
+                      </View>
                     );
                   })}
-                  <Pressable style={[styles.iconButton, styles.removeMemberButton]} onPress={() => handleRemove(member)}>
-                    <UserMinus size={16} color={colors.error} />
-                  </Pressable>
                 </View>
-              ) : null}
-            </View>
-          ))}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -623,6 +700,27 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionCountBadge: {
+    minWidth: 34,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sectionCountText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   emptyText: {
     color: colors.textTertiary,
     fontSize: 14,
@@ -664,20 +762,54 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  memberGroup: {
+    gap: 8,
+  },
+  memberGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+  },
+  memberGroupTitle: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  memberGroupCount: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  memberList: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    overflow: 'hidden',
+  },
   memberActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    flexShrink: 1,
+  },
+  roleButtonRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
-    gap: 8,
-    flex: 1.2,
+    gap: 6,
+    flexShrink: 1,
   },
   roleButton: {
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
   },
   roleButtonSelected: {
     borderColor: colors.primary,
@@ -716,6 +848,21 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  memberIdentity: {
+    flex: 1,
+    minWidth: 130,
+    gap: 3,
+  },
+  memberNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   memberName: {
     color: colors.text,
@@ -726,6 +873,28 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: colors.textTertiary,
     fontSize: 13,
     textTransform: 'capitalize',
+  },
+  memberBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  ownerBadge: {
+    borderColor: colors.primary,
+  },
+  memberBadgeText: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  lockedMemberText: {
+    color: colors.textTertiary,
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'right',
   },
   logoRow: {
     flexDirection: 'row',

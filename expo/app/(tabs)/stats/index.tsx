@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike, CheckCircle2, Clock, Gauge } from 'lucide-react-native';
+import { Route, MapPin, Camera, Users, Flame, Trophy, TrendingUp, Calendar, History, Bike, CheckCircle2, Clock, Gauge, Info, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew } from '@/providers/CrewProvider';
 import StatCard from '@/components/StatCard';
@@ -15,6 +15,7 @@ export default function StatsScreen() {
   const insets = useSafeAreaInsets();
   const { crewStats, memberStats, currentUser, crew, statsHistory, pastRides } = useCrew();
   const [activeTab, setActiveTab] = useState<TabType>('crew');
+  const [showAbout, setShowAbout] = useState(false);
   const [historyPeriod, setHistoryPeriod] = useState<'week' | 'month' | 'year'>('month');
   const [refreshing, setRefreshing] = useState(false);
   const { width } = useWindowDimensions();
@@ -170,6 +171,31 @@ export default function StatsScreen() {
                 ) : null}
               </View>
             </View>
+
+            {crew?.description?.trim() ? (
+              <Pressable
+                style={styles.aboutCard}
+                onPress={() => setShowAbout((value) => !value)}
+              >
+                <View style={styles.aboutHeader}>
+                  <View style={styles.aboutHeaderLeft}>
+                    <Info size={18} color={colors.primary} />
+                    <Text style={styles.aboutTitle}>About the Club</Text>
+                  </View>
+                  {showAbout ? (
+                    <ChevronUp size={18} color={colors.textTertiary} />
+                  ) : (
+                    <ChevronDown size={18} color={colors.textTertiary} />
+                  )}
+                </View>
+                <Text
+                  style={styles.aboutText}
+                  numberOfLines={showAbout ? undefined : 2}
+                >
+                  {crew.description.trim()}
+                </Text>
+              </Pressable>
+            ) : null}
 
             <Text style={styles.sectionTitle}>All Time</Text>
             <View style={styles.statsGrid}>
@@ -435,6 +461,35 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: 14,
     marginTop: 4,
+  },
+  aboutCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  aboutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  aboutHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aboutTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  aboutText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 10,
   },
   profileCard: {
     alignItems: 'center',

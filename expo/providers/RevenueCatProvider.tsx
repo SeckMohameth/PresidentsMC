@@ -94,7 +94,9 @@ const revenueCatBootstrap: RevenueCatBootstrap = (() => {
     Purchases.configure({ apiKey });
     return { apiKey, isConfigured: true };
   } catch (error) {
-    console.log('[RevenueCat] Error configuring Purchases:', error);
+    if (__DEV__) {
+      console.log('[RevenueCat] Error configuring Purchases:', error);
+    }
     return { apiKey: null, isConfigured: false };
   }
 })();

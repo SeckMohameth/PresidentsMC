@@ -128,6 +128,18 @@ export async function flushAnalyticsEvents() {
       return;
     }
 
+    // Events fired before the user signs in (e.g. on the auth screens) can't be
+    // recorded — the function requires auth. Drop them quietly instead of
+    // re-queuing, which would otherwise retry-spam until login.
+    const isUnauthenticated =
+      errorCode === 'functions/unauthenticated' ||
+      errorMessage.includes('unauthenticated') ||
+      errorMessage.includes('AUTH_REQUIRED');
+    if (isUnauthenticated) {
+      consecutiveFlushFailures = 0;
+      return;
+    }
+
     logAnalyticsDebug('[Analytics] Flush error:', error);
     consecutiveFlushFailures += 1;
     if (consecutiveFlushFailures >= 3 && errorCode === 'functions/internal') {

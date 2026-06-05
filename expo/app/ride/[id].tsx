@@ -171,7 +171,10 @@ export default function RideDetailScreen() {
   if (!ride) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <Text style={styles.errorText}>Ride not found</Text>
+        <Text style={styles.errorText}>This ride is no longer available.</Text>
+        <Pressable style={styles.errorBackButton} onPress={() => router.back()}>
+          <Text style={styles.errorBackText}>Go Back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -725,6 +728,18 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   errorText: {
     color: colors.textTertiary,
     fontSize: 16,
+  },
+  errorBackButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+  },
+  errorBackText: {
+    color: colors.onPrimary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   scrollView: {
     flex: 1,

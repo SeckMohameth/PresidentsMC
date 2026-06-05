@@ -489,7 +489,13 @@ export default function CreateRideScreen() {
           setIsSaving(true);
           try {
             await deleteRide(rideId);
-            router.back();
+            // Pop both this edit screen AND the now-deleted ride detail screen,
+            // otherwise we'd land on a "Ride not found" dead end.
+            if (router.canDismiss()) {
+              router.dismissAll();
+            } else {
+              router.back();
+            }
           } catch {
             Alert.alert('Error', 'Unable to delete this ride right now.');
           } finally {

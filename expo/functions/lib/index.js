@@ -9,7 +9,18 @@ const auth_1 = require("firebase-admin/auth");
 const firestore_2 = require("firebase-admin/firestore");
 const storage_1 = require("firebase-admin/storage");
 const params_1 = require("firebase-functions/params");
+const crypto_1 = require("crypto");
 const revenueCatWebhookSecret = (0, params_1.defineSecret)('REVENUECAT_WEBHOOK_SECRET');
+// Constant-time string comparison to avoid leaking the webhook secret via timing.
+function secretsMatch(provided, expected) {
+    if (!provided || !expected)
+        return false;
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length)
+        return false;
+    return (0, crypto_1.timingSafeEqual)(a, b);
+}
 (0, app_1.initializeApp)();
 const adminDb = (0, firestore_2.getFirestore)(process.env.FIRESTORE_DATABASE_ID || 'default');
 const adminAuth = (0, auth_1.getAuth)();
@@ -566,6 +577,10 @@ function normalizeAnalyticsEvent(input, fallbackUserId) {
     };
 }
 exports.recordAnalyticsEvents = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError('unauthenticated', 'AUTH_REQUIRED');
+    }
+    const uid = request.auth.uid;
     const rawEvents = Array.isArray(request.data?.events)
         ? request.data.events
         : request.data?.event
@@ -574,16 +589,25 @@ exports.recordAnalyticsEvents = (0, https_1.onCall)(async (request) => {
     if (rawEvents.length === 0) {
         throw new https_1.HttpsError('invalid-argument', 'EVENTS_REQUIRED');
     }
-    const events = rawEvents.slice(0, 25).map((event) => normalizeAnalyticsEvent(event, request.auth?.uid ?? null));
+    // Force the actor to the authenticated caller so events can't be spoofed.
+    const events = rawEvents.slice(0, 25).map((event) => ({
+        ...normalizeAnalyticsEvent(event, uid),
+        actorUserId: uid,
+    }));
     const batch = adminDb.batch();
     const dailyCounts = new Map();
+    const serverDayKey = new Date().toISOString().slice(0, 10);
     for (const event of events) {
-        const eventRef = adminDb.collection('analyticsEvents').doc(event.id);
+        // Use a server-generated document ID so a client cannot overwrite or collide
+        // with existing analytics documents. The client-provided id is kept as a field.
+        const eventRef = adminDb.collection('analyticsEvents').doc();
         batch.set(eventRef, {
             ...event,
+            clientEventId: event.id,
             createdAt: firestore_2.FieldValue.serverTimestamp(),
         });
-        const dayKey = event.clientTimestamp.slice(0, 10) || new Date().toISOString().slice(0, 10);
+        // Derive the daily bucket server-side so forged timestamps can't poison counters.
+        const dayKey = serverDayKey;
         const current = dailyCounts.get(dayKey) ?? {
             totalEvents: 0,
             eventCounts: {},
@@ -1027,14 +1051,29 @@ exports.revenueCatWebhook = (0, https_1.onRequest)({ secrets: [revenueCatWebhook
     const authHeader = String(request.headers.authorization ?? '');
     const signatureHeader = String(request.headers['x-revenuecat-signature'] ?? '');
     const expectedSecret = revenueCatWebhookSecret.value();
-    const authorized = authHeader === `Bearer ${expectedSecret}` ||
-        authHeader === expectedSecret ||
-        signatureHeader === expectedSecret;
+    // Refuse to run if the secret is not configured — otherwise an empty secret
+    // would let an empty/absent header authorize anyone.
+    if (!expectedSecret) {
+        console.error('[revenueCatWebhook] REVENUECAT_WEBHOOK_SECRET is not configured.');
+        response.status(500).json({ error: 'Webhook secret not configured' });
+        return;
+    }
+    const authorized = secretsMatch(authHeader, `Bearer ${expectedSecret}`) ||
+        secretsMatch(authHeader, expectedSecret) ||
+        secretsMatch(signatureHeader, expectedSecret);
     if (!authorized) {
         response.status(401).json({ error: 'Unauthorized' });
         return;
     }
-    const payload = typeof request.body === 'string' ? JSON.parse(request.body || '{}') : request.body ?? {};
+    let payload;
+    try {
+        payload =
+            typeof request.body === 'string' ? JSON.parse(request.body || '{}') : request.body ?? {};
+    }
+    catch {
+        response.status(400).json({ error: 'Invalid JSON body' });
+        return;
+    }
     const parsed = parseRevenueCatPayload(payload);
     if (!parsed.appUserId) {
         response.status(400).json({ error: 'Missing app user id' });
@@ -1062,17 +1101,24 @@ exports.revenueCatWebhook = (0, https_1.onRequest)({ secrets: [revenueCatWebhook
     const canOwnSubscription = memberSnap.exists &&
         member?.isDeveloperSupport !== true &&
         (member?.role === 'admin' || member?.role === 'officer');
+    const crewSnap = await crewRef.get();
+    const crew = crewSnap.exists ? crewSnap.data() : null;
+    const isCurrentSubscriptionOwner = crew?.subscriptionOwnerId === parsed.appUserId;
+    const isDowngrade = parsed.status === 'inactive' || parsed.status === 'past_due';
+    // Always honor a downgrade (cancellation / expiration / billing issue) for
+    // whoever currently owns the club subscription — even if they were since
+    // demoted or removed — so a club can never stay "active" without a real
+    // paying subscriber. This closes a revenue-leak gap.
+    if (isCurrentSubscriptionOwner && isDowngrade) {
+        await crewRef.set({
+            subscriptionStatus: parsed.status,
+            subscriptionOwnerId: parsed.status === 'inactive' ? null : parsed.appUserId,
+        }, { merge: true });
+        response.status(200).json({ ok: true, downgraded: true });
+        return;
+    }
+    // Only a current, billable admin/officer can ACTIVATE the club subscription.
     if (!canOwnSubscription) {
-        if (member?.isDeveloperSupport === true) {
-            const crewSnap = await crewRef.get();
-            const crew = crewSnap.exists ? crewSnap.data() : null;
-            if (crew?.subscriptionOwnerId === parsed.appUserId) {
-                await crewRef.set({
-                    subscriptionStatus: 'inactive',
-                    subscriptionOwnerId: null,
-                }, { merge: true });
-            }
-        }
         response.status(200).json({ ok: true, ignored: true });
         return;
     }
@@ -1123,15 +1169,15 @@ exports.purgeArchivedCrews = (0, scheduler_1.onSchedule)('every day 03:00', asyn
         await adminDb.recursiveDelete(crewDoc.ref);
     }
 });
-exports.onCrewRideWritten = (0, firestore_1.onDocumentWritten)('crews/{crewId}/rides/{rideId}', async (event) => {
+exports.onCrewRideWritten = (0, firestore_1.onDocumentWritten)({ document: 'crews/{crewId}/rides/{rideId}', database: 'default' }, async (event) => {
     const crewId = event.params.crewId;
     await refreshCrewAggregates(crewId);
 });
-exports.onCrewMemberWritten = (0, firestore_1.onDocumentWritten)('crews/{crewId}/members/{memberId}', async (event) => {
+exports.onCrewMemberWritten = (0, firestore_1.onDocumentWritten)({ document: 'crews/{crewId}/members/{memberId}', database: 'default' }, async (event) => {
     const crewId = event.params.crewId;
     await refreshCrewAggregates(crewId);
 });
-exports.onJoinRequestCreated = (0, firestore_1.onDocumentCreated)('crews/{crewId}/joinRequests/{requestId}', async (event) => {
+exports.onJoinRequestCreated = (0, firestore_1.onDocumentCreated)({ document: 'crews/{crewId}/joinRequests/{requestId}', database: 'default' }, async (event) => {
     const crewId = event.params.crewId;
     const data = event.data?.data();
     if (!data)
@@ -1162,7 +1208,7 @@ exports.onJoinRequestCreated = (0, firestore_1.onDocumentCreated)('crews/{crewId
     }
     await sendExpoPush(messages);
 });
-exports.onJoinRequestUpdated = (0, firestore_1.onDocumentUpdated)('crews/{crewId}/joinRequests/{requestId}', async (event) => {
+exports.onJoinRequestUpdated = (0, firestore_1.onDocumentUpdated)({ document: 'crews/{crewId}/joinRequests/{requestId}', database: 'default' }, async (event) => {
     const before = event.data?.before.data();
     const after = event.data?.after.data();
     if (!before || !after)

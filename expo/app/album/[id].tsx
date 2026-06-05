@@ -472,7 +472,9 @@ export default function AlbumScreen() {
             getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
             onMomentumScrollEnd={(event) => {
               const nextIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-              setSelectedPhotoIndex(nextIndex);
+              // A momentum-scroll event can fire just after the gallery is closed
+              // (e.g. tapping X mid-swipe). If it's already closed, don't reopen it.
+              setSelectedPhotoIndex((current) => (current === null ? null : nextIndex));
             }}
             renderItem={({ item }) => (
               <ZoomableGalleryPhoto photo={item} width={width} />

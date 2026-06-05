@@ -73,7 +73,7 @@ async function deleteStoragePath(path: string) {
     await deleteObject(ref(storage, path));
   } catch (error: any) {
     const code = String(error?.code ?? '');
-    if (code !== 'storage/object-not-found') {
+    if (code !== 'storage/object-not-found' && __DEV__) {
       console.log('[CrewProvider] Storage cleanup skipped:', path, error);
     }
   }
@@ -682,9 +682,11 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
         errorMessage.includes('not-found');
 
       if (isMissingFunction) {
-        console.log(
-          '[CrewProvider] getCrewInviteCode is not deployed yet. Invite code actions are disabled until functions are deployed.'
-        );
+        if (__DEV__) {
+          console.log(
+            '[CrewProvider] getCrewInviteCode is not deployed yet. Invite code actions are disabled until functions are deployed.'
+          );
+        }
         return '';
       }
 
