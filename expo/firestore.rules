@@ -47,10 +47,16 @@ service cloud.firestore {
     function isCrewLeader(crewId) {
       return (
         isCrewMember(crewId)
-        && ['admin', 'officer'].hasAny([get(memberPath(crewId, request.auth.uid)).data.role])
+        && (
+          get(memberPath(crewId, request.auth.uid)).data.role == 'admin'
+          || get(memberPath(crewId, request.auth.uid)).data.role == 'officer'
+        )
       ) || (
         isCrewUser(crewId)
-        && ['admin', 'officer'].hasAny([get(userPath(request.auth.uid)).data.role])
+        && (
+          get(userPath(request.auth.uid)).data.role == 'admin'
+          || get(userPath(request.auth.uid)).data.role == 'officer'
+        )
       );
     }
 
@@ -81,11 +87,8 @@ service cloud.firestore {
     }
 
     function hasActiveSubscription(crewId) {
-      let ownerId = crewDoc(crewId).data.subscriptionOwnerId;
-      return ownerId is string
-        && ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus])
-        && exists(memberPath(crewId, ownerId))
-        && get(memberPath(crewId, ownerId)).data.isDeveloperSupport != true;
+      return crewDoc(crewId).data.subscriptionOwnerId is string
+        && ['active', 'trialing'].hasAny([crewDoc(crewId).data.subscriptionStatus]);
     }
 
     function hasPaidFeatureAccess(crewId) {
@@ -218,8 +221,8 @@ service cloud.firestore {
 
       match /rides/{rideId} {
         allow read: if isCrewParticipant(crewId);
-        allow create, delete: if canManageRides(crewId) && hasPaidFeatureAccess(crewId);
-        allow update: if (canManageRides(crewId) && hasPaidFeatureAccess(crewId))
+        allow create, delete: if canManageRides(crewId);
+        allow update: if canManageRides(crewId)
           || (isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'attendees',
@@ -230,8 +233,8 @@ service cloud.firestore {
 
       match /albums/{albumId} {
         allow read: if isCrewParticipant(crewId);
-        allow create, delete: if canManageAlbums(crewId) && hasPaidFeatureAccess(crewId);
-        allow update: if (canManageAlbums(crewId) && hasPaidFeatureAccess(crewId))
+        allow create, delete: if canManageAlbums(crewId);
+        allow update: if canManageAlbums(crewId)
           || (isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'photos',

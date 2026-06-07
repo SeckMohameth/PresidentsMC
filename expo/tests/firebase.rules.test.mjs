@@ -145,6 +145,26 @@ async function seedData() {
         purgeAt: null,
         createdAt: now,
       }),
+      setDoc(doc(db, 'crews', 'crewStaleSubscription'), {
+        id: 'crewStaleSubscription',
+        name: 'Stale Subscription Crew',
+        description: 'Active subscription with a stale owner member reference',
+        nameLower: 'stale subscription crew',
+        ownerId: null,
+        subscriptionOwnerId: 'formerPayer',
+        subscriptionStatus: 'active',
+        billingRequired: true,
+        status: 'active',
+        isDiscoverable: false,
+        requiresApproval: true,
+        memberCount: 1,
+        totalRides: 0,
+        totalMiles: 0,
+        totalPhotos: 0,
+        archivedAt: null,
+        purgeAt: null,
+        createdAt: now,
+      }),
       setDoc(doc(db, 'crews', 'crewA', 'members', 'alice'), {
         id: 'alice',
         email: 'alice@example.com',
@@ -192,6 +212,14 @@ async function seedData() {
         avatar: '',
         role: 'admin',
         isDeveloperSupport: true,
+        joinedCrewAt: now,
+      }),
+      setDoc(doc(db, 'crews', 'crewStaleSubscription', 'members', 'alice'), {
+        id: 'alice',
+        email: 'alice@example.com',
+        name: 'Alice',
+        avatar: '',
+        role: 'admin',
         joinedCrewAt: now,
       }),
       setDoc(doc(db, 'crews', 'crewA', 'private', 'settings'), {
@@ -373,6 +401,46 @@ test('members can update ride attendance but not protected ride fields', async (
   await assertFails(updateDoc(rideRef, { title: 'Hijacked title' }));
 });
 
+test('members cannot create rides or albums', async () => {
+  const caraDb = testEnv.authenticatedContext('cara').firestore();
+
+  await assertFails(
+    setDoc(doc(caraDb, 'crews', 'crewA', 'rides', 'memberRide'), {
+      id: 'memberRide',
+      crewId: 'crewA',
+      title: 'Member Ride',
+      description: 'Members cannot create rides.',
+      dateTime: now,
+      estimatedDuration: '1h',
+      estimatedDistance: 12,
+      pace: 'moderate',
+      notes: '',
+      coverImage: '',
+      createdBy: 'cara',
+      createdByName: 'Cara',
+      attendees: [],
+      checkedIn: [],
+      status: 'upcoming',
+      photos: [],
+    })
+  );
+
+  await assertFails(
+    setDoc(doc(caraDb, 'crews', 'crewA', 'albums', 'memberAlbum'), {
+      id: 'memberAlbum',
+      crewId: 'crewA',
+      title: 'Member Album',
+      description: '',
+      coverImage: '',
+      createdBy: 'cara',
+      createdByName: 'Cara',
+      createdAt: now,
+      updatedAt: now,
+      photos: [],
+    })
+  );
+});
+
 test('developer support can test paid features without activating subscription', async () => {
   const devDb = testEnv.authenticatedContext('dev').firestore();
   const devStorage = testEnv.authenticatedContext('dev').storage();
@@ -415,6 +483,46 @@ test('developer support can test paid features without activating subscription',
   );
   await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/cover.jpg'), 'cover'));
   await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/photos/photo1.jpg'), 'photo'));
+});
+
+test('active paid crew unlocks rides and albums even when subscription owner member is stale', async () => {
+  const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+  await assertSucceeds(
+    setDoc(doc(aliceDb, 'crews', 'crewStaleSubscription', 'rides', 'paidRide'), {
+      id: 'paidRide',
+      crewId: 'crewStaleSubscription',
+      title: 'Paid Ride',
+      description: 'A real paid subscription should unlock ride creation.',
+      dateTime: now,
+      estimatedDuration: '1h',
+      estimatedDistance: 12,
+      pace: 'moderate',
+      notes: '',
+      coverImage: '',
+      createdBy: 'alice',
+      createdByName: 'Alice',
+      attendees: [],
+      checkedIn: [],
+      status: 'upcoming',
+      photos: [],
+    })
+  );
+
+  await assertSucceeds(
+    setDoc(doc(aliceDb, 'crews', 'crewStaleSubscription', 'albums', 'paidAlbum'), {
+      id: 'paidAlbum',
+      crewId: 'crewStaleSubscription',
+      title: 'Paid Album',
+      description: '',
+      coverImage: '',
+      createdBy: 'alice',
+      createdByName: 'Alice',
+      createdAt: now,
+      updatedAt: now,
+      photos: [],
+    })
+  );
 });
 
 test('join requests are requester-created and leader-readable', async () => {
