@@ -180,17 +180,27 @@ async function deleteUserPushTokens(userId) {
     }
     await flushBatch(batch, operations);
 }
+async function getCollectionGroupDocsByField(collectionGroup, fieldPath, value) {
+    const query = adminDb.collectionGroup(collectionGroup);
+    try {
+        return await query.where(fieldPath, '==', value).get();
+    }
+    catch (error) {
+        if (Number(error?.code) !== 9) {
+            throw error;
+        }
+        console.log(`[Functions] ${collectionGroup}.${fieldPath} index unavailable; using full scan for account cleanup.`);
+        const snapshot = await query.get();
+        return {
+            docs: snapshot.docs.filter((docSnap) => docSnap.data()?.[fieldPath] === value),
+        };
+    }
+}
 async function anonymizeUserGeneratedContent(userId) {
     const rideSnapshotsPromise = adminDb.collectionGroup('rides').get();
     const albumSnapshotsPromise = adminDb.collectionGroup('albums').get();
-    const announcementSnapshotsPromise = adminDb
-        .collectionGroup('announcements')
-        .where('authorId', '==', userId)
-        .get();
-    const joinRequestSnapshotsPromise = adminDb
-        .collectionGroup('joinRequests')
-        .where('userId', '==', userId)
-        .get();
+    const announcementSnapshotsPromise = getCollectionGroupDocsByField('announcements', 'authorId', userId);
+    const joinRequestSnapshotsPromise = getCollectionGroupDocsByField('joinRequests', 'userId', userId);
     const [rideSnapshots, albumSnapshots, announcementSnapshots, joinRequestSnapshots] = await Promise.all([
         rideSnapshotsPromise,
         albumSnapshotsPromise,
@@ -803,13 +813,13 @@ exports.deleteAccountAndCleanup = (0, https_1.onCall)(async (request) => {
     if (!userId) {
         throw new https_1.HttpsError('unauthenticated', 'AUTH_REQUIRED');
     }
-    const result = await exitCrew(userId, true);
     const userRef = adminDb.collection('users').doc(userId);
     await Promise.all([
         anonymizeUserGeneratedContent(userId),
         deleteUserPushTokens(userId),
         deleteUserStorage(userId),
     ]);
+    const result = await exitCrew(userId, true);
     try {
         await adminAuth.deleteUser(userId);
     }

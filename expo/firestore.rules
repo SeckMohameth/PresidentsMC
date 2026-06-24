@@ -137,6 +137,7 @@ service cloud.firestore {
           'bikes',
           'preferences',
           'hasOnboarded',
+          'hasFeatureOnboarded',
           'lastActiveAt',
           'crewId',
           'role',

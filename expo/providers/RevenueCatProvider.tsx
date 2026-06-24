@@ -25,7 +25,8 @@ const isRevenueCatExplicitlyDisabled = process.env.EXPO_PUBLIC_ENABLE_REVENUECAT
 
 function getRCToken() {
   if (Platform.OS === 'web' || isExpoGo) {
-    return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY || REVENUECAT_FALLBACK_API_KEY;
+    const testKey = process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
+    return testKey?.startsWith('test_') ? testKey : REVENUECAT_FALLBACK_API_KEY;
   }
 
   const nativeKey = Platform.select({

@@ -183,8 +183,10 @@ async function ensureDeveloperSupportAdmin(profile: {
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const { isConfigured: isRevenueCatConfigured, loginUser, logoutUser } = useRevenueCat();
   const loginUserRef = useRef(loginUser);
+  const hasFeatureOnboardedRef = useRef(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  const [hasFeatureOnboarded, setHasFeatureOnboarded] = useState<boolean | null>(null);
   const [hasCrew, setHasCrew] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigningUp, setIsSigningUp] = useState(false);
@@ -234,11 +236,16 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       setIsLoading(true);
 
       const storedOnboarded = await SafeAsyncStorage.getItem(STORAGE_KEYS.HAS_ONBOARDED);
+      const storedFeatureOnboarded = await SafeAsyncStorage.getItem(STORAGE_KEYS.HAS_FEATURE_ONBOARDED);
       setHasOnboarded(storedOnboarded === 'true');
+      setHasFeatureOnboarded(storedFeatureOnboarded === 'true');
+      hasFeatureOnboardedRef.current = storedFeatureOnboarded === 'true';
 
       if (!fbUser) {
         if (unsubscribeProfile) unsubscribeProfile();
         setProfile(null);
+        setHasFeatureOnboarded(false);
+        hasFeatureOnboardedRef.current = false;
         setHasCrew(false);
         setIsLoading(false);
         return;
@@ -313,6 +320,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           setIsLoading(false);
           return;
         }
+        const featureOnboardingComplete =
+          data.hasFeatureOnboarded === true || hasFeatureOnboardedRef.current;
         setProfile({
           id: fbUser.uid,
           email: data.email,
@@ -326,8 +335,12 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           preferences: data.preferences,
           lastActiveAt: data.lastActiveAt,
           pendingCrewId: data.pendingCrewId || null,
-          hasFeatureOnboarded: data.hasFeatureOnboarded === true,
+          hasFeatureOnboarded: featureOnboardingComplete,
         });
+        if (featureOnboardingComplete) {
+          hasFeatureOnboardedRef.current = true;
+        }
+        setHasFeatureOnboarded(featureOnboardingComplete);
         setHasCrew(!!data.crewId);
         setIsLoading(false);
       });
@@ -365,6 +378,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const completeFeatureOnboarding = useCallback(async () => {
     await SafeAsyncStorage.setItem(STORAGE_KEYS.HAS_FEATURE_ONBOARDED, 'true');
+    hasFeatureOnboardedRef.current = true;
+    setHasFeatureOnboarded(true);
+    setProfile((current) =>
+      current ? { ...current, hasFeatureOnboarded: true } : current
+    );
     if (profile?.id) {
       await updateDoc(doc(db, 'users', profile.id), { hasFeatureOnboarded: true }).catch((error) => {
         if (__DEV__) {
@@ -372,9 +390,6 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       });
     }
-    setProfile((current) =>
-      current ? { ...current, hasFeatureOnboarded: true } : current
-    );
   }, [profile?.id]);
 
   const signUp = useCallback(async ({ email, password, name }: { email: string; password: string; name: string }) => {
@@ -686,6 +701,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const result = await callable();
     await SafeAsyncStorage.removeItem(STORAGE_KEYS.HAS_ONBOARDED);
     await SafeAsyncStorage.removeItem(STORAGE_KEYS.HAS_FEATURE_ONBOARDED);
+    setHasFeatureOnboarded(false);
+    hasFeatureOnboardedRef.current = false;
     if (isRevenueCatConfigured) {
       await logoutUser().catch((error) => {
         if (__DEV__) {
@@ -707,7 +724,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   }, [isRevenueCatConfigured, logoutUser, profile?.id]);
 
   const getAuthStatus = useCallback((): AuthStatus => {
-    if (isLoading || hasOnboarded === null) {
+    if (isLoading || hasOnboarded === null || hasFeatureOnboarded === null) {
       return 'loading';
     }
     if (!hasOnboarded) {
@@ -716,14 +733,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     if (!profile) {
       return 'unauthenticated';
     }
-    if (!profile.hasFeatureOnboarded) {
+    if (!hasFeatureOnboarded && !profile.hasFeatureOnboarded) {
       return 'feature_onboarding';
     }
     if (!hasCrew) {
       return 'needs_crew';
     }
     return 'authenticated';
-  }, [isLoading, hasOnboarded, profile, hasCrew]);
+  }, [isLoading, hasOnboarded, hasFeatureOnboarded, profile, hasCrew]);
 
   return {
     user: profile,
