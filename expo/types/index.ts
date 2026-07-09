@@ -116,6 +116,20 @@ export interface Ride {
   photos: RidePhoto[];
 }
 
+export type RideStatusKind = 'on_my_way' | 'running_late' | 'arrived' | 'safe';
+
+export interface RideMessage {
+  id: string;
+  rideId: string;
+  userId: string;
+  userName: string;
+  type: 'chat' | 'status';
+  text: string;
+  status?: RideStatusKind;
+  eta?: string;
+  createdAt: string;
+}
+
 export interface ImageAttribution {
   source: 'unsplash';
   name: string;

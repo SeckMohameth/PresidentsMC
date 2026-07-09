@@ -110,7 +110,19 @@ export default function SignUpScreen() {
           method: 'email_password',
         },
       });
-      Alert.alert('Error', 'Failed to create account. Please try again.');
+      const code = String((error as { code?: unknown })?.code ?? '');
+      Alert.alert(
+        'Sign Up Failed',
+        code.includes('email-already-in-use')
+          ? 'An account already exists for this email. Go back and sign in instead.'
+          : code.includes('invalid-email')
+            ? 'That email address does not look valid. Double-check it and try again.'
+            : code.includes('weak-password')
+              ? 'That password is too weak. Use at least 6 characters.'
+              : code.includes('network-request-failed')
+                ? 'Could not reach the server. Check your internet connection and try again.'
+                : 'Failed to create account. Please try again.'
+      );
     }
   };
 

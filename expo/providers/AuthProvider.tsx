@@ -15,7 +15,6 @@ import {
   updatePassword,
 } from 'firebase/auth';
 import {
-  collection,
   doc,
   getDoc,
   onSnapshot,
@@ -180,6 +179,30 @@ async function ensureDeveloperSupportAdmin(profile: {
   }, { merge: true });
 }
 
+// The requestJoinCrew callable is not deployed in this project's functions,
+// so access requests are written straight to Firestore. The security rules
+// explicitly allow a signed-in user to create (or resubmit after a denial)
+// their own pending join request, and the onJoinRequestCreated trigger still
+// notifies admins.
+async function submitJoinRequestDirect(
+  requester: { id: string; name: string; avatar: string; email: string },
+  crewId: string,
+  message: string
+) {
+  await setDoc(doc(db, 'crews', crewId, 'joinRequests', requester.id), {
+    id: requester.id,
+    crewId,
+    userId: requester.id,
+    userName: requester.name,
+    userAvatar: requester.avatar || '',
+    userEmail: requester.email || '',
+    status: 'pending',
+    message,
+    createdAt: new Date().toISOString(),
+  });
+  await updateDoc(doc(db, 'users', requester.id), { pendingCrewId: crewId }).catch(() => undefined);
+}
+
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const { isConfigured: isRevenueCatConfigured, loginUser, logoutUser } = useRevenueCat();
   const loginUserRef = useRef(loginUser);
@@ -235,115 +258,163 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
       setIsLoading(true);
 
-      const storedOnboarded = await SafeAsyncStorage.getItem(STORAGE_KEYS.HAS_ONBOARDED);
-      const storedFeatureOnboarded = await SafeAsyncStorage.getItem(STORAGE_KEYS.HAS_FEATURE_ONBOARDED);
-      setHasOnboarded(storedOnboarded === 'true');
-      setHasFeatureOnboarded(storedFeatureOnboarded === 'true');
-      hasFeatureOnboardedRef.current = storedFeatureOnboarded === 'true';
+      try {
+        const storedOnboarded = await SafeAsyncStorage.getItem(STORAGE_KEYS.HAS_ONBOARDED);
+        const storedFeatureOnboarded = await SafeAsyncStorage.getItem(STORAGE_KEYS.HAS_FEATURE_ONBOARDED);
+        setHasOnboarded(storedOnboarded === 'true');
+        setHasFeatureOnboarded(storedFeatureOnboarded === 'true');
+        hasFeatureOnboardedRef.current = storedFeatureOnboarded === 'true';
 
-      if (!fbUser) {
-        if (unsubscribeProfile) unsubscribeProfile();
-        setProfile(null);
-        setHasFeatureOnboarded(false);
-        hasFeatureOnboardedRef.current = false;
-        setHasCrew(false);
-        setIsLoading(false);
-        return;
-      }
-
-      const userRef = doc(db, 'users', fbUser.uid);
-      const userSnap = await getDoc(userRef);
-      if (!userSnap.exists()) {
-        const name = fbUser.displayName || fbUser.email?.split('@')[0] || 'User';
-        const avatar = fbUser.photoURL || DEFAULT_AVATAR;
-        const isOwner = isInitialOwnerEmail(fbUser.email);
-        const isDeveloperAdmin = isDeveloperAdminEmail(fbUser.email);
-        await setDoc(userRef, {
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          name,
-          avatar,
-          bike: '',
-          hasOnboarded: storedOnboarded === 'true',
-          hasFeatureOnboarded: false,
-          crewId: isOwner || isDeveloperAdmin ? CLUB_ID : null,
-          role: isOwner || isDeveloperAdmin ? 'admin' : 'member',
-          pendingCrewId: null,
-          joinedAt: new Date().toISOString(),
-          preferences: DEFAULT_PREFERENCES,
-          lastActiveAt: new Date().toISOString(),
-        });
-        if (isOwner) {
-          await ensureSingleClubOwner({
-            id: fbUser.uid,
-            email: fbUser.email || '',
-            name,
-            avatar,
-          });
-        } else if (isDeveloperAdmin) {
-          await ensureDeveloperSupportAdmin({
-            id: fbUser.uid,
-            email: fbUser.email || '',
-            name,
-            avatar,
-          });
-        }
-      } else {
-        const existing = userSnap.data() as Record<string, unknown>;
-        if (!existing.preferences) {
-          await updateDoc(userRef, { preferences: DEFAULT_PREFERENCES });
-        }
-        await updateDoc(userRef, { lastActiveAt: new Date().toISOString() });
-        if (isInitialOwnerEmail(fbUser.email) && !existing.crewId) {
-          await ensureSingleClubOwner({
-            id: fbUser.uid,
-            email: String(existing.email || fbUser.email || ''),
-            name: String(existing.name || fbUser.displayName || 'Admin'),
-            avatar: String(existing.avatar || fbUser.photoURL || DEFAULT_AVATAR),
-          });
-        } else if (isDeveloperAdminEmail(fbUser.email)) {
-          await ensureDeveloperSupportAdmin({
-            id: fbUser.uid,
-            email: String(existing.email || fbUser.email || ''),
-            name: String(existing.name || fbUser.displayName || 'Developer'),
-            avatar: String(existing.avatar || fbUser.photoURL || DEFAULT_AVATAR),
-          });
-        }
-      }
-
-      if (unsubscribeProfile) unsubscribeProfile();
-      unsubscribeProfile = onSnapshot(userRef, (snap) => {
-        const data = snap.data() as UserProfile | undefined;
-        if (!data) {
+        if (!fbUser) {
+          if (unsubscribeProfile) unsubscribeProfile();
           setProfile(null);
+          setHasFeatureOnboarded(false);
+          hasFeatureOnboardedRef.current = false;
           setHasCrew(false);
           setIsLoading(false);
           return;
         }
-        const featureOnboardingComplete =
-          data.hasFeatureOnboarded === true || hasFeatureOnboardedRef.current;
-        setProfile({
-          id: fbUser.uid,
-          email: data.email,
-          name: data.name,
-          avatar: data.avatar,
-          bike: data.bike || '',
-          bikes: Array.isArray(data.bikes) ? data.bikes : [],
-          emailVerified: fbUser.emailVerified,
-          crewId: data.crewId || null,
-          role: data.role || 'member',
-          preferences: data.preferences,
-          lastActiveAt: data.lastActiveAt,
-          pendingCrewId: data.pendingCrewId || null,
-          hasFeatureOnboarded: featureOnboardingComplete,
-        });
-        if (featureOnboardingComplete) {
-          hasFeatureOnboardedRef.current = true;
+
+        const userRef = doc(db, 'users', fbUser.uid);
+
+        // Subscribe to the profile FIRST so a failed bootstrap write below can
+        // never leave the app stuck on the loading spinner: as soon as any
+        // snapshot (even an empty one) arrives, loading clears.
+        if (unsubscribeProfile) unsubscribeProfile();
+        let hasReceivedProfile = false;
+        unsubscribeProfile = onSnapshot(
+          userRef,
+          (snap) => {
+            const data = snap.data() as UserProfile | undefined;
+            if (!data) {
+              // No doc yet — bootstrap below will create it; keep waiting on
+              // the first auth pass, but never hold the spinner once we've
+              // already shown a profile.
+              if (hasReceivedProfile) {
+                setProfile(null);
+                setHasCrew(false);
+              }
+              return;
+            }
+            hasReceivedProfile = true;
+            const featureOnboardingComplete =
+              data.hasFeatureOnboarded === true || hasFeatureOnboardedRef.current;
+            setProfile({
+              id: fbUser.uid,
+              email: data.email,
+              name: data.name,
+              avatar: data.avatar,
+              bike: data.bike || '',
+              bikes: Array.isArray(data.bikes) ? data.bikes : [],
+              emailVerified: fbUser.emailVerified,
+              crewId: data.crewId || null,
+              role: data.role || 'member',
+              preferences: data.preferences,
+              lastActiveAt: data.lastActiveAt,
+              pendingCrewId: data.pendingCrewId || null,
+              hasFeatureOnboarded: featureOnboardingComplete,
+            });
+            if (featureOnboardingComplete) {
+              hasFeatureOnboardedRef.current = true;
+            }
+            setHasFeatureOnboarded(featureOnboardingComplete);
+            setHasCrew(!!data.crewId);
+            setIsLoading(false);
+          },
+          (error) => {
+            if (__DEV__) {
+              console.log('[AuthProvider] Profile listener error:', error);
+            }
+            setIsLoading(false);
+          }
+        );
+
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          const name = fbUser.displayName || fbUser.email?.split('@')[0] || 'User';
+          const avatar = fbUser.photoURL || DEFAULT_AVATAR;
+          const isOwner = isInitialOwnerEmail(fbUser.email);
+          const isDeveloperAdmin = isDeveloperAdminEmail(fbUser.email);
+          // Always create the doc in the shape the security rules require
+          // (role 'member', no crew). Owner/support elevation happens after,
+          // once the member doc exists, so validSelfCrewState passes.
+          await setDoc(userRef, {
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            name,
+            avatar,
+            bike: '',
+            hasOnboarded: storedOnboarded === 'true',
+            hasFeatureOnboarded: false,
+            crewId: null,
+            role: 'member',
+            pendingCrewId: null,
+            joinedAt: new Date().toISOString(),
+            preferences: DEFAULT_PREFERENCES,
+            lastActiveAt: new Date().toISOString(),
+          }).catch((error) => {
+            // A concurrent signUp() may have created the doc first — that's
+            // fine, the snapshot listener already has it. If the doc truly
+            // doesn't exist, clear the spinner so the app can still route.
+            if (__DEV__) {
+              console.log('[AuthProvider] User bootstrap write skipped:', error);
+            }
+            setIsLoading(false);
+          });
+          if (isOwner) {
+            await ensureSingleClubOwner({
+              id: fbUser.uid,
+              email: fbUser.email || '',
+              name,
+              avatar,
+            });
+          } else if (isDeveloperAdmin) {
+            await ensureDeveloperSupportAdmin({
+              id: fbUser.uid,
+              email: fbUser.email || '',
+              name,
+              avatar,
+            });
+          }
+        } else {
+          const existing = userSnap.data() as Record<string, unknown>;
+          // Best-effort housekeeping — a rules denial here must never block
+          // sign-in.
+          const housekeeping: Record<string, unknown> = {
+            lastActiveAt: new Date().toISOString(),
+          };
+          if (!existing.preferences) {
+            housekeeping.preferences = DEFAULT_PREFERENCES;
+          }
+          await updateDoc(userRef, housekeeping).catch((error) => {
+            if (__DEV__) {
+              console.log('[AuthProvider] lastActiveAt update skipped:', error);
+            }
+          });
+          if (isInitialOwnerEmail(fbUser.email) && !existing.crewId) {
+            await ensureSingleClubOwner({
+              id: fbUser.uid,
+              email: String(existing.email || fbUser.email || ''),
+              name: String(existing.name || fbUser.displayName || 'Admin'),
+              avatar: String(existing.avatar || fbUser.photoURL || DEFAULT_AVATAR),
+            });
+          } else if (isDeveloperAdminEmail(fbUser.email)) {
+            await ensureDeveloperSupportAdmin({
+              id: fbUser.uid,
+              email: String(existing.email || fbUser.email || ''),
+              name: String(existing.name || fbUser.displayName || 'Developer'),
+              avatar: String(existing.avatar || fbUser.photoURL || DEFAULT_AVATAR),
+            });
+          }
         }
-        setHasFeatureOnboarded(featureOnboardingComplete);
-        setHasCrew(!!data.crewId);
+      } catch (error) {
+        if (__DEV__) {
+          console.log('[AuthProvider] Auth bootstrap error:', error);
+        }
+        // Whatever failed above, don't trap the user on the spinner — the
+        // profile listener (if registered) will still hydrate when it can.
         setIsLoading(false);
-      });
+      }
     });
 
     return () => {
@@ -467,9 +538,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         try {
           const callable = httpsCallable(functions, 'requestJoinCrew');
           await callable({ crewId: CLUB_ID, message: '' });
-        } catch (error) {
-          if (__DEV__) {
-            console.log('[AuthProvider] Auto access request failed:', error);
+        } catch {
+          try {
+            await submitJoinRequestDirect(
+              { id: credential.user.uid, name, avatar: DEFAULT_AVATAR, email },
+              CLUB_ID,
+              ''
+            );
+          } catch (error) {
+            // Non-fatal: crew-selection lets the user resend the request.
+            if (__DEV__) {
+              console.log('[AuthProvider] Auto access request failed:', error);
+            }
           }
         }
       }
@@ -504,12 +584,25 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const requestJoin = useCallback(async (crewId: string, message?: string) => {
     if (!profile?.id) throw new Error('Not authenticated');
     const callable = httpsCallable(functions, 'requestJoinCrew');
-    const result = await callable({ crewId, message: message || '' });
-    return result.data as {
-      status: 'pending' | 'approved';
-      crewId: string;
-      crewName: string | null;
-    };
+    try {
+      const result = await callable({ crewId, message: message || '' });
+      return result.data as {
+        status: 'pending' | 'approved';
+        crewId: string;
+        crewName: string | null;
+      };
+    } catch (callableError) {
+      try {
+        await submitJoinRequestDirect(
+          { id: profile.id, name: profile.name, avatar: profile.avatar, email: profile.email },
+          crewId,
+          message || ''
+        );
+        return { status: 'pending' as const, crewId, crewName: null };
+      } catch {
+        throw callableError;
+      }
+    }
   }, [profile]);
 
   const createCrew = useCallback(async ({

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onJoinRequestUpdated = exports.onJoinRequestCreated = exports.onCrewMemberWritten = exports.onCrewRideWritten = exports.purgeArchivedCrews = exports.revenueCatWebhook = exports.setCrewMemberLeadership = exports.setCrewMemberRole = exports.removeCrewMember = exports.denyJoinRequest = exports.approveJoinRequest = exports.deleteAccountAndCleanup = exports.leaveCrew = exports.setCrewInviteCode = exports.getCrewInviteCode = exports.joinCrewByInvite = exports.recordAnalyticsEvents = void 0;
+exports.getRideWeather = exports.onJoinRequestUpdated = exports.onJoinRequestCreated = exports.onCrewMemberWritten = exports.onCrewRideWritten = exports.purgeArchivedCrews = exports.revenueCatWebhook = exports.setCrewMemberLeadership = exports.setCrewMemberRole = exports.removeCrewMember = exports.denyJoinRequest = exports.approveJoinRequest = exports.deleteAccountAndCleanup = exports.leaveCrew = exports.setCrewInviteCode = exports.getCrewInviteCode = exports.joinCrewByInvite = exports.recordAnalyticsEvents = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -1243,5 +1243,119 @@ exports.onJoinRequestUpdated = (0, firestore_1.onDocumentUpdated)({ document: 'c
         data: { crewId, requestId: event.params.requestId },
     }));
     await sendExpoPush(messages);
+});
+// ---------------------------------------------------------------------------
+// Ride weather (Google Weather API daily forecast)
+// ---------------------------------------------------------------------------
+const GOOGLE_PLACES_API_KEY = (0, params_1.defineSecret)('GOOGLE_PLACES_API_KEY');
+function normalizeWeatherCoordinate(value) {
+    if (!value || typeof value !== 'object')
+        return null;
+    const coordinate = value;
+    const latitude = Number(coordinate.latitude);
+    const longitude = Number(coordinate.longitude);
+    if (!Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        Math.abs(latitude) > 90 ||
+        Math.abs(longitude) > 180 ||
+        (latitude === 0 && longitude === 0)) {
+        return null;
+    }
+    return { latitude, longitude };
+}
+function normalizeRideDate(value) {
+    const date = new Date(String(value ?? ''));
+    if (Number.isNaN(date.getTime())) {
+        throw new https_1.HttpsError('invalid-argument', 'VALID_DATE_REQUIRED');
+    }
+    return date;
+}
+function formatDateKey(date) {
+    return date.toISOString().slice(0, 10);
+}
+function fahrenheit(value) {
+    const record = value;
+    const degrees = Number(record?.degrees);
+    if (!Number.isFinite(degrees))
+        return null;
+    const unit = String(record?.unit || '').toUpperCase();
+    const f = unit === 'CELSIUS' ? (degrees * 9) / 5 + 32 : degrees;
+    return Math.round(f);
+}
+function roundedNumber(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.round(numeric) : null;
+}
+exports.getRideWeather = (0, https_1.onCall)({ secrets: [GOOGLE_PLACES_API_KEY] }, async (request) => {
+    if (!request.auth?.uid) {
+        throw new https_1.HttpsError('unauthenticated', 'AUTH_REQUIRED');
+    }
+    const location = normalizeWeatherCoordinate(request.data?.location);
+    const rideDate = normalizeRideDate(request.data?.dateTime);
+    if (!location) {
+        throw new https_1.HttpsError('invalid-argument', 'VALID_LOCATION_REQUIRED');
+    }
+    const now = new Date();
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysOut = Math.floor((Date.UTC(rideDate.getUTCFullYear(), rideDate.getUTCMonth(), rideDate.getUTCDate()) -
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) /
+        msPerDay);
+    if (daysOut < 0 || daysOut > 9) {
+        return {
+            weather: {
+                available: false,
+                date: formatDateKey(rideDate),
+                condition: daysOut < 0 ? 'Forecast unavailable for past rides' : 'Forecast available within 10 days',
+                highTempF: null,
+                lowTempF: null,
+                precipitationProbability: null,
+                thunderstormProbability: null,
+                windSpeedMph: null,
+                source: 'google-weather',
+            },
+        };
+    }
+    const apiKey = GOOGLE_PLACES_API_KEY.value();
+    if (!apiKey) {
+        throw new https_1.HttpsError('failed-precondition', 'GOOGLE_PLACES_API_KEY_NOT_CONFIGURED');
+    }
+    const params = new URLSearchParams({
+        key: apiKey,
+        'location.latitude': String(location.latitude),
+        'location.longitude': String(location.longitude),
+        days: String(Math.min(10, Math.max(1, daysOut + 1))),
+        pageSize: String(Math.min(10, Math.max(1, daysOut + 1))),
+        unitsSystem: 'IMPERIAL',
+    });
+    const response = await fetch(`https://weather.googleapis.com/v1/forecast/days:lookup?${params.toString()}`);
+    if (!response.ok) {
+        console.log('[Weather] Daily forecast failed:', response.status, await response.text());
+        throw new https_1.HttpsError('internal', 'WEATHER_FORECAST_FAILED');
+    }
+    const data = (await response.json());
+    const forecastDay = data.forecastDays?.find((day) => {
+        const displayDate = day.displayDate;
+        if (!displayDate)
+            return false;
+        const key = [
+            String(displayDate.year).padStart(4, '0'),
+            String(displayDate.month).padStart(2, '0'),
+            String(displayDate.day).padStart(2, '0'),
+        ].join('-');
+        return key === formatDateKey(rideDate);
+    }) || data.forecastDays?.[daysOut];
+    const daytime = forecastDay?.daytimeForecast || forecastDay?.daytime || {};
+    const weather = {
+        available: !!forecastDay,
+        date: formatDateKey(rideDate),
+        condition: String(daytime.weatherCondition?.description?.text || daytime.weatherCondition?.type || 'Forecast unavailable'),
+        highTempF: fahrenheit(forecastDay?.maxTemperature),
+        lowTempF: fahrenheit(forecastDay?.minTemperature),
+        precipitationProbability: roundedNumber(daytime.precipitation?.probability?.percent ?? daytime.precipitationProbability),
+        thunderstormProbability: roundedNumber(daytime.thunderstormProbability),
+        windSpeedMph: roundedNumber(daytime.wind?.speed?.value),
+        source: 'google-weather',
+    };
+    return { weather };
 });
 //# sourceMappingURL=index.js.map

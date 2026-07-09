@@ -20,13 +20,15 @@ import {
   Pencil,
   Camera,
   CloudSun,
-  XCircle
+  XCircle,
+  MessageCircle
 } from 'lucide-react-native';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { getCoverImageSource } from '@/constants/coverImages';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, isToday, MapsApp } from '@/utils/helpers';
+import { getFriendlyErrorMessage } from '@/utils/errorMessages';
 import { functions } from '@/utils/firebase';
 
 type RideWeather = {
@@ -133,10 +135,11 @@ export default function RideDetailScreen() {
   useEffect(() => {
     const maybePromptCheckIn = async () => {
       if (!ride || hasPromptedCheckIn) return;
-      const isUpcomingLocal = ride.status === 'upcoming';
+      const isUpcomingLocal = ride.status === 'upcoming' || ride.status === 'active';
       const isAttendingLocal = currentUser ? ride.attendees.includes(currentUser.id) : false;
       const isCheckedInLocal = currentUser ? ride.checkedIn.includes(currentUser.id) : false;
       if (!isUpcomingLocal || !isAttendingLocal || isCheckedInLocal) return;
+      if (!hasUsableCoordinates(ride.startLocation)) return;
 
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status !== 'granted') return;
@@ -182,6 +185,8 @@ export default function RideDetailScreen() {
   const isAttending = currentUser ? ride.attendees.includes(currentUser.id) : false;
   const isCheckedIn = currentUser ? ride.checkedIn.includes(currentUser.id) : false;
   const isUpcoming = ride.status === 'upcoming';
+  const isActiveRide = ride.status === 'active';
+  const canRsvpOrCheckIn = isUpcoming || isActiveRide;
   const isCompleted = ride.status === 'completed';
   const isRideToday = isToday(ride.dateTime);
   const hasOpenAlbum = isCompleted || isRideToday;
@@ -249,36 +254,81 @@ export default function RideDetailScreen() {
     if (isAttending) {
       Alert.alert('Leave Ride', 'Are you sure you want to leave this ride?', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Leave', style: 'destructive', onPress: () => leaveRide(ride.id) },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: () =>
+            leaveRide(ride.id).catch((error) => {
+              Alert.alert(
+                'Could Not Leave Ride',
+                getFriendlyErrorMessage(error, 'Something went wrong leaving this ride. Please try again.')
+              );
+            }),
+        },
       ]);
     } else {
-      joinRide(ride.id);
+      joinRide(ride.id).catch((error) => {
+        Alert.alert(
+          'Could Not Join Ride',
+          getFriendlyErrorMessage(error, 'Something went wrong joining this ride. Please try again.')
+        );
+      });
+    }
+  };
+
+  const submitCheckIn = async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      await checkIn(ride.id);
+      Alert.alert('Checked In!', 'You\'ve been checked in for this ride.');
+    } catch (error) {
+      Alert.alert(
+        'Check-In Failed',
+        getFriendlyErrorMessage(error, 'Could not save your check-in. Please try again.')
+      );
     }
   };
 
   const handleCheckIn = async () => {
     setIsCheckingIn(true);
     try {
+      // Rides saved without real coordinates (0,0) can't be location-verified.
+      if (!hasUsableCoordinates(ride.startLocation)) {
+        await submitCheckIn();
+        return;
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Needed', 'Location permission is required to check in. Please enable it in Settings.');
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const { latitude, longitude } = location.coords;
+      let distance: number;
+      try {
+        const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const { latitude, longitude } = location.coords;
+
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const R = 3958.8; // Earth radius in miles
+        const dLat = toRad(ride.startLocation.latitude - latitude);
+        const dLon = toRad(ride.startLocation.longitude - longitude);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(toRad(latitude)) * Math.cos(toRad(ride.startLocation.latitude)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      } catch {
+        Alert.alert(
+          'Location Unavailable',
+          'Could not read your current location. Make sure GPS is on and try again.'
+        );
+        return;
+      }
 
       const CHECK_IN_RADIUS_MILES = 0.5;
-      const toRad = (deg: number) => (deg * Math.PI) / 180;
-      const R = 3958.8; // Earth radius in miles
-      const dLat = toRad(ride.startLocation.latitude - latitude);
-      const dLon = toRad(ride.startLocation.longitude - longitude);
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(latitude)) * Math.cos(toRad(ride.startLocation.latitude)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
       if (distance > CHECK_IN_RADIUS_MILES) {
         Alert.alert(
           'Too Far Away',
@@ -287,13 +337,7 @@ export default function RideDetailScreen() {
         return;
       }
 
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      await checkIn(ride.id);
-      Alert.alert('Checked In!', 'You\'ve been checked in for this ride.');
-    } catch {
-      Alert.alert('Error', 'Could not verify your location. Please try again.');
+      await submitCheckIn();
     } finally {
       setIsCheckingIn(false);
     }
@@ -599,38 +643,60 @@ export default function RideDetailScreen() {
               </Text>
             </View>
             <View style={styles.attendeesCard}>
-              {attendeeMembers.slice(0, 5).map((member, index) => (
-                <View key={member.id} style={[styles.attendeeAvatar, { marginLeft: index > 0 ? -12 : 0 }]}>
-                  {member.avatar ? (
-                    <Image 
-                      source={getAvatarSource(member.avatar)}
-                      style={styles.attendeeImage}
-                      contentFit="cover"
-                    />
-                  ) : (
-                    <View style={styles.attendeePlaceholder}>
-                      <Text style={styles.attendeeInitials}>{getInitials(member.name)}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.attendeesScroll}
+              >
+                {attendeeMembers.map((member) => {
+                  const memberCheckedIn = ride.checkedIn.includes(member.id);
+                  return (
+                    <View key={member.id} style={styles.attendeeItem}>
+                      <View
+                        style={[
+                          styles.attendeeRing,
+                          memberCheckedIn && styles.attendeeRingCheckedIn,
+                        ]}
+                      >
+                        {member.avatar ? (
+                          <Image
+                            source={getAvatarSource(member.avatar)}
+                            style={styles.attendeeImage}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View style={styles.attendeePlaceholder}>
+                            <Text style={styles.attendeeInitials}>{getInitials(member.name)}</Text>
+                          </View>
+                        )}
+                        {memberCheckedIn && (
+                          <View style={styles.checkedInBadge}>
+                            <CheckCircle2 size={10} color={colors.text} />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.attendeeName} numberOfLines={1}>
+                        {member.name.split(' ')[0]}
+                      </Text>
                     </View>
-                  )}
-                  {ride.checkedIn.includes(member.id) && (
-                    <View style={styles.checkedInBadge}>
-                      <CheckCircle2 size={10} color={colors.text} />
-                    </View>
-                  )}
-                </View>
-              ))}
-              {attendeeMembers.length > 5 && (
-                <View style={[styles.attendeeAvatar, styles.moreAttendees, { marginLeft: -12 }]}>
-                  <Text style={styles.moreAttendeesText}>+{attendeeMembers.length - 5}</Text>
-                </View>
-              )}
-              <View style={styles.attendeeNames}>
-                <Text style={styles.attendeeNamesText} numberOfLines={2}>
-                  {attendeeMembers.slice(0, 3).map(m => m.name.split(' ')[0]).join(', ')}
-                  {attendeeMembers.length > 3 && ` and ${attendeeMembers.length - 3} more`}
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Chat & Check-ins</Text>
+            <Pressable style={styles.emptyPhotosCard} onPress={() => router.push(`/ride-chat/${ride.id}`)}>
+              <MessageCircle size={22} color={colors.primary} />
+              <View style={styles.emptyPhotosText}>
+                <Text style={styles.emptyPhotosTitle}>Open ride chat</Text>
+                <Text style={styles.emptyPhotosSubtitle}>
+                  Coordinate with the crew and share your status.
                 </Text>
               </View>
-            </View>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </Pressable>
           </View>
 
           {hasOpenAlbum && (
@@ -684,7 +750,7 @@ export default function RideDetailScreen() {
         </View>
       </ScrollView>
 
-      {isUpcoming && (
+      {canRsvpOrCheckIn && (
         <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
           {isAttending && !isCheckedIn && (
             <Pressable style={styles.checkInButton} onPress={handleCheckIn} disabled={isCheckingIn}>
@@ -1056,35 +1122,49 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     lineHeight: 22,
   },
   attendeesCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: 16,
-    padding: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  attendeeAvatar: {
+  attendeesScroll: {
+    paddingHorizontal: 14,
+    gap: 14,
+  },
+  attendeeItem: {
+    alignItems: 'center',
+    width: 64,
+  },
+  attendeeRing: {
     position: 'relative',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attendeeRingCheckedIn: {
+    borderColor: colors.success,
   },
   attendeeImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.surface,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   attendeePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.surface,
   },
   attendeeInitials: {
     color: colors.onPrimary,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   checkedInBadge: {
@@ -1097,28 +1177,13 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface,
   },
-  moreAttendees: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.surface,
-  },
-  moreAttendeesText: {
+  attendeeName: {
+    marginTop: 6,
     color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '600',
-  },
-  attendeeNames: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  attendeeNamesText: {
-    color: colors.textSecondary,
-    fontSize: 14,
+    maxWidth: 64,
+    textAlign: 'center',
   },
   photosScroll: {
     gap: 8,

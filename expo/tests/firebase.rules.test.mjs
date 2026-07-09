@@ -7,7 +7,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadString } from 'firebase/storage';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -164,6 +164,60 @@ async function seedData() {
         archivedAt: null,
         purgeAt: null,
         createdAt: now,
+      }),
+      setDoc(doc(db, 'crews', 'crewUnpaid'), {
+        id: 'crewUnpaid',
+        name: 'Unpaid Crew',
+        description: 'Billing required but subscription inactive',
+        nameLower: 'unpaid crew',
+        ownerId: 'alice',
+        subscriptionOwnerId: null,
+        subscriptionStatus: 'inactive',
+        billingRequired: true,
+        status: 'active',
+        isDiscoverable: false,
+        requiresApproval: true,
+        memberCount: 2,
+        totalRides: 1,
+        totalMiles: 0,
+        totalPhotos: 0,
+        archivedAt: null,
+        purgeAt: null,
+        createdAt: now,
+      }),
+      setDoc(doc(db, 'crews', 'crewUnpaid', 'members', 'alice'), {
+        id: 'alice',
+        email: 'alice@example.com',
+        name: 'Alice',
+        avatar: '',
+        role: 'admin',
+        joinedCrewAt: now,
+      }),
+      setDoc(doc(db, 'crews', 'crewUnpaid', 'members', 'cara'), {
+        id: 'cara',
+        email: 'cara@example.com',
+        name: 'Cara',
+        avatar: '',
+        role: 'member',
+        joinedCrewAt: now,
+      }),
+      setDoc(doc(db, 'crews', 'crewUnpaid', 'rides', 'rideU'), {
+        id: 'rideU',
+        crewId: 'crewUnpaid',
+        title: 'Unpaid Crew Ride',
+        description: 'Ride on a crew without an active subscription',
+        dateTime: now,
+        estimatedDuration: '2h',
+        estimatedDistance: 20,
+        pace: 'moderate',
+        notes: '',
+        coverImage: '',
+        createdBy: 'alice',
+        createdByName: 'Alice',
+        attendees: [],
+        checkedIn: [],
+        status: 'upcoming',
+        photos: [],
       }),
       setDoc(doc(db, 'crews', 'crewA', 'members', 'alice'), {
         id: 'alice',
@@ -378,6 +432,19 @@ test('leaders can write announcements, members cannot', async () => {
   );
 });
 
+test('members can like announcements but not edit them', async () => {
+  const caraDb = testEnv.authenticatedContext('cara').firestore();
+  const dylanDb = testEnv.authenticatedContext('dylan').firestore();
+  const annRef = doc(caraDb, 'crews', 'crewA', 'announcements', 'annExisting');
+
+  await assertSucceeds(updateDoc(annRef, { likedBy: ['cara'] }));
+  await assertFails(updateDoc(annRef, { title: 'Hijacked' }));
+  await assertFails(updateDoc(annRef, { likedBy: ['cara'], title: 'Hijacked' }));
+  await assertFails(
+    updateDoc(doc(dylanDb, 'crews', 'crewA', 'announcements', 'annExisting'), { likedBy: ['dylan'] })
+  );
+});
+
 test('members can update ride attendance but not protected ride fields', async () => {
   const caraDb = testEnv.authenticatedContext('cara').firestore();
   const rideRef = doc(caraDb, 'crews', 'crewA', 'rides', 'ride1');
@@ -399,6 +466,158 @@ test('members can update ride attendance but not protected ride fields', async (
     })
   );
   await assertFails(updateDoc(rideRef, { title: 'Hijacked title' }));
+});
+
+test('crew members can chat on rides; status posts require attendance', async () => {
+  const caraDb = testEnv.authenticatedContext('cara').firestore();
+  const bobDb = testEnv.authenticatedContext('bob').firestore();
+  const dylanDb = testEnv.authenticatedContext('dylan').firestore();
+
+  // Any crew participant can post a chat message as themselves.
+  await assertSucceeds(
+    setDoc(doc(caraDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'msg1'), {
+      rideId: 'ride1',
+      userId: 'cara',
+      userName: 'Cara',
+      type: 'chat',
+      text: 'Rolling out soon?',
+      createdAt: now,
+    })
+  );
+
+  // Cannot spoof another user.
+  await assertFails(
+    setDoc(doc(caraDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'msg2'), {
+      rideId: 'ride1',
+      userId: 'bob',
+      userName: 'Bob',
+      type: 'chat',
+      text: 'Spoofed',
+      createdAt: now,
+    })
+  );
+
+  // Outsiders cannot read or post.
+  await assertFails(getDoc(doc(dylanDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'msg1')));
+  await assertFails(
+    setDoc(doc(dylanDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'msg3'), {
+      rideId: 'ride1',
+      userId: 'dylan',
+      userName: 'Dylan',
+      type: 'chat',
+      text: 'Not in this crew',
+      createdAt: now,
+    })
+  );
+
+  // Status posts require being an attendee, even for leaders.
+  const bobStatus = {
+    rideId: 'ride1',
+    userId: 'bob',
+    userName: 'Bob',
+    type: 'status',
+    status: 'on_my_way',
+    text: 'On my way',
+    createdAt: now,
+  };
+  await assertFails(
+    setDoc(doc(bobDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'status1'), bobStatus)
+  );
+  await assertSucceeds(updateDoc(doc(bobDb, 'crews', 'crewA', 'rides', 'ride1'), { attendees: ['bob'] }));
+  await assertSucceeds(
+    setDoc(doc(bobDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'status1'), bobStatus)
+  );
+
+  // Messages are immutable; authors can delete their own.
+  await assertFails(
+    updateDoc(doc(caraDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'msg1'), { text: 'edited' })
+  );
+  await assertSucceeds(deleteDoc(doc(caraDb, 'crews', 'crewA', 'rides', 'ride1', 'messages', 'msg1')));
+});
+
+test('RSVP, check-in, and ride chat stay available when the club subscription is inactive', async () => {
+  const caraDb = testEnv.authenticatedContext('cara').firestore();
+  const rideRef = doc(caraDb, 'crews', 'crewUnpaid', 'rides', 'rideU');
+
+  // Core safety features are never paywalled.
+  await assertSucceeds(updateDoc(rideRef, { attendees: ['cara'] }));
+  await assertSucceeds(updateDoc(rideRef, { checkedIn: ['cara'] }));
+  await assertSucceeds(
+    setDoc(doc(caraDb, 'crews', 'crewUnpaid', 'rides', 'rideU', 'messages', 'chat1'), {
+      rideId: 'rideU',
+      userId: 'cara',
+      userName: 'Cara',
+      type: 'chat',
+      text: 'Anyone riding today?',
+      createdAt: now,
+    })
+  );
+  await assertSucceeds(
+    setDoc(doc(caraDb, 'crews', 'crewUnpaid', 'rides', 'rideU', 'messages', 'status1'), {
+      rideId: 'rideU',
+      userId: 'cara',
+      userName: 'Cara',
+      type: 'status',
+      status: 'on_my_way',
+      text: 'On my way',
+      createdAt: now,
+    })
+  );
+
+  // Photo posting stays behind the club subscription.
+  await assertFails(
+    updateDoc(rideRef, {
+      photos: [
+        {
+          id: 'photoU',
+          rideId: 'rideU',
+          uploadedBy: 'cara',
+          uploadedByName: 'Cara',
+          imageUrl: 'https://example.com/photo.jpg',
+          uploadedAt: now,
+        },
+      ],
+    })
+  );
+});
+
+test('a denied join request can be resubmitted by its owner only', async () => {
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'crews', 'crewA', 'joinRequests', 'dylan'), {
+      id: 'dylan',
+      crewId: 'crewA',
+      userId: 'dylan',
+      userName: 'Dylan',
+      userEmail: 'dylan@example.com',
+      userAvatar: '',
+      status: 'denied',
+      createdAt: now,
+      decidedAt: now,
+      decidedBy: 'alice',
+    });
+  });
+
+  const dylanDb = testEnv.authenticatedContext('dylan').firestore();
+  const caraDb = testEnv.authenticatedContext('cara').firestore();
+  const resubmission = {
+    id: 'dylan',
+    crewId: 'crewA',
+    userId: 'dylan',
+    userName: 'Dylan',
+    userEmail: 'dylan@example.com',
+    userAvatar: '',
+    status: 'pending',
+    createdAt: now,
+  };
+
+  // Someone else cannot flip Dylan's denied request.
+  await assertFails(setDoc(doc(caraDb, 'crews', 'crewA', 'joinRequests', 'dylan'), resubmission));
+  // Dylan can resubmit his own denied request back to pending.
+  await assertSucceeds(setDoc(doc(dylanDb, 'crews', 'crewA', 'joinRequests', 'dylan'), resubmission));
+  // Once pending again, a further self-update is rejected (admins decide from here).
+  await assertFails(
+    updateDoc(doc(dylanDb, 'crews', 'crewA', 'joinRequests', 'dylan'), { status: 'approved' })
+  );
 });
 
 test('members cannot create rides or albums', async () => {
@@ -465,8 +684,12 @@ test('developer support can test paid features without activating subscription',
       photos: [],
     })
   );
-  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/rides/devRide/cover.jpg'), 'cover'));
-  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/rides/devRide/photos/photo1.jpg'), 'photo'));
+  await assertSucceeds(
+    uploadString(ref(devStorage, 'crews/crewDev/rides/devRide/cover.jpg'), 'cover', 'raw', { contentType: 'image/jpeg' })
+  );
+  await assertSucceeds(
+    uploadString(ref(devStorage, 'crews/crewDev/rides/devRide/photos/photo1.jpg'), 'photo', 'raw', { contentType: 'image/jpeg' })
+  );
   await assertSucceeds(
     setDoc(doc(devDb, 'crews', 'crewDev', 'albums', 'devAlbum'), {
       id: 'devAlbum',
@@ -481,8 +704,12 @@ test('developer support can test paid features without activating subscription',
       photos: [],
     })
   );
-  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/cover.jpg'), 'cover'));
-  await assertSucceeds(uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/photos/photo1.jpg'), 'photo'));
+  await assertSucceeds(
+    uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/cover.jpg'), 'cover', 'raw', { contentType: 'image/jpeg' })
+  );
+  await assertSucceeds(
+    uploadString(ref(devStorage, 'crews/crewDev/albums/devAlbum/photos/photo1.jpg'), 'photo', 'raw', { contentType: 'image/jpeg' })
+  );
 });
 
 test('active paid crew unlocks rides and albums even when subscription owner member is stale', async () => {
@@ -568,23 +795,35 @@ test('stats history stays server-owned', async () => {
   );
 });
 
-test('storage rules enforce self-only avatars and crew role-based uploads', async () => {
+test('storage rules enforce self-only avatars and image-typed uploads', async () => {
+  // Storage rules are intentionally self-contained (see the header note in
+  // storage.rules): cross-service firestore lookups don't work against this
+  // project's named database, so crew paths accept any signed-in image upload
+  // and Firestore rules remain the business-permission gate.
   const aliceStorage = testEnv.authenticatedContext('alice').storage();
   const caraStorage = testEnv.authenticatedContext('cara').storage();
   const dylanStorage = testEnv.authenticatedContext('dylan').storage();
-  const mirrorAdminStorage = testEnv.authenticatedContext('mirrorAdmin').storage();
+  const anonStorage = testEnv.unauthenticatedContext().storage();
+  const image = { contentType: 'image/jpeg' };
 
-  await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatar.jpg'), 'fresh-avatar'));
-  await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatar.jpg'), 'nope'));
-  await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatars/avatar-123.jpg'), 'fresh-avatar'));
-  await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatars/avatar-123.jpg'), 'nope'));
-  await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/announcements/old-path.jpg'), 'announcement'));
-  await assertFails(uploadString(ref(dylanStorage, 'crews/crewA/announcements/old-path.jpg'), 'announcement'));
-  await assertSucceeds(uploadString(ref(mirrorAdminStorage, 'crews/crewA/announcements/mirror-path.jpg'), 'announcement'));
-  await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/announcements/annExisting/image.jpg'), 'announcement'));
-  await assertFails(uploadString(ref(caraStorage, 'crews/crewA/announcements/annExisting/image.jpg'), 'announcement'));
-  await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover'));
-  await assertFails(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover'));
-  await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/photos/photo1.jpg'), 'photo'));
-  await assertFails(uploadString(ref(dylanStorage, 'crews/crewA/rides/ride1/photos/photo1.jpg'), 'photo'));
+  // Avatars are strictly self-owned.
+  await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatar.jpg'), 'fresh-avatar', 'raw', image));
+  await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatar.jpg'), 'nope', 'raw', image));
+  await assertSucceeds(uploadString(ref(aliceStorage, 'users/alice/avatars/avatar-123.jpg'), 'fresh-avatar', 'raw', image));
+  await assertFails(uploadString(ref(dylanStorage, 'users/alice/avatars/avatar-123.jpg'), 'nope', 'raw', image));
+
+  // Crew media paths accept image uploads from any signed-in user.
+  await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/announcements/old-path.jpg'), 'announcement', 'raw', image));
+  await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/announcements/annExisting/image.jpg'), 'announcement', 'raw', image));
+  await assertSucceeds(uploadString(ref(aliceStorage, 'crews/crewA/rides/ride1/cover.jpg'), 'cover', 'raw', image));
+  await assertSucceeds(uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/photos/photo1.jpg'), 'photo', 'raw', image));
+
+  // Non-image payloads, signed-out users, and unknown paths are rejected.
+  await assertFails(
+    uploadString(ref(caraStorage, 'crews/crewA/rides/ride1/photos/bad.jpg'), 'not-an-image', 'raw', {
+      contentType: 'text/plain',
+    })
+  );
+  await assertFails(uploadString(ref(anonStorage, 'crews/crewA/rides/ride1/photos/photo2.jpg'), 'photo', 'raw', image));
+  await assertFails(uploadString(ref(aliceStorage, 'random/other.jpg'), 'nope', 'raw', image));
 });
