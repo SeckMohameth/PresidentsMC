@@ -819,7 +819,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     height: '100%',
   },
   heroGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   backButton: {
     position: 'absolute',
@@ -1200,7 +1200,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     height: '100%',
   },
   photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',

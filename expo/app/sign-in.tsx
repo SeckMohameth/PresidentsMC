@@ -256,10 +256,10 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     backgroundColor: colors.background,
   },
   backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   backgroundOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   safeArea: {

@@ -3,7 +3,7 @@
 // In this diagnostic build, the error is shown on screen via Alert.
 import { Alert } from 'react-native';
 
-const errorUtils = (global as any).ErrorUtils;
+const errorUtils = (globalThis as any).ErrorUtils;
 if (errorUtils) {
   errorUtils.setGlobalHandler((error: Error, isFatal: boolean) => {
     const msg = error?.message ?? String(error);

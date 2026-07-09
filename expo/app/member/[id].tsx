@@ -90,7 +90,7 @@ export default function MemberProfileScreen() {
           <LinearGradient
             colors={['rgba(0,0,0,0.08)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0.92)']}
             locations={[0, 0.48, 1]}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <ArrowLeft size={21} color="#FFFFFF" />
@@ -187,7 +187,7 @@ export default function MemberProfileScreen() {
                   <LinearGradient
                     colors={['transparent', 'rgba(0,0,0,0.74)', 'rgba(0,0,0,0.96)']}
                     locations={[0.2, 0.64, 1]}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                   />
                   <View style={styles.bikeCopy}>
                     {bike.isPrimary ? (
@@ -250,7 +250,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   backPill: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 18, backgroundColor: colors.surface },
   backPillText: { color: colors.text, fontWeight: '700' },
   hero: { minHeight: 520, justifyContent: 'flex-end', overflow: 'hidden', backgroundColor: colors.surface },
-  heroImage: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.surface },
+  heroImage: { ...StyleSheet.absoluteFill, backgroundColor: colors.surface },
   heroCopy: { paddingHorizontal: 20, paddingBottom: 24, gap: 18 },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   identityText: { flex: 1 },
@@ -277,8 +277,8 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '900', marginBottom: 12 },
   bikeList: { gap: 12, paddingRight: 16 },
   bikeCard: { width: 276, height: 360, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
-  bikeImage: { ...StyleSheet.absoluteFillObject },
-  bikeImageFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
+  bikeImage: { ...StyleSheet.absoluteFill },
+  bikeImageFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated },
   bikeCopy: { position: 'absolute', left: 16, right: 16, bottom: 16 },
   primaryTag: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 3, backgroundColor: 'rgba(216,58,46,0.86)', marginBottom: 10 },
   primaryTagText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },

@@ -44,7 +44,7 @@ export default function OnboardingScreen() {
           'rgba(5,5,5,0.92)',
         ]}
         locations={[0, 0.32, 0.58, 1]}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
       />
 
       <SafeAreaView style={styles.safeArea}>
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
   },
   heroImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
   },
