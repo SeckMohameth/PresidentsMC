@@ -156,8 +156,15 @@ function RootLayoutNav() {
           presentation: 'card',
         }} 
       />
-      <Stack.Screen 
-        name="create-ride" 
+      <Stack.Screen
+        name="ride-chat/[id]"
+        options={{
+          headerShown: false,
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="create-ride"
         options={{ 
           presentation: 'modal',
           headerShown: false,

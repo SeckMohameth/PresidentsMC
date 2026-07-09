@@ -1663,3 +1663,157 @@ export const onJoinRequestUpdated = onDocumentUpdated(
     await sendExpoPush(messages);
   }
 );
+
+// ---------------------------------------------------------------------------
+// Ride weather (Google Weather API daily forecast)
+// ---------------------------------------------------------------------------
+
+const GOOGLE_PLACES_API_KEY = defineSecret('GOOGLE_PLACES_API_KEY');
+
+type WeatherCoordinate = {
+  latitude: number;
+  longitude: number;
+};
+
+type WeatherSummary = {
+  available: boolean;
+  date: string;
+  condition: string;
+  highTempF: number | null;
+  lowTempF: number | null;
+  precipitationProbability: number | null;
+  thunderstormProbability: number | null;
+  windSpeedMph: number | null;
+  source: 'google-weather';
+};
+
+function normalizeWeatherCoordinate(value: unknown): WeatherCoordinate | null {
+  if (!value || typeof value !== 'object') return null;
+  const coordinate = value as { latitude?: unknown; longitude?: unknown };
+  const latitude = Number(coordinate.latitude);
+  const longitude = Number(coordinate.longitude);
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    Math.abs(latitude) > 90 ||
+    Math.abs(longitude) > 180 ||
+    (latitude === 0 && longitude === 0)
+  ) {
+    return null;
+  }
+  return { latitude, longitude };
+}
+
+function normalizeRideDate(value: unknown) {
+  const date = new Date(String(value ?? ''));
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpsError('invalid-argument', 'VALID_DATE_REQUIRED');
+  }
+  return date;
+}
+
+function formatDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function fahrenheit(value: unknown): number | null {
+  const record = value as { degrees?: unknown; unit?: unknown } | null | undefined;
+  const degrees = Number(record?.degrees);
+  if (!Number.isFinite(degrees)) return null;
+  const unit = String(record?.unit || '').toUpperCase();
+  const f = unit === 'CELSIUS' ? (degrees * 9) / 5 + 32 : degrees;
+  return Math.round(f);
+}
+
+function roundedNumber(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.round(numeric) : null;
+}
+
+export const getRideWeather = onCall({ secrets: [GOOGLE_PLACES_API_KEY] }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'AUTH_REQUIRED');
+  }
+
+  const location = normalizeWeatherCoordinate(request.data?.location);
+  const rideDate = normalizeRideDate(request.data?.dateTime);
+  if (!location) {
+    throw new HttpsError('invalid-argument', 'VALID_LOCATION_REQUIRED');
+  }
+
+  const now = new Date();
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysOut = Math.floor(
+    (Date.UTC(rideDate.getUTCFullYear(), rideDate.getUTCMonth(), rideDate.getUTCDate()) -
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) /
+      msPerDay
+  );
+
+  if (daysOut < 0 || daysOut > 9) {
+    return {
+      weather: {
+        available: false,
+        date: formatDateKey(rideDate),
+        condition: daysOut < 0 ? 'Forecast unavailable for past rides' : 'Forecast available within 10 days',
+        highTempF: null,
+        lowTempF: null,
+        precipitationProbability: null,
+        thunderstormProbability: null,
+        windSpeedMph: null,
+        source: 'google-weather',
+      } satisfies WeatherSummary,
+    };
+  }
+
+  const apiKey = GOOGLE_PLACES_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError('failed-precondition', 'GOOGLE_PLACES_API_KEY_NOT_CONFIGURED');
+  }
+
+  const params = new URLSearchParams({
+    key: apiKey,
+    'location.latitude': String(location.latitude),
+    'location.longitude': String(location.longitude),
+    days: String(Math.min(10, Math.max(1, daysOut + 1))),
+    pageSize: String(Math.min(10, Math.max(1, daysOut + 1))),
+    unitsSystem: 'IMPERIAL',
+  });
+
+  const response = await fetch(`https://weather.googleapis.com/v1/forecast/days:lookup?${params.toString()}`);
+  if (!response.ok) {
+    console.log('[Weather] Daily forecast failed:', response.status, await response.text());
+    throw new HttpsError('internal', 'WEATHER_FORECAST_FAILED');
+  }
+
+  const data = (await response.json()) as any;
+  const forecastDay =
+    data.forecastDays?.find((day: any) => {
+      const displayDate = day.displayDate;
+      if (!displayDate) return false;
+      const key = [
+        String(displayDate.year).padStart(4, '0'),
+        String(displayDate.month).padStart(2, '0'),
+        String(displayDate.day).padStart(2, '0'),
+      ].join('-');
+      return key === formatDateKey(rideDate);
+    }) || data.forecastDays?.[daysOut];
+
+  const daytime = forecastDay?.daytimeForecast || forecastDay?.daytime || {};
+  const weather: WeatherSummary = {
+    available: !!forecastDay,
+    date: formatDateKey(rideDate),
+    condition: String(
+      daytime.weatherCondition?.description?.text || daytime.weatherCondition?.type || 'Forecast unavailable'
+    ),
+    highTempF: fahrenheit(forecastDay?.maxTemperature),
+    lowTempF: fahrenheit(forecastDay?.minTemperature),
+    precipitationProbability: roundedNumber(
+      daytime.precipitation?.probability?.percent ?? daytime.precipitationProbability
+    ),
+    thunderstormProbability: roundedNumber(daytime.thunderstormProbability),
+    windSpeedMph: roundedNumber(daytime.wind?.speed?.value),
+    source: 'google-weather',
+  };
+
+  return { weather };
+});

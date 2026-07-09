@@ -20,6 +20,7 @@ import { AppColors, useThemeColors } from '@/constants/colors';
 import { CLUB_ID, CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
+import { getFriendlyErrorMessage } from '@/utils/errorMessages';
 
 const WAITING_ROOM_IMAGE = require('../assets/images/custom-images/optimized/waiting-room.jpg');
 const ADMIN_SUPPORT_EMAIL = 'mohameth@mostudios.io';
@@ -128,8 +129,11 @@ export default function CrewSelectionScreen() {
         return;
       }
       Alert.alert('Request Sent', `Your request to join ${clubName} is waiting for admin approval.`);
-    } catch {
-      Alert.alert('Error', 'Could not send your access request. Please try again.');
+    } catch (error) {
+      Alert.alert(
+        'Request Failed',
+        getFriendlyErrorMessage(error, 'Could not send your access request. Please try again.')
+      );
     } finally {
       setIsSubmitting(false);
     }

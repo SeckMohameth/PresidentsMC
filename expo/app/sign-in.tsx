@@ -21,6 +21,7 @@ import { CLUB_NAME } from '@/constants/club';
 import { PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/constants/legal';
 import { useAuth } from '@/providers/AuthProvider';
 import { trackAnalyticsEvent } from '@/utils/analytics';
+import { getSignInErrorMessage } from '@/utils/errorMessages';
 
 const authBackgroundImage = require('../assets/images/auth-login.jpg');
 const ADMIN_SUPPORT_EMAIL = 'mohameth@mostudios.io';
@@ -80,7 +81,7 @@ export default function SignInScreen() {
           method: 'email_password',
         },
       });
-      Alert.alert('Error', 'Invalid email or password. Please try again.');
+      Alert.alert('Sign In Failed', getSignInErrorMessage(error));
     }
   };
 

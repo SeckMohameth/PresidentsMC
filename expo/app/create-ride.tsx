@@ -14,6 +14,7 @@ import { useCrew, useRide } from '@/providers/CrewProvider';
 import AddressAutocomplete, { AddressSelection } from '@/components/AddressAutocomplete';
 import { ImageAttribution, RouteCoordinate } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
+import { getFriendlyErrorMessage } from '@/utils/errorMessages';
 import { functions } from '@/utils/firebase';
 import { getPhotoPickerErrorMessage, pickSingleImage, requestPhotoLibraryAccess } from '@/utils/imagePicker';
 import {
@@ -58,7 +59,7 @@ function getRideSaveErrorMessage(error: unknown) {
     return 'You need admin or officer access and an active club subscription to update ride background images.';
   }
 
-  return message || 'Unable to save this ride right now.';
+  return getFriendlyErrorMessage(error, 'Unable to save this ride right now.');
 }
 
 export default function CreateRideScreen() {
@@ -363,10 +364,29 @@ export default function CreateRideScreen() {
     ? rideDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : '';
 
+  const resolveCoords = async (
+    coords: { latitude: number; longitude: number } | null,
+    address: string
+  ) => {
+    if (coords) return coords;
+    const trimmed = address.trim();
+    if (!trimmed) return null;
+    try {
+      const results = await Location.geocodeAsync(trimmed);
+      if (results[0]) return { latitude: results[0].latitude, longitude: results[0].longitude };
+    } catch {
+      // Fall through; ride saves without coordinates.
+    }
+    return null;
+  };
+
   const submitRide = async () => {
     if (Platform.OS !== 'web') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
+
+    const resolvedStartCoords = await resolveCoords(startCoords, startAddress);
+    const resolvedEndCoords = await resolveCoords(endCoords, endAddress);
 
     const coverValue = normalizeCoverImageReference(coverImage || DEFAULT_COVER_IMAGE);
     if (isEditMode && rideId) {
@@ -378,14 +398,14 @@ export default function CreateRideScreen() {
           startLocation: {
             name: startName.trim(),
             address: startAddress.trim(),
-            latitude: startCoords?.latitude ?? 0,
-            longitude: startCoords?.longitude ?? 0,
+            latitude: resolvedStartCoords?.latitude ?? 0,
+            longitude: resolvedStartCoords?.longitude ?? 0,
           },
           endLocation: {
             name: endName.trim(),
             address: endAddress.trim(),
-            latitude: endCoords?.latitude ?? 0,
-            longitude: endCoords?.longitude ?? 0,
+            latitude: resolvedEndCoords?.latitude ?? 0,
+            longitude: resolvedEndCoords?.longitude ?? 0,
           },
           dateTime: rideDate.toISOString(),
           estimatedDuration: duration || '2 hours',
@@ -418,14 +438,14 @@ export default function CreateRideScreen() {
         startLocation: {
           name: startName.trim(),
           address: startAddress.trim(),
-          latitude: startCoords?.latitude ?? 0,
-          longitude: startCoords?.longitude ?? 0,
+          latitude: resolvedStartCoords?.latitude ?? 0,
+          longitude: resolvedStartCoords?.longitude ?? 0,
         },
         endLocation: {
           name: endName.trim(),
           address: endAddress.trim(),
-          latitude: endCoords?.latitude ?? 0,
-          longitude: endCoords?.longitude ?? 0,
+          latitude: resolvedEndCoords?.latitude ?? 0,
+          longitude: resolvedEndCoords?.longitude ?? 0,
         },
         dateTime: rideDate.toISOString(),
         estimatedDuration: duration || '2 hours',

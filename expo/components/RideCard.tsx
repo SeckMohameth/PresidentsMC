@@ -6,8 +6,10 @@ import { MapPin, Clock, Users, ChevronRight, Gauge, Navigation } from 'lucide-re
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { getCoverImageSource, getDefaultRideCoverUri } from '@/constants/coverImages';
+import { useCrew } from '@/providers/CrewProvider';
+import { getAvatarSource } from '@/utils/avatar';
 import { Ride } from '@/types';
-import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, getDaysUntil, isToday } from '@/utils/helpers';
+import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, getDaysUntil, isToday, getInitials } from '@/utils/helpers';
 
 interface RideCardProps {
   ride: Ride;
@@ -20,6 +22,11 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
   const styles = React.useMemo(() => createStyles(colors, isLight), [colors, isLight]);
   const [imageFailed, setImageFailed] = React.useState(false);
   const router = useRouter();
+  const { members } = useCrew();
+  const attendeePreview = React.useMemo(
+    () => members.filter((member) => ride.attendees.includes(member.id)).slice(0, 3),
+    [members, ride.attendees]
+  );
   const coverImage = !imageFailed && ride.coverImage ? ride.coverImage : getDefaultRideCoverUri();
   const daysUntil = getDaysUntil(ride.dateTime);
   const isRideToday = isToday(ride.dateTime);
@@ -31,7 +38,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
       ? colors.completed
       : ride.status === 'cancelled'
         ? colors.cancelled
-        : isRideToday
+        : ride.status === 'active' || isRideToday
           ? colors.heat
           : isPastDue
             ? colors.pending
@@ -41,13 +48,15 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
       ? 'Completed'
       : ride.status === 'cancelled'
         ? 'Cancelled'
-        : isPastDue
-          ? 'Past due'
-          : isRideToday
-            ? 'Today'
-            : daysUntil === 1
-              ? 'Tomorrow'
-              : `In ${daysUntil} days`;
+        : ride.status === 'active'
+          ? 'Today'
+          : isPastDue
+            ? 'Past due'
+            : isRideToday
+              ? 'Today'
+              : daysUntil === 1
+                ? 'Tomorrow'
+                : `In ${daysUntil} days`;
 
   const handlePress = () => {
     router.push(`/ride/${ride.id}`);
@@ -110,7 +119,7 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
           end={{ x: 1, y: 1 }}
           style={styles.heatLine}
         />
-        {(ride.status === 'upcoming' || ride.status === 'completed' || ride.status === 'cancelled') && (
+        {(ride.status === 'upcoming' || ride.status === 'active' || ride.status === 'completed' || ride.status === 'cancelled') && (
           <View style={[styles.statusBadge, { borderColor: statusTone }]}>
             <Text style={styles.statusText}>
               {statusLabel}
@@ -149,7 +158,30 @@ export default function RideCard({ ride, variant = 'default' }: RideCardProps) {
             </Text>
           </View>
           <View style={styles.stat}>
-            <Users size={14} color={colors.textTertiary} />
+            {attendeePreview.length > 0 ? (
+              <View style={styles.avatarStack}>
+                {attendeePreview.map((member, index) => (
+                  <View
+                    key={member.id}
+                    style={[styles.stackAvatar, index > 0 && styles.stackAvatarOverlap]}
+                  >
+                    {member.avatar ? (
+                      <Image
+                        source={getAvatarSource(member.avatar)}
+                        style={styles.stackAvatarImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={styles.stackAvatarPlaceholder}>
+                        <Text style={styles.stackAvatarInitials}>{getInitials(member.name)}</Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Users size={14} color={colors.textTertiary} />
+            )}
             <Text style={styles.statText}>{ride.attendees.length} going</Text>
           </View>
         </View>
@@ -286,6 +318,37 @@ const createStyles = (colors: AppColors, isLight: boolean) => StyleSheet.create(
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
+  },
+  avatarStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stackAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceElevated,
+  },
+  stackAvatarOverlap: {
+    marginLeft: -8,
+  },
+  stackAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  stackAvatarPlaceholder: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stackAvatarInitials: {
+    color: colors.onPrimary,
+    fontSize: 9,
+    fontWeight: '700',
   },
   compactContainer: {
     backgroundColor: colors.surface,

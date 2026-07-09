@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, ActivityIndicator, useWindowDimensions, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -12,6 +12,7 @@ import { useCrew } from '@/providers/CrewProvider';
 import AnnouncementCard from '@/components/AnnouncementCard';
 import RideCard from '@/components/RideCard';
 import { getAvatarSource } from '@/utils/avatar';
+import { getFriendlyErrorMessage } from '@/utils/errorMessages';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -163,7 +164,14 @@ export default function HomeScreen() {
                 key={announcement.id} 
                 announcement={announcement}
                 resolvedAuthorAvatar={author?.avatar}
-                onToggleLike={() => toggleAnnouncementLike(announcement.id)}
+                onToggleLike={() =>
+                  toggleAnnouncementLike(announcement.id).catch((error) => {
+                    Alert.alert(
+                      'Could Not Update Like',
+                      getFriendlyErrorMessage(error, 'Something went wrong. Please try again.')
+                    );
+                  })
+                }
                 onEdit={canManageAnnouncements ? () => router.push({ pathname: '/create-announcement', params: { announcementId: announcement.id } }) : undefined}
               />
               );

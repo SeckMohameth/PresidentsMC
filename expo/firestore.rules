@@ -217,19 +217,50 @@ service cloud.firestore {
 
       match /announcements/{announcementId} {
         allow read: if isCrewParticipant(crewId);
-        allow create, update, delete: if canManageAnnouncements(crewId);
+        allow create, delete: if canManageAnnouncements(crewId);
+        // Any crew participant may like/unlike; everything else is leader-only.
+        allow update: if canManageAnnouncements(crewId)
+          || (isCrewParticipant(crewId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly(['likedBy']));
       }
 
       match /rides/{rideId} {
         allow read: if isCrewParticipant(crewId);
         allow create, delete: if canManageRides(crewId);
+        // RSVP + check-in are core safety features and stay available even
+        // when the club's subscription lapses; only photo posting is paid.
         allow update: if canManageRides(crewId)
+          || (isCrewParticipant(crewId)
+            && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+              'attendees',
+              'checkedIn'
+            ]))
           || (isCrewParticipant(crewId) && hasPaidFeatureAccess(crewId)
             && request.resource.data.diff(resource.data).changedKeys().hasOnly([
               'attendees',
               'checkedIn',
               'photos'
             ]));
+
+        // Ride chat doubles as the safety check-in channel, so it is not
+        // gated on the club subscription either.
+        match /messages/{messageId} {
+          allow read: if isCrewParticipant(crewId);
+          allow create: if isCrewParticipant(crewId)
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 1000
+            && (
+              request.resource.data.type == 'chat'
+              || (
+                request.resource.data.type == 'status'
+                && get(/databases/$(database)/documents/crews/$(crewId)/rides/$(rideId)).data.attendees.hasAny([request.auth.uid])
+              )
+            );
+          allow update: if false;
+          allow delete: if isSelf(resource.data.userId) || canManageRides(crewId);
+        }
       }
 
       match /albums/{albumId} {
@@ -251,7 +282,16 @@ service cloud.firestore {
           && request.resource.data.crewId == crewId
           && request.resource.data.status == 'pending'
           && !isCrewMember(crewId);
-        allow update: if false;
+        // A denied requester may resubmit: flip their own request back to
+        // pending. Everything else stays immutable to non-admins.
+        allow update: if signedIn()
+          && requestId == request.auth.uid
+          && resource.data.status == 'denied'
+          && request.resource.data.id == request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.crewId == crewId
+          && request.resource.data.status == 'pending'
+          && !isCrewMember(crewId);
         allow delete: if signedIn() && requestId == request.auth.uid && resource.data.status == 'pending';
       }
 

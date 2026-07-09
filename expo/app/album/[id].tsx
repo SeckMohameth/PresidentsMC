@@ -10,6 +10,7 @@ import { ArrowLeft, X, Camera, Plus, Trash2, Pencil, Download } from 'lucide-rea
 import { AppColors, useThemeColors } from '@/constants/colors';
 import { useCrew, useRide } from '@/providers/CrewProvider';
 import { formatDate, formatRelativeTime } from '@/utils/helpers';
+import { getFriendlyErrorMessage } from '@/utils/errorMessages';
 import { RidePhoto } from '@/types';
 
 export default function AlbumScreen() {
@@ -168,12 +169,9 @@ export default function AlbumScreen() {
       if (__DEV__) {
         console.log('[Album] Photo upload error:', error);
       }
-      const message = String((error as any)?.message ?? '');
       Alert.alert(
         'Upload Failed',
-        message.includes('SUBSCRIPTION_INACTIVE')
-          ? 'The club subscription must be active before members can add album photos.'
-          : 'Unable to add this photo right now. Please try another photo.'
+        getFriendlyErrorMessage(error, 'Unable to add this photo right now. Please try another photo.')
       );
     } finally {
       setIsAddingPhoto(false);
