@@ -29,6 +29,7 @@ import { getCoverImageSource } from '@/constants/coverImages';
 import { getAvatarSource } from '@/utils/avatar';
 import { formatDateTime, formatMiles, getPaceColor, getPaceLabel, openInMaps, getInitials, isToday, MapsApp } from '@/utils/helpers';
 import { getFriendlyErrorMessage } from '@/utils/errorMessages';
+import { hasUsableCoordinates } from '@/utils/coordinates';
 import { functions } from '@/utils/firebase';
 
 type RideWeather = {
@@ -56,14 +57,6 @@ const getRouteCoordinates = (start: { latitude: number; longitude: number }, end
   
   return points;
 };
-
-const hasUsableCoordinates = (location?: { latitude: number; longitude: number } | null) =>
-  !!location &&
-  Number.isFinite(location.latitude) &&
-  Number.isFinite(location.longitude) &&
-  Math.abs(location.latitude) <= 90 &&
-  Math.abs(location.longitude) <= 180 &&
-  !(location.latitude === 0 && location.longitude === 0);
 
 export default function RideDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -819,7 +812,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     height: '100%',
   },
   heroGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   backButton: {
     position: 'absolute',
@@ -1200,7 +1193,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     height: '100%',
   },
   photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
     justifyContent: 'center',

@@ -879,7 +879,7 @@ export default function MoreScreen() {
                         <LinearGradient
                           colors={['transparent', 'rgba(0,0,0,0.72)', 'rgba(0,0,0,0.95)']}
                           locations={[0.22, 0.68, 1]}
-                          style={StyleSheet.absoluteFillObject}
+                          style={StyleSheet.absoluteFill}
                         />
                         <View style={styles.bikePhotoCopy}>
                           <Text style={styles.bikeCardTitle} numberOfLines={1}>
@@ -1525,7 +1525,7 @@ const createStyles = (colors: AppColors) => StyleSheet.create({
     fontWeight: '800',
   },
   bikePhotoOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.18)',
     borderBottomWidth: 180,
     borderBottomColor: 'rgba(0,0,0,0.72)',
