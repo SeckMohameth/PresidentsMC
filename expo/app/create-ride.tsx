@@ -465,7 +465,7 @@ export default function CreateRideScreen() {
       if (__DEV__) {
         console.log('[CreateRide] Create ride error:', error);
       }
-      Alert.alert('Ride Error', 'Unable to save this ride right now.');
+      Alert.alert('Ride Error', getRideSaveErrorMessage(error));
     }
   };
 
