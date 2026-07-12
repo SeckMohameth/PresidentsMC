@@ -33,6 +33,8 @@ import {
   CrewAlbum,
 } from '@/types';
 import { calculateDistanceMiles } from '@/utils/helpers';
+import { resolveRideStatus } from '@/utils/rideStatus';
+import { assertAdminActiveAccess, deriveCrewAccess } from '@/utils/crewAccess';
 import { getDefaultRideCoverUri, normalizeCoverImageReference } from '@/constants/coverImages';
 import { isPersistedImageUri, uploadImageUri } from '@/utils/storageUpload';
 
@@ -79,39 +81,6 @@ async function deleteStoragePath(path: string) {
   }
 }
 
-// How long past its scheduled end a ride still counts as "happening" —
-// riders arrive late, check in at the meetup point, and post photos.
-const RIDE_ACTIVE_GRACE_MS = 2 * 60 * 60 * 1000;
-const DEFAULT_RIDE_DURATION_MS = 2 * 60 * 60 * 1000;
-
-function getRideDurationMs(ride: Pick<Ride, 'estimatedDuration' | 'routeDurationSeconds'>): number {
-  if (ride.routeDurationSeconds && Number.isFinite(ride.routeDurationSeconds)) {
-    return ride.routeDurationSeconds * 1000;
-  }
-  const match = /([\d.]+)\s*(hour|hr|h|minute|min|m)/i.exec(ride.estimatedDuration || '');
-  if (match) {
-    const value = parseFloat(match[1]);
-    if (Number.isFinite(value) && value > 0) {
-      return match[2].toLowerCase().startsWith('h') ? value * 3_600_000 : value * 60_000;
-    }
-  }
-  return DEFAULT_RIDE_DURATION_MS;
-}
-
-function resolveRideStatus(
-  ride: Pick<Ride, 'status' | 'dateTime' | 'estimatedDuration' | 'routeDurationSeconds'>
-): Ride['status'] {
-  if (ride.status !== 'upcoming') return ride.status;
-  const rideTime = new Date(ride.dateTime).getTime();
-  if (Number.isNaN(rideTime)) return ride.status;
-  const now = Date.now();
-  if (now < rideTime) return 'upcoming';
-  // Once the start time passes, the ride is ACTIVE (not completed) for its
-  // duration plus a grace window, so check-in and the ride chat stay open
-  // while the crew is actually out riding.
-  return now < rideTime + getRideDurationMs(ride) + RIDE_ACTIVE_GRACE_MS ? 'active' : 'completed';
-}
-
 export const [CrewProvider, useCrew] = createContextHook(() => {
   const { user } = useAuth();
   const crewId = user?.crewId || null;
@@ -128,36 +97,24 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
   const [isCreatingRide, setIsCreatingRide] = useState(false);
   const [statsHistory, setStatsHistory] = useState<CrewStatsSnapshot[]>([]);
 
-  const isAdmin = currentUser?.role === 'admin';
-  const isOfficer = currentUser?.role === 'officer';
-  const isDeveloperSupport = !!currentUser?.isDeveloperSupport;
-  const isOwner = !!currentUser?.id && crew?.ownerId === currentUser.id;
-  const permissions = currentUser?.permissions || {};
-  const subscriptionOwnerIsBillable = !!crew?.subscriptionOwnerId && allMembers.some(
-    (member) => member.id === crew.subscriptionOwnerId && !member.isDeveloperSupport
-  );
-  const isSubscriptionActive = subscriptionOwnerIsBillable && (
-    crew?.subscriptionStatus === 'active' || crew?.subscriptionStatus === 'trialing'
-  );
-  const isBillingRequired = crew?.billingRequired === true;
-  const canUseAdminTools = isAdmin || isOfficer || isDeveloperSupport;
-  const hasPaidFeatureAccess = !isBillingRequired || isSubscriptionActive;
-  const canManageRides =
-    isDeveloperSupport || ((isAdmin || isOfficer || permissions.manageRides === true) && hasPaidFeatureAccess);
-  const canManageAnnouncements =
-    isDeveloperSupport || isAdmin || isOfficer || permissions.manageAnnouncements === true;
-  const canManageAlbums =
-    isDeveloperSupport || ((isAdmin || isOfficer || permissions.manageAlbums === true) && hasPaidFeatureAccess);
-  const canManageJoinRequests =
-    isDeveloperSupport || isAdmin || isOfficer || permissions.manageJoinRequests === true;
-  const canPost = canManageRides || canManageAnnouncements;
+  const {
+    isAdmin,
+    isOfficer,
+    isDeveloperSupport,
+    isOwner,
+    isSubscriptionActive,
+    isBillingRequired,
+    canUseAdminTools,
+    hasPaidFeatureAccess,
+    canManageRides,
+    canManageAnnouncements,
+    canManageAlbums,
+    canManageJoinRequests,
+    canPost,
+  } = deriveCrewAccess(currentUser, crew, allMembers);
 
   const assertAdminActive = useCallback(() => {
-    if (isDeveloperSupport) return;
-    if (isOwner) return;
-    if (isBillingRequired && !isSubscriptionActive) {
-      throw new Error('SUBSCRIPTION_INACTIVE');
-    }
+    assertAdminActiveAccess({ isDeveloperSupport, isOwner, isBillingRequired, isSubscriptionActive });
   }, [isBillingRequired, isDeveloperSupport, isOwner, isSubscriptionActive]);
 
   const assertAdminOrOfficer = useCallback(() => {

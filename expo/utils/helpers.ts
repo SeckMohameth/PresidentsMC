@@ -1,5 +1,6 @@
 import { Linking, Platform } from 'react-native';
 import { Location } from '@/types';
+import { hasUsableCoordinates } from '@/utils/coordinates';
 
 export function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -81,14 +82,7 @@ export function getPaceLabel(pace: 'casual' | 'moderate' | 'spirited'): string {
 
 export type MapsApp = 'apple' | 'google' | 'waze';
 
-function isValidCoordinate(location?: Pick<Location, 'latitude' | 'longitude'> | null) {
-  return !!location &&
-    Number.isFinite(location.latitude) &&
-    Number.isFinite(location.longitude) &&
-    Math.abs(location.latitude) <= 90 &&
-    Math.abs(location.longitude) <= 180 &&
-    !(location.latitude === 0 && location.longitude === 0);
-}
+const isValidCoordinate = hasUsableCoordinates;
 
 function coordinateParam(location: Pick<Location, 'latitude' | 'longitude'>) {
   return `${location.latitude},${location.longitude}`;
@@ -164,6 +158,7 @@ export async function openInMaps(
 export function getInitials(name: string): string {
   return name
     .split(' ')
+    .filter(Boolean)
     .map(n => n[0])
     .join('')
     .toUpperCase()
