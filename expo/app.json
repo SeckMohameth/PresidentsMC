@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "PresidentsMC",
+    "name": "Wheels of Soul MC",
     "slug": "presidentsmc",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "presidentsmc",
@@ -12,18 +12,16 @@
       "bundleIdentifier": "app.mostudios.presidentsmc",
       "buildNumber": "15",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow PresidentsMC to access your photos to upload ride photos and update your profile picture.",
-        "NSCameraUsageDescription": "Allow PresidentsMC to use your camera for profile photos and ride photos.",
-        "NSLocationWhenInUseUsageDescription": "Allow PresidentsMC to access your location for ride check-ins and route details.",
+        "NSPhotoLibraryUsageDescription": "Allow Wheels of Soul MC to access your photos to upload ride photos and update your profile picture.",
+        "NSCameraUsageDescription": "Allow Wheels of Soul MC to use your camera for profile photos and ride photos.",
+        "NSLocationWhenInUseUsageDescription": "Allow Wheels of Soul MC to access your location for ride check-ins and route details.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon-android-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png",
-        "backgroundColor": "#050505"
+        "backgroundColor": "#000000"
       },
       "package": "app.mostudios.presidentsmc",
       "versionCode": 1
@@ -38,21 +36,21 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow PresidentsMC to access your photos to upload ride photos, club images, and profile pictures.",
-          "cameraPermission": "Allow PresidentsMC to use your camera for profile photos and ride photos."
+          "photosPermission": "Allow Wheels of Soul MC to access your photos to upload ride photos, club images, and profile pictures.",
+          "cameraPermission": "Allow Wheels of Soul MC to use your camera for profile photos and ride photos."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow PresidentsMC to access your photos to add them to shared ride albums.",
-          "savePhotosPermission": "Allow PresidentsMC to save photos to your library."
+          "photosPermission": "Allow Wheels of Soul MC to access your photos to add them to shared ride albums.",
+          "savePhotosPermission": "Allow Wheels of Soul MC to save photos to your library."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow PresidentsMC to access your location for ride check-ins."
+          "locationWhenInUsePermission": "Allow Wheels of Soul MC to access your location for ride check-ins."
         }
       ],
       "expo-web-browser",
@@ -62,9 +60,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#050505",
+          "backgroundColor": "#000000",
           "dark": {
-            "backgroundColor": "#050505"
+            "backgroundColor": "#000000"
           }
         }
       ],

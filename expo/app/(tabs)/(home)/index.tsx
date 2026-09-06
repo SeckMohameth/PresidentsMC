@@ -71,7 +71,7 @@ export default function HomeScreen() {
           <View style={[styles.heroTop, { paddingTop: insets.top + 8 }]}>
             <View>
               <Text style={styles.eyebrow}>Private Club</Text>
-              <Text style={styles.crewName}>{crew?.name || 'PresidentsMC'}</Text>
+              <Text style={styles.crewName}>{crew?.name || 'Wheels of Soul MC'}</Text>
             </View>
             <Pressable style={styles.profileButton} onPress={() => router.push('/(tabs)/more')}>
               {currentUser?.avatar ? (

@@ -1,0 +1,36 @@
+# Repository metadata and dependencies
+.git/
+node_modules/
+expo/node_modules/
+expo/.expo/
+expo/.rork/
+expo/.vercel/
+
+# Generated native and web output
+expo/android/
+expo/ios/
+expo/dist/
+expo/web-build/
+expo/expo-env.d.ts
+*.tsbuildinfo
+
+# Secrets, signing files, logs, and editor metadata
+.env
+.env*.local
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+*.orig.*
+*.log
+.DS_Store
+
+# Not required to compile the mobile application
+expo/docs/
+expo/functions/
+
+# The app uses the resized images under custom-images/optimized/.
+expo/assets/images/custom-images/*.jpg
+expo/assets/images/waiting-room.jpg

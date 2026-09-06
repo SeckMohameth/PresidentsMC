@@ -505,7 +505,7 @@ export default function CreateCrewPaywallScreen() {
                 style={styles.heroImageOverlay}
               />
               <View style={styles.heroTextContainer}>
-                <Text style={styles.heroEyebrow}>PresidentsMC Pro</Text>
+                <Text style={styles.heroEyebrow}>Wheels of Soul MC Pro</Text>
                 <Text style={styles.heroTitle}>Become a Crew Admin</Text>
                 <Text style={styles.heroSubtitle}>
                   Create and manage your own private crew. Members always join free.

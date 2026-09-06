@@ -1,6 +1,6 @@
-# PresidentsMC
+# Wheels of Soul MC
 
-PresidentsMC is a private motorcycle club app made for a local biker club based in New Haven, Connecticut, with chapters in other Connecticut cities.
+Wheels of Soul MC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
 
 The club wanted one place to coordinate rides, approve members, post announcements, share photos, and keep track of road memories without using a mix of group chats and social media.
 

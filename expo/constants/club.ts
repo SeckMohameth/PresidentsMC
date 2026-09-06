@@ -1,5 +1,5 @@
 export const CLUB_ID = process.env.EXPO_PUBLIC_CLUB_ID || 'presidents-mc';
-export const CLUB_NAME = process.env.EXPO_PUBLIC_CLUB_NAME || 'PresidentsMC';
+export const CLUB_NAME = process.env.EXPO_PUBLIC_CLUB_NAME || 'Wheels of Soul MC';
 export const CLUB_DESCRIPTION =
   process.env.EXPO_PUBLIC_CLUB_DESCRIPTION ||
   'Private biker club rides, announcements, members, photos, and stats.';

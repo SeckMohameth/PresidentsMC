@@ -1,6 +1,6 @@
-# PresidentsMC
+# Wheels of Soul MC
 
-PresidentsMC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
+Wheels of Soul MC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
 
 This folder contains the Expo app. See the root [README](../README.md) for the public project overview.
 
