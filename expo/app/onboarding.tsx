@@ -10,6 +10,7 @@ import { CLUB_NAME } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 
 const heroImage = require('../assets/images/crew-image-mc.avif');
+const brandLogo = require('../assets/images/app-icon.png');
 
 export default function OnboardingScreen() {
   const { completeOnboarding } = useAuth();
@@ -49,10 +50,7 @@ export default function OnboardingScreen() {
 
       <SafeAreaView style={styles.safeArea}>
         <Animated.View style={[styles.logoRow, { opacity: logoOpacity }]}>
-          <Text style={styles.logoText}>P</Text>
-          <View style={styles.logoPill}>
-            <Text style={styles.logoPillText}>MC</Text>
-          </View>
+          <Image source={brandLogo} style={styles.brandLogo} contentFit="contain" />
         </Animated.View>
 
         <View style={styles.content}>
@@ -110,29 +108,17 @@ const styles = StyleSheet.create({
   logoRow: {
     alignSelf: 'center',
     marginTop: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    width: 88,
+    height: 88,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#000',
   },
-  logoText: {
-    color: Colors.dark.text,
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 0,
-  },
-  logoPill: {
-    minWidth: 52,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.dark.text,
-  },
-  logoPillText: {
-    color: Colors.dark.background,
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0,
+  brandLogo: {
+    width: '100%',
+    height: '100%',
   },
   content: {
     paddingHorizontal: 26,

@@ -37,6 +37,7 @@ import { resolveRideStatus } from '@/utils/rideStatus';
 import { assertAdminActiveAccess, deriveCrewAccess } from '@/utils/crewAccess';
 import { getDefaultRideCoverUri, normalizeCoverImageReference } from '@/constants/coverImages';
 import { isPersistedImageUri, uploadImageUri } from '@/utils/storageUpload';
+import { getClubDisplayName } from '@/constants/club';
 
 export type InviteCodeSettings = {
   inviteCode: string;
@@ -172,6 +173,7 @@ export const [CrewProvider, useCrew] = createContextHook(() => {
       }
       setCrew({
         ...data,
+        name: getClubDisplayName(data.name),
         createdAt: normalizeDate(data.createdAt),
       });
     });

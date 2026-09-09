@@ -4,6 +4,18 @@ export const CLUB_DESCRIPTION =
   process.env.EXPO_PUBLIC_CLUB_DESCRIPTION ||
   'Private biker club rides, announcements, members, photos, and stats.';
 
+export function getClubDisplayName(name?: string | null) {
+  const trimmedName = name?.trim();
+  if (!trimmedName) return CLUB_NAME;
+
+  const normalizedName = trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (normalizedName === 'presidentsmc' || normalizedName === 'pmc') {
+    return CLUB_NAME;
+  }
+
+  return trimmedName;
+}
+
 export const OWNER_EMAILS = (process.env.EXPO_PUBLIC_OWNER_EMAILS || '')
   .split(',')
   .map((email) => email.trim().toLowerCase())

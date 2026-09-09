@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, Hash, LogOut, ShieldCheck, Trash2, UserPlus } from 'lucide-react-native';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { AppColors, useThemeColors } from '@/constants/colors';
-import { CLUB_ID, CLUB_NAME } from '@/constants/club';
+import { CLUB_ID, CLUB_NAME, getClubDisplayName } from '@/constants/club';
 import { useAuth } from '@/providers/AuthProvider';
 import { db } from '@/utils/firebase';
 import { getFriendlyErrorMessage } from '@/utils/errorMessages';
@@ -43,7 +43,7 @@ export default function CrewSelectionScreen() {
     getDoc(doc(db, 'crews', CLUB_ID))
       .then((snap) => {
         if (snap.exists()) {
-          setClubName((snap.data() as { name?: string }).name || CLUB_NAME);
+          setClubName(getClubDisplayName((snap.data() as { name?: string }).name));
         }
       })
       .catch(() => setClubName(CLUB_NAME));
@@ -125,7 +125,7 @@ export default function CrewSelectionScreen() {
     try {
       const result = await requestJoin(CLUB_ID);
       if (result?.status === 'approved') {
-        Alert.alert('Access Granted', `You are now in ${result.crewName || clubName}.`);
+        Alert.alert('Access Granted', `You are now in ${getClubDisplayName(result.crewName || clubName)}.`);
         return;
       }
       Alert.alert('Request Sent', `Your request to join ${clubName} is waiting for admin approval.`);

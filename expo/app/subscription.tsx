@@ -211,7 +211,7 @@ export default function SubscriptionScreen() {
     if (!selectedPackage) {
       Alert.alert(
         'Store Setup Needed',
-        'The subscription products are not available from Apple yet. In RevenueCat, attach the Apple monthly/yearly products to the PresidentsMC Pro entitlement and current offering, then make sure App Store Connect subscription metadata is complete.'
+        'The subscription products are not available from Apple yet. In RevenueCat, attach the Apple monthly/yearly products to the configured Pro entitlement and current offering, then make sure App Store Connect subscription metadata is complete.'
       );
       setIsPresentingPaywall(false);
       return;
