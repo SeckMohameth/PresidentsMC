@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Wheels of Soul MC",
+    "name": "Crew: Bike Clubs & Rides",
     "slug": "presidentsmc",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon.png",
     "scheme": "presidentsmc",
@@ -12,9 +12,9 @@
       "bundleIdentifier": "app.mostudios.presidentsmc",
       "buildNumber": "15",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow Wheels of Soul MC to access your photos to upload ride photos and update your profile picture.",
-        "NSCameraUsageDescription": "Allow Wheels of Soul MC to use your camera for profile photos and ride photos.",
-        "NSLocationWhenInUseUsageDescription": "Allow Wheels of Soul MC to access your location for ride check-ins and route details.",
+        "NSPhotoLibraryUsageDescription": "Allow Crew: Bike Clubs & Rides to access your photos to upload ride photos and update your profile picture.",
+        "NSCameraUsageDescription": "Allow Crew: Bike Clubs & Rides to use your camera for profile photos and ride photos.",
+        "NSLocationWhenInUseUsageDescription": "Allow Crew: Bike Clubs & Rides to access your location for ride check-ins and route details.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -36,21 +36,21 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Wheels of Soul MC to access your photos to upload ride photos, club images, and profile pictures.",
-          "cameraPermission": "Allow Wheels of Soul MC to use your camera for profile photos and ride photos."
+          "photosPermission": "Allow Crew: Bike Clubs & Rides to access your photos to upload ride photos, club images, and profile pictures.",
+          "cameraPermission": "Allow Crew: Bike Clubs & Rides to use your camera for profile photos and ride photos."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Wheels of Soul MC to access your photos to add them to shared ride albums.",
-          "savePhotosPermission": "Allow Wheels of Soul MC to save photos to your library."
+          "photosPermission": "Allow Crew: Bike Clubs & Rides to access your photos to add them to shared ride albums.",
+          "savePhotosPermission": "Allow Crew: Bike Clubs & Rides to save photos to your library."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Wheels of Soul MC to access your location for ride check-ins."
+          "locationWhenInUsePermission": "Allow Crew: Bike Clubs & Rides to access your location for ride check-ins."
         }
       ],
       "expo-web-browser",

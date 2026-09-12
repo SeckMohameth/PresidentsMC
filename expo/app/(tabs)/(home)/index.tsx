@@ -13,6 +13,7 @@ import AnnouncementCard from '@/components/AnnouncementCard';
 import RideCard from '@/components/RideCard';
 import { getAvatarSource } from '@/utils/avatar';
 import { getFriendlyErrorMessage } from '@/utils/errorMessages';
+import { getClubDisplayName } from '@/constants/club';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -71,7 +72,7 @@ export default function HomeScreen() {
           <View style={[styles.heroTop, { paddingTop: insets.top + 8 }]}>
             <View>
               <Text style={styles.eyebrow}>Private Club</Text>
-              <Text style={styles.crewName}>{crew?.name || 'Wheels of Soul MC'}</Text>
+              <Text style={styles.crewName}>{getClubDisplayName(crew?.name)}</Text>
             </View>
             <Pressable style={styles.profileButton} onPress={() => router.push('/(tabs)/more')}>
               {currentUser?.avatar ? (

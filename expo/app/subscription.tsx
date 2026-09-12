@@ -249,7 +249,7 @@ export default function SubscriptionScreen() {
           route: '/subscription',
           properties: { selectedPlan },
         });
-        Alert.alert('Subscription Active', 'Wheels of Soul MC Pro is active for this account.');
+        Alert.alert('Subscription Active', 'Crew Pro is active for this account.');
         return;
       }
 
@@ -328,7 +328,7 @@ export default function SubscriptionScreen() {
             <Shield size={32} color={colors.textTertiary} />
             <Text style={styles.accessDeniedTitle}>Admins Only</Text>
             <Text style={styles.accessDeniedText}>
-              Members never need to subscribe. A club admin handles Wheels of Soul MC Pro for the club.
+              Members never need to subscribe. A club admin handles Crew Pro for the club.
             </Text>
           </View>
         </SafeAreaView>
@@ -369,7 +369,7 @@ export default function SubscriptionScreen() {
                 style={styles.heroImageOverlay}
               />
               <View style={styles.heroTextContainer}>
-                <Text style={styles.heroEyebrow}>Wheels of Soul MC Pro</Text>
+                <Text style={styles.heroEyebrow}>Crew Pro</Text>
                 <Text style={styles.heroTitle}>Keep the club connected.</Text>
                 <Text style={styles.heroSubtitle}>
                   One active club admin subscription supports private rides, announcements, photos, members, and stats.

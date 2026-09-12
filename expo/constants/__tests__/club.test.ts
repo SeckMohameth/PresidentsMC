@@ -8,6 +8,10 @@ describe('getClubDisplayName', () => {
     }
   );
 
+  it('replaces the retired Wheels of Soul club name', () => {
+    expect(getClubDisplayName('Wheels of Soul MC')).toBe('Crew: Bike Clubs & Rides');
+  });
+
   it('preserves a genuinely customized club name', () => {
     expect(getClubDisplayName('Wheels of Soul Baltimore')).toBe('Wheels of Soul Baltimore');
   });

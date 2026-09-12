@@ -1,6 +1,6 @@
-# Wheels of Soul MC
+# Crew: Bike Clubs & Rides
 
-Wheels of Soul MC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
+Crew: Bike Clubs & Rides is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
 
 This folder contains the Expo app. See the root [README](../README.md) for the public project overview.
 
