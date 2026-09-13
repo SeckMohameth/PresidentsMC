@@ -1,17 +1,17 @@
-# Crew: Bike Clubs & Rides
+# Wheels of Soul MC
 
-Crew: Bike Clubs & Rides is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
+Wheels of Soul MC is a private motorcycle club app for rides, announcements, members, shared albums, club stats, and road memories.
 
 The club wanted one place to coordinate rides, approve members, post announcements, share photos, and keep track of road memories without using a mix of group chats and social media.
 
 ## Screenshots
 
 <p>
-  <img src="./expo/docs/screenshots/onboarding.png" alt="Crew onboarding screen" width="220" />
-  <img src="./expo/docs/screenshots/home.png" alt="Crew home screen" width="220" />
-  <img src="./expo/docs/screenshots/rides.png" alt="Crew rides screen" width="220" />
-  <img src="./expo/docs/screenshots/albums.png" alt="Crew albums screen" width="220" />
-  <img src="./expo/docs/screenshots/announcements.png" alt="Crew announcements screen" width="220" />
+  <img src="./expo/docs/screenshots/onboarding.png" alt="PresidentsMC onboarding screen" width="220" />
+  <img src="./expo/docs/screenshots/home.png" alt="PresidentsMC home screen" width="220" />
+  <img src="./expo/docs/screenshots/rides.png" alt="PresidentsMC rides screen" width="220" />
+  <img src="./expo/docs/screenshots/albums.png" alt="PresidentsMC albums screen" width="220" />
+  <img src="./expo/docs/screenshots/announcements.png" alt="PresidentsMC announcements screen" width="220" />
 </p>
 
 ## What It Does
